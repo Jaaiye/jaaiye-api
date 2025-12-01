@@ -14,8 +14,6 @@ const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./utils/asyncHandler');
 const logger = require('./utils/logger');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpecs = require('./config/swagger');
 
 // Load environment variables
 dotenv.config();
@@ -80,13 +78,48 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Health check endpoint
-app.get('/health', (req, res, next) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+// Health check endpoints
+app.get('/health', (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : dbState === 3 ? 'disconnecting' : 'disconnected';
+
+    const memoryUsage = process.memoryUsage();
+    const memoryMB = {
+      rss: Math.round(memoryUsage.rss / 1024 / 1024),
+      heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+      heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+      external: Math.round(memoryUsage.external / 1024 / 1024)
+    };
+
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      database: {
+        status: dbStatus,
+        connectionState: dbState,
+        name: mongoose.connection.name,
+        host: mongoose.connection.host,
+        port: mongoose.connection.port
+      },
+      memory: {
+        usage: memoryMB,
+        percentage: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100)
+      },
+      nodeVersion: process.version,
+      platform: process.platform
+    });
+  } catch (error) {
+    logger.error('Health check failed', error);
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 app.get('/test-cors', (req, res) => {
@@ -95,28 +128,22 @@ app.get('/test-cors', (req, res) => {
 
 app.use('/webhooks', require('./routes/webhookRoutes'));
 
-// Swagger docs (mounted before API key enforcement)
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
-
 // Apply API key validation to all other routes
 app.use(validateMobileApiKey);
 
 // Routes
-app.use('/api/v1/auth', require('./routes/authRoutes'));
-app.use('/api/v1/users', require('./routes/userRoutes'));
-app.use('/api/v1/admin', require('./routes/adminRoutes'));
-app.use('/api/v1/analytics', require('./routes/analyticsRoutes'));
-app.use('/api/v1/calendars', require('./routes/calendarRoutes'));
-app.use('/api/v1/events', require('./routes/eventRoutes'));
-app.use('/api/v1/notifications', require('./routes/notificationRoutes'));
-app.use('/api/v1/health', require('./routes/healthRoutes'));
-app.use('/api/v1/google', require('./routes/googleRoutes'));
+app.use('/api/v1/auth', require('./domains/auth/config/container').getAuthRoutes());
+app.use('/api/v1/users', require('./domains/user/config/container').getUserRoutes());
+app.use('/api/v1/admin', require('./domains/admin/config/container').getAdminRoutes());
+app.use('/api/v1/analytics', require('./domains/analytics/config/container').getAnalyticsRoutes());
+app.use('/api/v1/calendars', require('./domains/calendar/config/container').getCalendarRoutes());
+app.use('/api/v1/events', require('./domains/event/config/container').getEventRoutes());
+app.use('/api/v1/notifications', require('./domains/notification/config/container').getNotificationRoutes());
 app.use('/api/v1/ics', require('./routes/icsRoutes'));
-app.use('/api/v1/calendar-shares', require('./routes/calendarShareRoutes'));
-app.use('/api/v1/groups', require('./routes/groupRoutes'));
-app.use('/api/v1/tickets', require('./routes/ticketRoutes'));
-app.use('/api/v1/transactions', require('./routes/transactionRoutes'));
-app.use('/api/v1/payments', require('./routes/paymentRoutes'));
+app.use('/api/v1/groups', require('./domains/group/config/container').getGroupRoutes());
+app.use('/api/v1/tickets', require('./domains/ticket/config/container').getTicketRoutes());
+app.use('/api/v1/transactions', require('./domains/payment/config/container').getTransactionRoutes());
+app.use('/api/v1/payments', require('./domains/payment/config/container').getPaymentRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
 
 // 404 handler

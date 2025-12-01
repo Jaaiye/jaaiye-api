@@ -29,6 +29,20 @@ class AuthorizationError extends AppError {
   }
 }
 
+class ForbiddenError extends AppError {
+  constructor(message) {
+    super(message, 403);
+    this.name = 'ForbiddenError';
+  }
+}
+
+class BadRequestError extends AppError {
+  constructor(message) {
+    super(message, 400);
+    this.name = 'BadRequestError';
+  }
+}
+
 class NotFoundError extends AppError {
   constructor(message) {
     super(message, 404);
@@ -133,6 +147,8 @@ module.exports = {
   ValidationError,
   AuthenticationError,
   AuthorizationError,
+  ForbiddenError,
+  BadRequestError,
   NotFoundError,
   ConflictError,
   RateLimitError,

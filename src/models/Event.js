@@ -45,7 +45,7 @@ const eventSchema = new mongoose.Schema({
   category: {
     type: String,
     enum: ['hangout', 'event'],
-    default: 'event'
+    default: 'hangout'
   },
   privacy: {
     type: String,
@@ -218,6 +218,15 @@ eventSchema.statics.findByCategory = function(category) {
   return this.find({ category, status: 'scheduled' }).sort({ startTime: 1 });
 };
 
+// Ensure hangouts remain ticketless
+eventSchema.pre('validate', function(next) {
+  if (this.category === 'hangout') {
+    this.ticketTypes = [];
+    this.ticketFee = null;
+  }
+  next();
+});
+
 // Generate slug from title before saving
 eventSchema.pre('save', async function(next) {
   if (this.isModified('title') || !this.slug) {
@@ -267,6 +276,4 @@ eventSchema.index({ category: 1 });
 eventSchema.index({ attendeeCount: 1 });
 eventSchema.index({ slug: 1 });
 
-const Event = mongoose.model('Event', eventSchema);
-
-module.exports = Event;
+module.exports = mongoose.models.Event || mongoose.model('Event', eventSchema);

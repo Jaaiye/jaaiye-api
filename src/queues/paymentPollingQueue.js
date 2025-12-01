@@ -1,17 +1,39 @@
+/**
+ * Payment Polling Queue
+ * Background job to poll payment providers for pending transactions
+ * Uses new Payment domain services
+ */
+
 const logger = require('../utils/logger');
-const flutterwaveService = require('../services/flutterwaveService');
-const paystackService = require('../services/paystackService');
-const payazaService = require('../services/payazaService');
-const monnifyService = require('../services/monnifyService');
+const paymentContainer = require('../domains/payment/config/container');
+const { PollPendingTransactionsUseCase } = require('../domains/payment/application/use-cases');
 
 class PaymentPollingQueue {
   constructor() {
     this.isRunning = false;
     this.intervalId = null;
-    // Default to 10 minutes; can be overridden via env
+    // Default to 3 minutes; can be overridden via env
     const defaultInterval = 3 * 60 * 1000;
     const envInterval = Number(process.env.PAYMENT_POLL_INTERVAL_MS);
     this.pollingInterval = Number.isFinite(envInterval) && envInterval > 0 ? envInterval : defaultInterval;
+    this._pollUseCase = null;
+  }
+
+  /**
+   * Initialize polling use case
+   */
+  _getPollUseCase() {
+    if (!this._pollUseCase) {
+      this._pollUseCase = new PollPendingTransactionsUseCase({
+        transactionRepository: paymentContainer.getTransactionRepository(),
+        paystackAdapter: paymentContainer.getPaystackAdapter(),
+        flutterwaveAdapter: paymentContainer.getFlutterwaveAdapter(),
+        payazaAdapter: paymentContainer.getPayazaAdapter(),
+        monnifyAdapter: paymentContainer.getMonnifyAdapter(),
+        paymentService: paymentContainer.getPaymentService()
+      });
+    }
+    return this._pollUseCase;
   }
 
   // Start the polling job
@@ -50,31 +72,8 @@ class PaymentPollingQueue {
 
   // Poll for pending transactions
   async pollPendingTransactions() {
-    try {
-      logger.info('Starting payment polling job');
-
-      // ⚠️ IMPORTANT: These polling calls make external API requests
-      // but DO NOT count against user rate limits since they:
-      // 1. Run server-side (not via user HTTP requests)
-      // 2. Use server IP (not user IP)
-      // 3. Call payment provider APIs (not our API endpoints)
-
-      // Poll Flutterwave pending transactions
-      await flutterwaveService.pollPendingTransactions();
-
-      // Poll Paystack pending transactions (if similar function exists)
-      // await paystackService.pollPendingTransactions();
-
-      // Poll Payaza pending transactions (if similar function exists)
-      await payazaService.pollPendingTransactions();
-
-      // Poll Monnify pending transactions (if similar function exists)
-      await monnifyService.pollPendingTransactions();
-
-      logger.info('Payment polling job completed successfully');
-    } catch (error) {
-      logger.error('Error in payment polling job:', error);
-    }
+    const useCase = this._getPollUseCase();
+    await useCase.execute();
   }
 
   // Get queue status

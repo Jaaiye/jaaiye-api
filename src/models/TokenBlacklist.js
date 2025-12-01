@@ -5,4 +5,5 @@ const blacklistSchema = new mongoose.Schema({
   expiresAt: { type: Date, expires: 0 } // Auto-delete when expiresAt passes
 });
 
-module.exports = mongoose.model('TokenBlacklist', blacklistSchema);
+// Export model (check if already compiled to avoid overwrite errors)
+module.exports = mongoose.models.TokenBlacklist || mongoose.model('TokenBlacklist', blacklistSchema);

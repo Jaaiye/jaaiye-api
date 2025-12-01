@@ -1,4 +1,29 @@
-const { generateTicketQRCode } = require('../utils/qrGenerator');
+// QR code generation moved to QRCodeAdapter in Ticket domain
+// For legacy compatibility, using QRCode directly
+const QRCode = require('qrcode');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.QR_TOKEN_SECRET || 'supersecretkey';
+const APP_URL = process.env.ADMIN_ORIGIN || 'https://api.jaaiye.com';
+
+async function generateTicketQRCode(ticket) {
+  const payload = {
+    ticketId: ticket._id,
+    eventId: ticket.eventId,
+    userId: ticket.userId,
+    type: 'ticket',
+  };
+  const token = jwt.sign(payload, JWT_SECRET);
+  const verifyUrl = `${APP_URL}/tickets/verify?token=${token}`;
+  const qrCode = await QRCode.toDataURL(verifyUrl, {
+    errorCorrectionLevel: 'M',
+    type: 'image/png',
+    quality: 0.92,
+    margin: 1,
+    color: { dark: '#000000', light: '#FFFFFF' }
+  });
+  return { qrCode, token, verifyUrl };
+}
 const Ticket = require('../models/Ticket');
 const Event = require('../models/Event');
 const { ValidationError, NotFoundError, ConflictError } = require('../middleware/errorHandler');

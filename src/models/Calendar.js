@@ -60,6 +60,5 @@ calendarSchema.pre('validate', function(next) {
 calendarSchema.index({ owner: 1 }, { unique: true }); // enforce one calendar per user
 calendarSchema.index({ isDefault: 1 });
 
-const Calendar = mongoose.model('Calendar', calendarSchema);
-
-module.exports = Calendar;
+// Export model (check if already compiled to avoid overwrite errors)
+module.exports = mongoose.models.Calendar || mongoose.model('Calendar', calendarSchema);

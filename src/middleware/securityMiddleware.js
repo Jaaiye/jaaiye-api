@@ -1,6 +1,5 @@
 const rateLimit = require('express-rate-limit');
-const { generateDeviceFingerprint, rateLimitKey } = require('../services/authService');
-const User = require('../models/User');
+const { generateDeviceFingerprint, rateLimitKey } = require('../utils/securityUtils');
 
 // Rate limiting
 exports.apiLimiter = rateLimit({
@@ -11,7 +10,11 @@ exports.apiLimiter = rateLimit({
 });
 
 // API Key validation
+// Note: ApiKey is a separate model, not a User field
+// This middleware uses the legacy ApiKey model for now
+// TODO: Migrate to ApiKeyRepository when ApiKey domain is created
 exports.validateApiKey = async (req, res, next) => {
+  const ApiKey = require('../models/ApiKey');
   const apiKey = req.headers['x-api-key'];
 
   if (!apiKey) {
@@ -22,15 +25,24 @@ exports.validateApiKey = async (req, res, next) => {
   }
 
   try {
-    const user = await User.findOne({ apiKey });
-    if (!user) {
+    const validKey = await ApiKey.findOne({
+      key: apiKey,
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!validKey) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid API key'
+        error: 'Invalid or expired API key'
       });
     }
 
-    req.user = user;
+    // Update last used timestamp
+    validKey.lastUsed = new Date();
+    await validKey.save();
+
+    req.apiKey = validKey;
     next();
   } catch(error) {
     res.status(500).json({

@@ -1,12 +1,18 @@
+/**
+ * ICS Routes
+ * Infrastructure layer - iCalendar feed generation
+ * Uses new domain repositories
+ */
+
 const express = require('express');
 const router = express.Router();
 const ics = require('ics');
 const crypto = require('crypto');
-const User = require('../models/User');
-const Event = require('../models/Event');
 const { successResponse, errorResponse } = require('../utils/response');
 const { protect } = require('../middleware/authMiddleware');
 const { apiLimiter } = require('../middleware/securityMiddleware');
+const sharedContainer = require('../domains/shared/config/container');
+const calendarContainer = require('../domains/calendar/config/container');
 
 // Helper to build feed URL
 function buildFeedUrl(req, userId, token) {
@@ -17,16 +23,21 @@ function buildFeedUrl(req, userId, token) {
 // Protected: issue ICS token if not present
 router.post('/token/issue', apiLimiter, protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id || req.user.id).select('+ics.token');
-    if (!user) return errorResponse(res, new Error('User not found'), 404);
-    if (!user.ics) user.ics = {};
-    if (!user.ics.token) {
-      user.ics.token = crypto.randomBytes(24).toString('hex');
-      await user.save();
-      const feedUrl = buildFeedUrl(req, user.id || user._id, user.ics.token);
-      return successResponse(res, { token: user.ics.token, feedUrl }, 201, 'ICS token issued');
+    const userRepository = sharedContainer.getUserRepository();
+    const user = await userRepository.findByIdWithICSToken(req.user._id || req.user.id);
+
+    if (!user) {
+      return errorResponse(res, new Error('User not found'), 404);
     }
-    const feedUrl = buildFeedUrl(req, user.id || user._id, user.ics.token);
+
+    if (!user.ics || !user.ics.token) {
+      const token = crypto.randomBytes(24).toString('hex');
+      await userRepository.setICSToken(user.id, token);
+      const feedUrl = buildFeedUrl(req, user.id, token);
+      return successResponse(res, { token, feedUrl }, 201, 'ICS token issued');
+    }
+
+    const feedUrl = buildFeedUrl(req, user.id, user.ics.token);
     return successResponse(res, { token: user.ics.token, feedUrl }, 200, 'ICS token already exists');
   } catch (err) {
     return errorResponse(res, err, 400);
@@ -36,13 +47,17 @@ router.post('/token/issue', apiLimiter, protect, async (req, res) => {
 // Protected: rotate ICS token (invalidate previous)
 router.post('/token/rotate', apiLimiter, protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id || req.user.id).select('+ics.token');
-    if (!user) return errorResponse(res, new Error('User not found'), 404);
-    if (!user.ics) user.ics = {};
-    user.ics.token = crypto.randomBytes(24).toString('hex');
-    await user.save();
-    const feedUrl = buildFeedUrl(req, user.id || user._id, user.ics.token);
-    return successResponse(res, { token: user.ics.token, feedUrl }, 200, 'ICS token rotated');
+    const userRepository = sharedContainer.getUserRepository();
+    const user = await userRepository.findByIdWithICSToken(req.user._id || req.user.id);
+
+    if (!user) {
+      return errorResponse(res, new Error('User not found'), 404);
+    }
+
+    const token = crypto.randomBytes(24).toString('hex');
+    await userRepository.setICSToken(user.id, token);
+    const feedUrl = buildFeedUrl(req, user.id, token);
+    return successResponse(res, { token, feedUrl }, 200, 'ICS token rotated');
   } catch (err) {
     return errorResponse(res, err, 400);
   }
@@ -53,29 +68,37 @@ router.get('/unified/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { token } = req.query;
-    const user = await User.findById(userId).select('+ics.token');
+
+    const userRepository = sharedContainer.getUserRepository();
+    const calendarRepository = calendarContainer.getCalendarRepository();
+
+    const user = await userRepository.findByIdWithICSToken(userId);
     if (!user || !user.ics?.token || user.ics.token !== token) {
       return errorResponse(res, new Error('Unauthorized'), 401);
     }
 
-    // Get events from our DB (could be extended to fetch provider in real-time if needed)
+    // Get calendars accessible by user
+    const calendars = await calendarRepository.findAccessibleByUser(userId);
+    const calendarIds = calendars.map(c => c.id);
+
+    // Get events from calendars
     const now = new Date();
     const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const calendars = await require('../models/Calendar').find({
-      $or: [ { owner: userId }, { 'sharedWith.user': userId } ]
-    });
-    const events = await Event.find({
-      calendar: { $in: calendars.map(c => c._id) },
+
+    // Use EventSchema directly for complex MongoDB queries
+    const EventSchema = require('../domains/event/infrastructure/persistence/schemas/Event.schema');
+    const events = await EventSchema.find({
+      calendar: { $in: calendarIds },
       startTime: { $gte: now },
       endTime: { $lte: future }
-    });
+    }).lean();
 
     const icsEvents = events.map(ev => ({
       title: ev.title,
-      description: ev.description,
-      location: ev.location,
+      description: ev.description || '',
+      location: ev.location || '',
       start: toIcsArray(ev.startTime),
-      end: toIcsArray(ev.endTime)
+      end: toIcsArray(ev.endTime || ev.startTime)
     }));
 
     ics.createEvents(icsEvents, (error, value) => {

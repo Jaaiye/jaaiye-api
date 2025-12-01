@@ -1,9 +1,14 @@
+/**
+ * Webhook Routes
+ * Infrastructure layer - external webhook handlers
+ * Uses new domain repositories
+ */
+
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
-const { successResponse, errorResponse } = require('../utils/response');
 const { syncQueue } = require('../queues');
-const PaymentController = require('../controllers/paymentController');
+const paymentContainer = require('../domains/payment/config/container');
+const sharedContainer = require('../domains/shared/config/container');
 
 // Google Calendar webhook
 // POST /webhooks/google/calendar
@@ -24,9 +29,17 @@ router.post('/google/calendar', async (req, res) => {
     }
 
     // Find the user who has this resource/channel registered
-    const user = await User.findOne({ 'googleCalendar.calendars.resourceId': resourceId });
+    const userRepository = sharedContainer.getUserRepository();
+    const user = await userRepository.findByGoogleCalendarResourceId(resourceId);
+
     if (user) {
-      syncQueue.add({ type: 'googleIncrementalSync', userId: user._id.toString(), resourceId, channelId, state });
+      syncQueue.add({
+        type: 'googleIncrementalSync',
+        userId: user.id,
+        resourceId,
+        channelId,
+        state
+      });
     }
 
     return res.status(200).end();
@@ -35,37 +48,10 @@ router.post('/google/calendar', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * tags:
- *   name: Webhooks
- *   description: External webhook endpoints
- */
-
-/**
- * @swagger
- * /webhooks/paystack:
- *   post:
- *     summary: Paystack webhook receiver
- *     tags: [Webhooks]
- *     responses:
- *       200:
- *         description: Acknowledged
- */
 // Paystack webhook
-router.post('/paystack', express.json({ type: '*/*' }), PaymentController.handlePaystackWebhook);
+router.post('/paystack', express.json({ type: '*/*' }), paymentContainer.getPaymentController().handlePaystackWebhook);
 
-/**
- * @swagger
- * /webhooks/flutterwave:
- *   post:
- *     summary: Flutterwave webhook receiver
- *     tags: [Webhooks]
- *     responses:
- *       200:
- *         description: Acknowledged
- */
 // Flutterwave webhook
-router.post('/flutterwave', express.json({ type: '*/*' }), PaymentController.handleFlutterwaveWebhook);
+router.post('/flutterwave', express.json({ type: '*/*' }), paymentContainer.getPaymentController().handleFlutterwaveWebhook);
 
 module.exports = router;

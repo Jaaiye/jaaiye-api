@@ -284,8 +284,7 @@ class AnalyticsService {
       .filter(id => mongoose.Types.ObjectId.isValid(id))
       .map(id => new mongoose.Types.ObjectId(id));
 
-    // Use the EventSchema directly for better ID matching
-    const EventSchema = require('../../../event/infrastructure/persistence/schemas/Event.schema');
+    // Use the EventSchema directly for better ID matching (already declared above)
     const eventDocs = await EventSchema.find({ _id: { $in: objectIds } }).lean();
 
     // Create a map with both string and ObjectId keys for lookup

@@ -16,13 +16,16 @@ class AnalyticsRoutes {
   getRoutes() {
     router.use(securityHeaders);
     router.use(sanitizeRequest);
-    router.use(apiLimiter, protect);
+    // Note: apiLimiter is applied per-route to avoid double counting with global limiter
+    // The global limiter in index.js already applies to all routes
+    router.use(protect);
 
-    router.get('/revenue', admin, this.analyticsController.revenue);
-    router.get('/tickets', admin, this.analyticsController.tickets);
-    router.get('/events', admin, this.analyticsController.events);
-    router.get('/users', admin, this.analyticsController.users);
-    router.get('/engagement', admin, this.analyticsController.engagement);
+    // Apply apiLimiter per route to avoid double counting with global limiter
+    router.get('/revenue', apiLimiter, admin, this.analyticsController.revenue);
+    router.get('/tickets', apiLimiter, admin, this.analyticsController.tickets);
+    router.get('/events', apiLimiter, admin, this.analyticsController.events);
+    router.get('/users', apiLimiter, admin, this.analyticsController.users);
+    router.get('/engagement', apiLimiter, admin, this.analyticsController.engagement);
 
     return router;
   }

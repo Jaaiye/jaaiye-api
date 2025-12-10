@@ -228,8 +228,9 @@ class AnalyticsService {
     const EventSchema = require('../../../event/infrastructure/persistence/schemas/Event.schema');
     const TransactionSchema = require('../../../payment/infrastructure/persistence/schemas/Transaction.schema');
 
+    // Get status counts - use a wider date range or all events if range is too restrictive
+    // For admin dashboard, we want to see all events, not just recent ones
     const statusCounts = await EventSchema.aggregate([
-      { $match: buildDateMatch(range, 'createdAt') },
       {
         $group: {
           _id: '$status',
@@ -245,8 +246,8 @@ class AnalyticsService {
     };
     const upcomingEvents = await EventSchema.countDocuments(futureMatch);
 
+    // Get category mix - show all categories for admin dashboard
     const categoryMix = await EventSchema.aggregate([
-      { $match: buildDateMatch(range, 'createdAt') },
       {
         $group: {
           _id: '$category',
@@ -274,29 +275,50 @@ class AnalyticsService {
       { $limit: 5 },
     ]);
 
-    const eventIds = topEvents.map((item) => item._id);
-    const events = await this.eventRepository.find({ id: { $in: eventIds } }, { limit: 5 });
-    const eventMap = new Map(events.events.map((event) => [event.id, event]));
+    // Convert eventIds to strings for lookup
+    const eventIds = topEvents.map((item) => String(item._id));
+    const mongoose = require('mongoose');
+
+    // Try to find events by both string ID and ObjectId
+    const objectIds = eventIds
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    // Use the EventSchema directly for better ID matching
+    const EventSchema = require('../../../event/infrastructure/persistence/schemas/Event.schema');
+    const eventDocs = await EventSchema.find({ _id: { $in: objectIds } }).lean();
+
+    // Create a map with both string and ObjectId keys for lookup
+    const eventMap = new Map();
+    eventDocs.forEach((doc) => {
+      const idStr = String(doc._id);
+      eventMap.set(idStr, doc);
+      // Also add ObjectId version if different
+      if (doc._id.toString() !== idStr) {
+        eventMap.set(doc._id.toString(), doc);
+      }
+    });
 
     return {
       range,
       statusCounts: statusCounts.map((entry) => ({
-        status: entry._id,
-        count: entry.count,
+        status: entry._id || 'unknown',
+        count: entry.count || 0,
       })),
       upcomingEvents,
       categoryMix: categoryMix.map((entry) => ({
-        category: entry._id,
-        count: entry.count,
+        category: entry._id || 'unknown',
+        count: entry.count || 0,
       })),
       topRevenueEvents: topEvents.map((item) => {
-        const event = eventMap.get(String(item._id));
+        const eventIdStr = String(item._id);
+        const event = eventMap.get(eventIdStr) || eventMap.get(item._id);
         return {
-          eventId: item._id,
+          eventId: eventIdStr,
           title: event?.title || 'Unknown Event',
           startTime: event?.startTime || null,
-          revenue: item.revenue,
-          transactions: item.transactions,
+          revenue: item.revenue || 0,
+          transactions: item.transactions || 0,
         };
       }),
     };

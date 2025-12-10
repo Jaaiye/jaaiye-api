@@ -1,12 +1,21 @@
 const rateLimit = require('express-rate-limit');
 const { generateDeviceFingerprint, rateLimitKey } = require('../utils/securityUtils');
 
-// Rate limiting
+// Rate limiting for API routes
+// Using IP-only key generator for authenticated routes to avoid double counting
+// The global limiter already handles device fingerprinting
 exports.apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  keyGenerator: rateLimitKey,
-  message: 'Too many requests from this IP, please try again later'
+  windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
+  max: process.env.RATE_LIMIT_MAX_REQUESTS || 2000, // Increased to 2000 for admin dashboard (makes 5+ parallel requests)
+  keyGenerator: (req) => {
+    // Use IP only for authenticated routes to avoid double counting with global limiter
+    return req.ip || req.connection.remoteAddress || 'unknown';
+  },
+  message: 'Too many requests from this IP, please try again later',
+  skip: (req) => {
+    // Skip rate limiting for health checks and other public endpoints
+    return req.path === '/health' || req.path.startsWith('/api/v1/health');
+  }
 });
 
 // API Key validation

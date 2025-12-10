@@ -72,10 +72,18 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 // Request logging middleware (comprehensive logging)
 app.use(requestLogger);
 
-// Rate limiting
+// Rate limiting - exclude authenticated/admin routes as they have their own rate limiters
 const limiter = rateLimit({
   windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
-  max: process.env.RATE_LIMIT_MAX_REQUESTS || 100 // limit each IP to 100 requests per windowMs
+  max: process.env.RATE_LIMIT_MAX_REQUESTS || 1000, // limit each IP to 1000 requests per windowMs
+  skip: (req) => {
+    // Skip rate limiting for authenticated routes that have their own limiters
+    // This prevents double counting
+    const path = req.path || '';
+    return path.startsWith('/api/v1/analytics') ||
+           path.startsWith('/api/v1/admin') ||
+           path.startsWith('/api/v1/auth') && req.headers.authorization;
+  }
 });
 app.use(limiter);
 

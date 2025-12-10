@@ -102,6 +102,58 @@ class EventController {
 
     return successResponse(res, null, 200, 'Participant removed successfully');
   });
+
+  addTicketType = asyncHandler(async (req, res) => {
+    const container = require('../../config/container');
+    const eventRepository = container.getEventRepository();
+    const event = await eventRepository.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const ticketTypeData = {
+      name: req.body.name,
+      price: Number(req.body.price),
+      capacity: req.body.capacity !== undefined && req.body.capacity !== null ? Number(req.body.capacity) : null,
+      isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
+      salesStartDate: req.body.salesStartDate ? new Date(req.body.salesStartDate) : null,
+      salesEndDate: req.body.salesEndDate ? new Date(req.body.salesEndDate) : null
+    };
+
+    const updatedEvent = await eventRepository.addTicketType(req.params.id, ticketTypeData);
+    return successResponse(res, { event: updatedEvent }, 201, 'Ticket type added successfully');
+  });
+
+  getAvailableTicketTypes = asyncHandler(async (req, res) => {
+    const EventSchema = require('../../infrastructure/persistence/schemas/Event.schema');
+    const doc = await EventSchema.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const availableTypes = doc.getAvailableTicketTypes();
+    return successResponse(res, { ticketTypes: availableTypes });
+  });
+
+  updateEventImage = asyncHandler(async (req, res) => {
+    const container = require('../../config/container');
+    const eventRepository = container.getEventRepository();
+    const cloudinaryAdapter = container.getCloudinaryAdapter();
+
+    const event = await eventRepository.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Image file is required' });
+    }
+
+    const imageUrl = await cloudinaryAdapter.uploadImage(req.file.buffer);
+    const updatedEvent = await eventRepository.update(req.params.id, { image: imageUrl });
+
+    return successResponse(res, { event: updatedEvent }, 200, 'Event image updated successfully');
+  });
 }
 
 module.exports = EventController;

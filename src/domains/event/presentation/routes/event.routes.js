@@ -110,6 +110,35 @@ function createEventRoutes(eventController) {
     eventController.removeParticipant
   );
 
+  // Ticket type management
+  router.post(
+    '/:id/ticket-types',
+    apiLimiter,
+    protect,
+    validateEventId,
+    validate,
+    eventController.addTicketType
+  );
+
+  router.get(
+    '/:id/ticket-types/available',
+    apiLimiter,
+    validateEventId,
+    validate,
+    eventController.getAvailableTicketTypes
+  );
+
+  // Image management
+  router.put(
+    '/:id/image',
+    apiLimiter,
+    protect,
+    upload.single('image'),
+    validateEventId,
+    validate,
+    eventController.updateEventImage
+  );
+
   return router;
 }
 

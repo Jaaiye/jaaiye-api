@@ -45,6 +45,7 @@ const allowedOrigins = [
   'http://localhost:3030',
   'https://jaaiye-checkout.vercel.app',
   'https://tickets.jaaiye.com',
+  'https://ticket.jaaiye.com',
   'https://admin.jaaiye.com'
 ].filter(Boolean);
 

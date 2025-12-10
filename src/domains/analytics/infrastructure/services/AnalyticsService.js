@@ -77,7 +77,7 @@ class AnalyticsService {
       totalQuantity: 0,
     };
 
-    const [rates] = await TransactionSchema.aggregate([
+    const ratesResult = await TransactionSchema.aggregate([
       { $match: buildDateMatch(range) },
       {
         $group: {
@@ -87,10 +87,11 @@ class AnalyticsService {
       },
     ]);
 
-    const total = rates?.reduce((sum, item) => sum + item.count, 0) || 0;
+    const rates = Array.isArray(ratesResult) ? ratesResult : [];
+    const total = rates.reduce((sum, item) => sum + item.count, 0);
     const success = rates
-      ?.filter((item) => SUCCESS_STATUSES.includes(item._id))
-      .reduce((sum, item) => sum + item.count, 0) || 0;
+      .filter((item) => SUCCESS_STATUSES.includes(item._id))
+      .reduce((sum, item) => sum + item.count, 0);
 
     const providerBreakdown = await TransactionSchema.aggregate([
       { $match: match },

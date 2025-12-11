@@ -13,7 +13,31 @@ class QRCodeAdapter {
   }
 
   /**
-   * Generate QR code for a ticket
+   * Generate QR code for a ticket using publicId (new format)
+   * QR code contains just the publicId: "jaaiye-123456"
+   * @param {Object} ticket - Ticket entity
+   * @returns {Promise<{ qrCode: string }>}
+   */
+  async generateTicketQRCodeWithPublicId(ticket) {
+    if (!ticket.publicId) {
+      throw new Error('Ticket publicId is required to generate QR code');
+    }
+
+    // QR code contains just the publicId
+    const qrCode = await QRCode.toDataURL(ticket.publicId, {
+      errorCorrectionLevel: 'M',
+      type: 'image/png',
+      quality: 0.92,
+      margin: 1,
+      color: { dark: '#000000', light: '#FFFFFF' }
+    });
+
+    return { qrCode };
+  }
+
+  /**
+   * Generate QR code for a ticket using token (legacy format, for backward compatibility)
+   * QR code contains URL with token: "https://api.jaaiye.com/tickets/verify?token=..."
    * @param {Object} ticket - Ticket entity
    * @returns {Promise<{ qrCode: string, token: string, verifyUrl: string }>}
    */

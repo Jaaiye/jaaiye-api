@@ -120,21 +120,49 @@ class CreateTicketUseCase {
       quantity: dto.quantity
     });
 
-    // Ensure a human-readable publicId
+    // Generate unique publicId in format: jaaiye-{6 digits}
     if (!ticket.publicId) {
-      const suffix = (ticket.id?.toString() || Math.random().toString(36).slice(2)).slice(-8);
-      await this.ticketRepository.update(ticket.id, { publicId: `jaaiye-${suffix}` });
-      ticket.publicId = `jaaiye-${suffix}`;
+      let publicId;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      // Generate random 6-digit number and ensure uniqueness
+      do {
+        const randomNum = Math.floor(100000 + Math.random() * 900000); // 100000 to 999999
+        publicId = `jaaiye-${randomNum}`;
+
+        // Check if this publicId already exists
+        const existing = await this.ticketRepository.findByPublicId(publicId);
+        if (!existing) {
+          break; // Found unique publicId
+        }
+
+        attempts++;
+        if (attempts >= maxAttempts) {
+          throw new Error('Failed to generate unique ticket number after multiple attempts');
+        }
+      } while (attempts < maxAttempts);
+
+      await this.ticketRepository.update(ticket.id, { publicId });
+      ticket.publicId = publicId;
     }
 
-    // Generate QR code
-    const { qrCode, verifyUrl } = await this.qrCodeAdapter.generateTicketQRCode(ticket);
+    // Generate QR code with publicId (new format)
+    // QR code contains just the publicId: "jaaiye-123456"
+    const { qrCode } = await this.qrCodeAdapter.generateTicketQRCodeWithPublicId(ticket);
+
+    // Also generate token-based QR for backward compatibility (optional, can be removed later)
+    const { token, verifyUrl } = await this.qrCodeAdapter.generateTicketQRCode(ticket);
+
     await this.ticketRepository.update(ticket.id, {
-      qrCode,
-      ticketData: JSON.stringify({ verifyUrl })
+      qrCode, // Store new publicId-based QR code
+      ticketData: JSON.stringify({
+        verifyUrl, // Keep token URL for backward compatibility
+        token // Store token for legacy support
+      })
     });
     ticket.qrCode = qrCode;
-    ticket.ticketData = JSON.stringify({ verifyUrl });
+    ticket.ticketData = JSON.stringify({ verifyUrl, token });
 
     // Increment event's sold ticket count
     await eventDoc.incrementTicketSales(ticketTypeIdForSales, dto.quantity, dto.bypassCapacity);

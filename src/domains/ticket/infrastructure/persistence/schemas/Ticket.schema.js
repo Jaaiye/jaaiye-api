@@ -100,7 +100,7 @@ ticketSchema.index({ eventId: 1, createdAt: -1 });
 ticketSchema.index({ status: 1 });
 ticketSchema.index({ ticketTypeId: 1 });
 ticketSchema.index({ userId: 1, eventId: 1, ticketTypeId: 1 }); // Prevent duplicate tickets of same type
-ticketSchema.index({ publicId: 1 });
+ticketSchema.index({ publicId: 1 }, { unique: true, sparse: true }); // Unique index for publicId (sparse allows null values for old tickets)
 
 module.exports = mongoose.models.Ticket || mongoose.model('Ticket', ticketSchema);
 

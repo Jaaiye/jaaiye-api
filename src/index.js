@@ -80,7 +80,9 @@ const limiter = rateLimit({
     // Skip rate limiting for authenticated routes that have their own limiters
     // This prevents double counting
     const path = req.path || '';
-    return path.startsWith('/api/v1/analytics') ||
+    return path === '/health' ||
+           path.startsWith('/api/v1/health') ||
+           path.startsWith('/api/v1/analytics') ||
            path.startsWith('/api/v1/admin') ||
            path.startsWith('/api/v1/auth') && req.headers.authorization;
   }

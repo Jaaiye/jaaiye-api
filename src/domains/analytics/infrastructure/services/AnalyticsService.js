@@ -16,21 +16,33 @@ function toDate(value, fallback) {
 }
 
 function normalizeRange(input = {}) {
-  const now = new Date();
-  const defaultFrom = new Date(now);
-  defaultFrom.setDate(defaultFrom.getDate() - 30);
-  const from = toDate(input.from, defaultFrom);
-  const to = toDate(input.to, now);
+  // If neither 'from' nor 'to' is provided → return empty
+  if (!input.from && !input.to) {
+    return {};
+  }
+
+  const from = input.from ? toDate(input.from) : undefined;
+  const to = input.to ? toDate(input.to) : undefined;
+
   return { from, to };
 }
 
-function buildDateMatch(range, field = 'createdAt') {
-  return {
-    [field]: {
-      $gte: range.from,
-      $lte: range.to,
-    },
-  };
+function buildDateMatch(range = {}, field = 'createdAt') {
+  // No range at all → no date constraint
+  if (!range.from && !range.to) {
+    return {};
+  }
+
+  const match = {};
+
+  if (range.from) {
+    match.$gte = range.from;
+  }
+  if (range.to) {
+    match.$lte = range.to;
+  }
+
+  return { [field]: match };
 }
 
 class AnalyticsService {
@@ -52,10 +64,11 @@ class AnalyticsService {
 
   async getRevenueAnalytics(rangeInput) {
     const range = normalizeRange(rangeInput);
+    const dateMatch = buildDateMatch(range);
     const TransactionSchema = require('../../../payment/infrastructure/persistence/schemas/Transaction.schema');
 
     const match = {
-      ...buildDateMatch(range),
+      ...dateMatch,
       status: { $in: SUCCESS_STATUSES },
     };
 
@@ -78,7 +91,7 @@ class AnalyticsService {
     };
 
     const ratesResult = await TransactionSchema.aggregate([
-      { $match: buildDateMatch(range) },
+      { $match: { ...dateMatch } },
       {
         $group: {
           _id: '$status',
@@ -192,7 +205,7 @@ class AnalyticsService {
     ]);
 
     const eventIds = topEvents.map((item) => item._id);
-    const events = await this.eventRepository.find({ id: { $in: eventIds } }, { limit: 5 });
+    const events = await this.eventRepository.find({ _id: { $in: eventIds } }, { limit: 5 });
     const eventMap = new Map(events.events.map((event) => [event.id, event]));
 
     return {

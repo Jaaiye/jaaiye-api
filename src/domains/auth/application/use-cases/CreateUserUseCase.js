@@ -66,7 +66,7 @@ class CreateUserUseCase {
     const userEntity = new UserEntity(user);
     const accessToken = TokenService.generateAccessToken(userEntity);
 
-    return { accessToken };
+    return { accessToken, user: userEntity };
   }
 }
 

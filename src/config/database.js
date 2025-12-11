@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 
 // Retry configuration constants
-const MAX_RETRIES = parseInt(process.env.MONGODB_MAX_RETRIES || '5', 10);
+const MAX_RETRIES = parseInt(process.env.MONGODB_MAX_RETRIES || '10', 10);
 const INITIAL_RETRY_DELAY_MS = parseInt(process.env.MONGODB_RETRY_DELAY_MS || '1000', 10);
 const MAX_RETRY_DELAY_MS = parseInt(process.env.MONGODB_MAX_RETRY_DELAY_MS || '30000', 10);
 const RETRY_MULTIPLIER = 2;

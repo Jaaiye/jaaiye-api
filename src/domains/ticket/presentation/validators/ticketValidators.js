@@ -71,12 +71,40 @@ const cancelTicketValidator = [
     .withMessage('Invalid ticket ID format')
 ];
 
+const getTicketByPublicIdValidator = [
+  param('publicId')
+    .notEmpty()
+    .withMessage('Public ID is required')
+    .isString()
+    .trim()
+    .withMessage('Public ID must be a string'),
+  query('eventId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid event ID')
+];
+
+const verifyAndUseTicketByPublicIdValidator = [
+  body('publicId')
+    .notEmpty()
+    .withMessage('Public ID is required')
+    .isString()
+    .trim()
+    .withMessage('Public ID must be a string'),
+  body('eventId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid event ID')
+];
+
 module.exports = {
   createTicketValidator,
   getTicketByIdValidator,
   getEventTicketsValidator,
+  getTicketByPublicIdValidator,
   scanTicketValidator,
   verifyAndUseTicketValidator,
+  verifyAndUseTicketByPublicIdValidator,
   cancelTicketValidator
 };
 

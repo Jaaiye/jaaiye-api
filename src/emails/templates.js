@@ -3,7 +3,7 @@ const path = require('path');
 
 const APP_NAME = process.env.APP_NAME || 'Jaaiye';
 const APP_URL = process.env.APP_URL || 'https://www.jaaiye.com/';
-const APP_LOGO_URL = process.env.APP_LOGO_URL || 'https://res.cloudinary.com/djrmprmup/image/upload/v1763066733/IMG_8264_mittgk.png';
+const APP_LOGO_URL = 'https://res.cloudinary.com/djrmprmup/image/upload/v1763066733/IMG_8264_mittgk.png';
 const EMBED_LOGO = process.env.APP_EMBED_LOGO === 'true';
 const LOGO_CID = 'app-logo';
 const PRIMARY = process.env.BRAND_PRIMARY_COLOR || '#4F46E5';
@@ -361,13 +361,16 @@ function paymentConfirmationEmail({ tickets }) {
     </div>
   `;
 
+  // Get event ID - handle both _id and id formats
+  const eventId = event._id || event.id;
+
   return baseLayout({
     title,
     previewText,
     bodyHtml,
-    cta: event._id ? {
+    cta: eventId ? {
       label: 'View Event Details',
-      url: `${APP_URL}events/${event._id}`
+      url: `${APP_URL}/events/${eventId}`
     } : null
   });
 }

@@ -17,6 +17,7 @@ class TicketEntity {
     publicId,
     status,
     usedAt,
+    verifiedBy,
     createdAt,
     updatedAt
   }) {
@@ -32,6 +33,7 @@ class TicketEntity {
     this.publicId = publicId;
     this.status = status || 'active';
     this.usedAt = usedAt;
+    this.verifiedBy = verifiedBy;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }

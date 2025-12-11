@@ -8,9 +8,13 @@ class TicketNotFoundError extends AppError {
 }
 
 class TicketAlreadyUsedError extends AppError {
-  constructor(message = 'Ticket has already been used') {
+  constructor(data = {}) {
+    const message = data.ticket
+      ? 'Ticket has already been used'
+      : (typeof data === 'string' ? data : 'Ticket has already been used');
     super(message, 400);
     this.name = 'TicketAlreadyUsedError';
+    this.ticket = data.ticket || null;
   }
 }
 

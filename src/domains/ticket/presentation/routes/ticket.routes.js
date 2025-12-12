@@ -24,19 +24,21 @@ class TicketRoutes {
   }
 
   getRoutes() {
+    // Public scanning (view only) - MUST come before /:ticketId to avoid route matching conflict
+    router.get('/scan', ...scanTicketValidator, validate, this.ticketController.scanTicket);
+
+    // Authenticated scanner (mark as used) - uses same endpoint but with auth
+    router.get('/scan/auth', protect, scanner, ...scanTicketValidator, validate, this.ticketController.scanTicket);
+
     // Ticket management routes
     router.post('/', protect, admin, ...createTicketValidator, validate, this.ticketController.createTicket);
     router.get('/my-tickets', protect, this.ticketController.getMyTickets);
     router.get('/active', protect, this.ticketController.getActiveTickets);
     router.get('/event/:eventId', protect, admin, ...getEventTicketsValidator, validate, this.ticketController.getEventTickets);
     router.get('/public/:publicId', protect, scanner, ...getTicketByPublicIdValidator, validate, this.ticketController.getTicketByPublicId);
+
+    // Parameterized routes MUST come last to avoid matching specific routes
     router.get('/:ticketId', protect, ...getTicketByIdValidator, validate, this.ticketController.getTicketById);
-
-    // Public scanning (view only)
-    router.get('/scan', ...scanTicketValidator, validate, this.ticketController.scanTicket);
-
-    // Authenticated scanner (mark as used) - uses same endpoint but with auth
-    router.get('/scan/auth', protect, scanner, ...scanTicketValidator, validate, this.ticketController.scanTicket);
 
     // Verify and use ticket by token (for scanner)
     router.post('/verify', protect, scanner, ...verifyAndUseTicketValidator, validate, this.ticketController.verifyAndUseTicket);

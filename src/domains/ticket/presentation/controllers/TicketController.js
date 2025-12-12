@@ -80,6 +80,7 @@ class TicketController {
 
     this.scanTicket = asyncHandler(async (req, res) => {
       const { t: token } = req.query;
+      console.log("token: ", token)
       const result = await scanTicketUseCase.execute(token);
       return res.json(result);
     });

@@ -13,6 +13,7 @@ class ScanTicketUseCase {
 
   async execute(token) {
     const decoded = await this.qrCodeAdapter.verifyQRToken(token);
+    console.log("decoded: ", decoded)
 
     if (!decoded || !decoded.ticketId) {
       throw new TicketNotFoundError('Invalid or expired ticket');
@@ -22,6 +23,7 @@ class ScanTicketUseCase {
     const ticket = await this.ticketRepository.findById(ticketId, {
       populate: 'eventId'
     });
+    console.log("ticket: ", ticket)
 
     if (!ticket) {
       throw new TicketNotFoundError();

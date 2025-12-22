@@ -2,6 +2,7 @@ const { body, param, query } = require('express-validator');
 
 const validateCreateGroup = [
   body('name')
+    .trim()
     .notEmpty()
     .withMessage('Group name is required')
     .isLength({ min: 1, max: 100 })

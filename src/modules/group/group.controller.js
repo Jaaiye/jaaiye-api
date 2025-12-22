@@ -34,6 +34,15 @@ class GroupController {
   }
 
   createGroup = asyncHandler(async (req, res) => {
+    // Debug logging
+    console.log('[CreateGroup] Request body:', {
+      name: req.body.name,
+      nameType: typeof req.body.name,
+      nameLength: req.body.name?.length,
+      bodyKeys: Object.keys(req.body),
+      fullBody: req.body
+    });
+
     const { CreateGroupDTO } = require('../../dto');
     const dto = new CreateGroupDTO(req.body);
     const result = await this.createGroupUseCase.execute(req.user.id, dto);

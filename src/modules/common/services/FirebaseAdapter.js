@@ -50,22 +50,42 @@ class FirebaseAdapter {
         hasEndHeader: privateKey.includes('END'),
         hasNewlines: privateKey.includes('\n'),
         hasEscapedNewlines: privateKey.includes('\\n'),
-        firstChars: privateKey.substring(0, 50).replace(/\n/g, '\\n'),
-        lastChars: privateKey.substring(Math.max(0, privateKey.length - 50)).replace(/\n/g, '\\n')
+        hasDoubleEscapedNewlines: privateKey.includes('\\\\n'),
+        firstChars: privateKey.substring(0, 50).replace(/\n/g, '\\n').replace(/\\/g, '\\\\'),
+        lastChars: privateKey.substring(Math.max(0, privateKey.length - 50)).replace(/\n/g, '\\n').replace(/\\/g, '\\\\')
       });
 
-      // Handle escaped newlines (common in environment variables)
-      const beforeReplace = privateKey;
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      if (beforeReplace !== privateKey) {
-        console.log('[Firebase Init] Replaced escaped newlines (\\n -> \\n)');
-      }
-
-      // Handle literal \n strings (double escaped)
+      // Handle multiple levels of escaping - order matters!
+      // First, handle double-escaped (\\\\n -> \n) - this matches \\n in the actual string
       const beforeDoubleReplace = privateKey;
       privateKey = privateKey.replace(/\\\\n/g, '\n');
       if (beforeDoubleReplace !== privateKey) {
-        console.log('[Firebase Init] Replaced double-escaped newlines (\\\\n -> \\n)');
+        const count = (beforeDoubleReplace.match(/\\\\n/g) || []).length;
+        console.log(`[Firebase Init] Replaced double-escaped newlines (\\\\n -> \\n), count: ${count}`);
+      }
+
+      // Then handle single-escaped (\n -> \n) - this matches \n in the actual string
+      const beforeReplace = privateKey;
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      if (beforeReplace !== privateKey) {
+        const count = (beforeReplace.match(/\\n/g) || []).length;
+        console.log(`[Firebase Init] Replaced escaped newlines (\\n -> \\n), count: ${count}`);
+      }
+
+      // Clean up any trailing/leading backslashes that might remain (common issue with env vars)
+      // This handles cases like "-----END PRIVATE KEY-----\\" where there's a trailing backslash
+      const beforeBackslashCleanup = privateKey;
+      privateKey = privateKey.replace(/\\+$/gm, ''); // Remove trailing backslashes from each line
+      privateKey = privateKey.replace(/^\\+/gm, ''); // Remove leading backslashes from each line
+      if (beforeBackslashCleanup !== privateKey) {
+        console.log('[Firebase Init] Cleaned up trailing/leading backslashes');
+        const firstLine = privateKey.split('\n')[0];
+        const lastLine = privateKey.split('\n').pop();
+        console.log('[Firebase Init] After cleanup - first line:', firstLine?.substring(0, 60));
+        console.log('[Firebase Init] After cleanup - last line:', lastLine?.substring(Math.max(0, lastLine.length - 60)));
+      }
+      if (beforeBackslashCleanup !== privateKey) {
+        console.log('[Firebase Init] Cleaned up trailing/leading backslashes');
       }
 
       // Ensure proper PEM format - add headers if missing

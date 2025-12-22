@@ -43,7 +43,7 @@ class GroupController {
       fullBody: req.body
     });
 
-    const { CreateGroupDTO } = require('../../dto');
+    const { CreateGroupDTO } = require('./dto');
     const dto = new CreateGroupDTO(req.body);
     const result = await this.createGroupUseCase.execute(req.user.id, dto);
 

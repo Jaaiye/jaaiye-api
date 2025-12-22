@@ -40,11 +40,39 @@ class FirebaseAdapter {
         return;
       }
 
+      // Normalize private key - handle various formats from environment variables
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+
+      // Handle escaped newlines (common in environment variables)
+      privateKey = privateKey.replace(/\\n/g, '\n');
+
+      // Handle literal \n strings (double escaped)
+      privateKey = privateKey.replace(/\\\\n/g, '\n');
+
+      // Ensure proper PEM format - add headers if missing
+      if (privateKey && !privateKey.includes('BEGIN PRIVATE KEY') && !privateKey.includes('BEGIN RSA PRIVATE KEY')) {
+        // If it looks like a key without headers, try to add them
+        const keyContent = privateKey.trim();
+        if (keyContent.length > 0) {
+          // Check if it's RSA or PKCS8 format based on content
+          if (keyContent.includes('MII')) {
+            // Likely PKCS8 format
+            privateKey = `-----BEGIN PRIVATE KEY-----\n${keyContent}\n-----END PRIVATE KEY-----\n`;
+          } else {
+            // Try RSA format
+            privateKey = `-----BEGIN RSA PRIVATE KEY-----\n${keyContent}\n-----END RSA PRIVATE KEY-----\n`;
+          }
+        }
+      }
+
+      // Clean up any extra whitespace
+      privateKey = privateKey.trim();
+
       const serviceAccount = {
         type: "service_account",
         project_id: process.env.FIREBASE_PROJECT_ID,
         private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-        private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        private_key: privateKey,
         client_email: process.env.FIREBASE_CLIENT_EMAIL,
         client_id: process.env.FIREBASE_CLIENT_ID,
         auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -57,16 +85,55 @@ class FirebaseAdapter {
       // Validate service account data
       if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
         console.warn('Firebase Admin not initialized: Invalid service account configuration');
+        if (!serviceAccount.private_key) {
+          console.warn('FIREBASE_PRIVATE_KEY is missing or empty');
+        }
         return;
       }
 
-      // Initialize Firebase Admin
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
+      // Validate private key format
+      if (!serviceAccount.private_key.includes('BEGIN') || !serviceAccount.private_key.includes('END')) {
+        console.error('Firebase Admin not initialized: Private key appears to be malformed');
+        console.error('Private key should include -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY----- headers');
+        return;
+      }
+
+      // Initialize Firebase Admin with better error handling
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: serviceAccount.project_id
+        });
+      } catch (initError) {
+        // Provide more helpful error messages
+        if (initError.message && initError.message.includes('PEM')) {
+          console.error('Firebase Admin initialization failed: Invalid PEM format');
+          console.error('Common issues:');
+          console.error('1. Private key may have incorrect newline formatting');
+          console.error('2. Private key may be missing BEGIN/END headers');
+          console.error('3. Environment variable may have encoding issues');
+          console.error('Tip: Ensure FIREBASE_PRIVATE_KEY includes the full key with headers');
+        } else {
+          throw initError; // Re-throw if it's not a PEM error
+        }
+        this.initialized = false;
+        return;
+      }
+
+      // Verify messaging is available (FCM V1 API)
+      try {
+        const messaging = admin.messaging();
+        if (!messaging) {
+          console.warn('Firebase Messaging not available - ensure Firebase Cloud Messaging API (V1) is enabled in Google Cloud Console');
+        } else {
+          console.log('Firebase Admin initialized successfully with FCM V1 support');
+        }
+      } catch (error) {
+        console.warn('Firebase Messaging check failed:', error.message);
+        console.warn('Ensure Firebase Cloud Messaging API (V1) is enabled in Google Cloud Console');
+      }
 
       this.initialized = true;
-      console.log('Firebase Admin initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Firebase Admin:', error.message);
       // Don't throw - allow app to run without Firebase
@@ -131,9 +198,11 @@ class FirebaseAdapter {
         return { successCount: 0, failureCount: 0, responses: [] };
       }
 
-      // Validate that messaging is available
+      // Validate that messaging is available (FCM V1 API)
       if (!admin.messaging) {
-        console.error('Firebase messaging not available - FCM may not be enabled for this project');
+        console.error('Firebase messaging not available - Firebase Cloud Messaging API (V1) may not be enabled for this project');
+        console.error('Please enable Firebase Cloud Messaging API (V1) in Google Cloud Console:');
+        console.error(`https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`);
         return { successCount: 0, failureCount: tokens.length, responses: [] };
       }
 
@@ -187,9 +256,11 @@ class FirebaseAdapter {
     }
 
     try {
-      // Validate that messaging is available
+      // Validate that messaging is available (FCM V1 API)
       if (!admin.messaging) {
-        console.error('Firebase messaging not available - FCM may not be enabled for this project');
+        console.error('Firebase messaging not available - Firebase Cloud Messaging API (V1) may not be enabled for this project');
+        console.error('Please enable Firebase Cloud Messaging API (V1) in Google Cloud Console:');
+        console.error(`https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`);
         return null;
       }
 

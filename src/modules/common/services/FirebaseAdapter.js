@@ -43,30 +43,66 @@ class FirebaseAdapter {
       // Normalize private key - handle various formats from environment variables
       let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
 
+      // Log initial state (sanitized for security)
+      console.log('[Firebase Init] Private key initial state:', {
+        length: privateKey.length,
+        hasBeginHeader: privateKey.includes('BEGIN'),
+        hasEndHeader: privateKey.includes('END'),
+        hasNewlines: privateKey.includes('\n'),
+        hasEscapedNewlines: privateKey.includes('\\n'),
+        firstChars: privateKey.substring(0, 50).replace(/\n/g, '\\n'),
+        lastChars: privateKey.substring(Math.max(0, privateKey.length - 50)).replace(/\n/g, '\\n')
+      });
+
       // Handle escaped newlines (common in environment variables)
+      const beforeReplace = privateKey;
       privateKey = privateKey.replace(/\\n/g, '\n');
+      if (beforeReplace !== privateKey) {
+        console.log('[Firebase Init] Replaced escaped newlines (\\n -> \\n)');
+      }
 
       // Handle literal \n strings (double escaped)
+      const beforeDoubleReplace = privateKey;
       privateKey = privateKey.replace(/\\\\n/g, '\n');
+      if (beforeDoubleReplace !== privateKey) {
+        console.log('[Firebase Init] Replaced double-escaped newlines (\\\\n -> \\n)');
+      }
 
       // Ensure proper PEM format - add headers if missing
-      if (privateKey && !privateKey.includes('BEGIN PRIVATE KEY') && !privateKey.includes('BEGIN RSA PRIVATE KEY')) {
-        // If it looks like a key without headers, try to add them
+      const hasBeginHeader = privateKey.includes('BEGIN PRIVATE KEY') || privateKey.includes('BEGIN RSA PRIVATE KEY');
+      const hasEndHeader = privateKey.includes('END PRIVATE KEY') || privateKey.includes('END RSA PRIVATE KEY');
+
+      if (privateKey && !hasBeginHeader) {
+        console.log('[Firebase Init] Missing BEGIN header, attempting to add...');
         const keyContent = privateKey.trim();
         if (keyContent.length > 0) {
           // Check if it's RSA or PKCS8 format based on content
           if (keyContent.includes('MII')) {
             // Likely PKCS8 format
             privateKey = `-----BEGIN PRIVATE KEY-----\n${keyContent}\n-----END PRIVATE KEY-----\n`;
+            console.log('[Firebase Init] Added PKCS8 headers');
           } else {
             // Try RSA format
             privateKey = `-----BEGIN RSA PRIVATE KEY-----\n${keyContent}\n-----END RSA PRIVATE KEY-----\n`;
+            console.log('[Firebase Init] Added RSA headers');
           }
         }
       }
 
       // Clean up any extra whitespace
       privateKey = privateKey.trim();
+
+      // Log final state
+      console.log('[Firebase Init] Private key after normalization:', {
+        length: privateKey.length,
+        hasBeginHeader: privateKey.includes('BEGIN'),
+        hasEndHeader: privateKey.includes('END'),
+        hasNewlines: privateKey.includes('\n'),
+        newlineCount: (privateKey.match(/\n/g) || []).length,
+        firstLine: privateKey.split('\n')[0],
+        lastLine: privateKey.split('\n').pop(),
+        lineCount: privateKey.split('\n').length
+      });
 
       const serviceAccount = {
         type: "service_account",
@@ -100,20 +136,56 @@ class FirebaseAdapter {
 
       // Initialize Firebase Admin with better error handling
       try {
+        console.log('[Firebase Init] Attempting to initialize Firebase Admin...');
+        console.log('[Firebase Init] Service account config:', {
+          project_id: serviceAccount.project_id,
+          client_email: serviceAccount.client_email,
+          private_key_id: serviceAccount.private_key_id ? 'present' : 'missing',
+          private_key_length: serviceAccount.private_key?.length || 0,
+          private_key_has_headers: serviceAccount.private_key?.includes('BEGIN') && serviceAccount.private_key?.includes('END')
+        });
+
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
           projectId: serviceAccount.project_id
         });
+
+        console.log('[Firebase Init] Firebase Admin initialized successfully');
       } catch (initError) {
+        // Log detailed error information
+        console.error('[Firebase Init] Initialization failed with error:', {
+          name: initError.name,
+          message: initError.message,
+          code: initError.code,
+          stack: initError.stack?.split('\n').slice(0, 5).join('\n')
+        });
+
         // Provide more helpful error messages
-        if (initError.message && initError.message.includes('PEM')) {
-          console.error('Firebase Admin initialization failed: Invalid PEM format');
+        if (initError.message && (initError.message.includes('PEM') || initError.message.includes('private key'))) {
+          console.error('[Firebase Init] PEM Format Error Details:');
+          console.error('Error:', initError.message);
+          console.error('Private key state:', {
+            length: serviceAccount.private_key?.length || 0,
+            isEmpty: !serviceAccount.private_key || serviceAccount.private_key.length === 0,
+            hasBeginHeader: serviceAccount.private_key?.includes('BEGIN') || false,
+            hasEndHeader: serviceAccount.private_key?.includes('END') || false,
+            hasNewlines: serviceAccount.private_key?.includes('\n') || false,
+            firstLine: serviceAccount.private_key?.split('\n')[0] || 'N/A',
+            lastLine: serviceAccount.private_key?.split('\n').pop() || 'N/A',
+            lineCount: serviceAccount.private_key?.split('\n').length || 0
+          });
           console.error('Common issues:');
           console.error('1. Private key may have incorrect newline formatting');
           console.error('2. Private key may be missing BEGIN/END headers');
           console.error('3. Environment variable may have encoding issues');
+          console.error('4. Private key may be corrupted or truncated');
           console.error('Tip: Ensure FIREBASE_PRIVATE_KEY includes the full key with headers');
+          console.error('Expected format:');
+          console.error('-----BEGIN PRIVATE KEY-----');
+          console.error('(base64 encoded key content)');
+          console.error('-----END PRIVATE KEY-----');
         } else {
+          console.error('[Firebase Init] Non-PEM error, re-throwing...');
           throw initError; // Re-throw if it's not a PEM error
         }
         this.initialized = false;

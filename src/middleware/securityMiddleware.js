@@ -23,7 +23,7 @@ exports.apiLimiter = rateLimit({
 // This middleware uses the legacy ApiKey model for now
 // TODO: Migrate to ApiKeyRepository when ApiKey domain is created
 exports.validateApiKey = async (req, res, next) => {
-  const ApiKey = require('../models/ApiKey');
+  const ApiKey = require('../modules/ApiKey');
   const apiKey = req.headers['x-api-key'];
 
   if (!apiKey) {

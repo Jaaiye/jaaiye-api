@@ -7,7 +7,6 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const WebSocket = require('ws');
-const WebSocketService = require('./services/websocketService');
 const dotenv = require('dotenv');
 const connectDB = require('./config/database');
 const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
@@ -23,9 +22,6 @@ const app = express();
 
 // Create HTTP server
 const server = require('http').createServer(app);
-
-// Initialize WebSocket service
-const wss = new WebSocketService(server);
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '../logs');
@@ -143,18 +139,19 @@ app.use('/webhooks', require('./routes/webhookRoutes'));
 app.use(validateMobileApiKey);
 
 // Routes
-app.use('/api/v1/auth', require('./domains/auth/config/container').getAuthRoutes());
-app.use('/api/v1/users', require('./domains/user/config/container').getUserRoutes());
-app.use('/api/v1/admin', require('./domains/admin/config/container').getAdminRoutes());
-app.use('/api/v1/analytics', require('./domains/analytics/config/container').getAnalyticsRoutes());
-app.use('/api/v1/calendars', require('./domains/calendar/config/container').getCalendarRoutes());
-app.use('/api/v1/events', require('./domains/event/config/container').getEventRoutes());
-app.use('/api/v1/notifications', require('./domains/notification/config/container').getNotificationRoutes());
+app.use('/api/v1/auth', require('./modules/auth/auth.module').getAuthRoutes());
+app.use('/api/v1/users', require('./modules/user/user.module').getUserRoutes());
+app.use('/api/v1/admin', require('./modules/admin/admin.module').getAdminRoutes());
+app.use('/api/v1/analytics', require('./modules/analytics/analytics.module').getAnalyticsRoutes());
+app.use('/api/v1/calendars', require('./modules/calendar/calendar.module').getCalendarRoutes());
+app.use('/api/v1/events', require('./modules/event/event.module').getEventRoutes());
+app.use('/api/v1/notifications', require('./modules/notification/notification.module').getNotificationRoutes());
 app.use('/api/v1/ics', require('./routes/icsRoutes'));
-app.use('/api/v1/groups', require('./domains/group/config/container').getGroupRoutes());
-app.use('/api/v1/tickets', require('./domains/ticket/config/container').getTicketRoutes());
-app.use('/api/v1/transactions', require('./domains/payment/config/container').getTransactionRoutes());
-app.use('/api/v1/payments', require('./domains/payment/config/container').getPaymentRoutes());
+app.use('/api/v1/groups', require('./modules/group/group.module').getGroupRoutes());
+app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRoutes());
+app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
+app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
+app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
 
 // 404 handler
@@ -192,8 +189,8 @@ process.on('uncaughtException', (err) => {
 connectDB();
 
 // Start background services
-const { paymentPollingQueue } = require('./queues');
-paymentPollingQueue.start();
+const queueModule = require('./modules/queue/queue.module');
+queueModule.getPaymentPollingQueue().start();
 
 // Start server
 const PORT = process.env.PORT || 3000;

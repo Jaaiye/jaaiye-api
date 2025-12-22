@@ -1,4 +1,4 @@
-const ApiKey = require('../models/ApiKey');
+const ApiKey = require('../modules/common/entities/ApiKey.schema');
 
 // Validate mobile API key
 exports.validateMobileApiKey = async (req, res, next) => {

@@ -1,4 +1,4 @@
-const authContainer = require('../domains/auth/config/container');
+const authModule = require('../modules/auth/auth.module');
 
 /**
  * Check if token is blacklisted
@@ -6,7 +6,7 @@ const authContainer = require('../domains/auth/config/container');
  */
 module.exports = async (req, res, next) => {
     try {
-        const tokenBlacklistRepository = authContainer.getTokenBlacklistRepository();
+        const tokenBlacklistRepository = authModule.getTokenBlacklistRepository();
         const isBlacklisted = await tokenBlacklistRepository.isBlacklisted(req.token);
 
         if (isBlacklisted) {

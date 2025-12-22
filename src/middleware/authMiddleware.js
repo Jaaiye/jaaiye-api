@@ -3,14 +3,14 @@
  * Exports DDD middleware for use across the application
  */
 
-const authContainer = require('../domains/auth/config/container');
-const { requireAdmin, requireScanner, requireSuperAdmin } = require('../domains/auth/presentation/middleware');
+const authModule = require('../modules/auth/auth.module');
+const { requireAdmin, requireScanner, requireSuperAdmin } = require('../modules/auth/authorize');
 
-// Export protect middleware from Auth domain
-exports.protect = authContainer.getAuthMiddleware();
+// Export protect middleware from Auth module
+exports.protect = authModule.getAuthMiddleware();
 
 // Export optional auth middleware (doesn't fail if no token)
-exports.optionalAuth = authContainer.getOptionalAuthMiddleware();
+exports.optionalAuth = authModule.getOptionalAuthMiddleware();
 
 // Export authorization middleware
 exports.admin = requireAdmin;

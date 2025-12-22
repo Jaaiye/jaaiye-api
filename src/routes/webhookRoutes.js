@@ -6,9 +6,9 @@
 
 const express = require('express');
 const router = express.Router();
-const { syncQueue } = require('../queues');
-const paymentContainer = require('../domains/payment/config/container');
-const sharedContainer = require('../domains/shared/config/container');
+const { syncQueue } = require('../modules/queue/queue.module');
+const paymentModule = require('../modules/payment/payment.module');
+const commonModule = require('../modules/common/common.module');
 
 // Google Calendar webhook
 // POST /webhooks/google/calendar
@@ -29,7 +29,7 @@ router.post('/google/calendar', async (req, res) => {
     }
 
     // Find the user who has this resource/channel registered
-    const userRepository = sharedContainer.getUserRepository();
+    const userRepository = commonModule.getUserRepository();
     const user = await userRepository.findByGoogleCalendarResourceId(resourceId);
 
     if (user) {
@@ -49,9 +49,9 @@ router.post('/google/calendar', async (req, res) => {
 });
 
 // Paystack webhook
-router.post('/paystack', express.json({ type: '*/*' }), paymentContainer.getPaymentController().handlePaystackWebhook);
+router.post('/paystack', express.json({ type: '*/*' }), paymentModule.getPaymentController().handlePaystackWebhook);
 
 // Flutterwave webhook
-router.post('/flutterwave', express.json({ type: '*/*' }), paymentContainer.getPaymentController().handleFlutterwaveWebhook);
+router.post('/flutterwave', express.json({ type: '*/*' }), paymentModule.getPaymentController().handleFlutterwaveWebhook);
 
 module.exports = router;

@@ -396,6 +396,132 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function walletEventCreditedEmail({ eventTitle, grossAmount, feeAmount, netAmount, walletBalanceAfter }) {
+  const title = 'Your event wallet has been credited';
+  const previewText = `You received ${formatCurrency(netAmount)} from ticket sales for ${eventTitle}.`;
+  const bodyHtml = `
+    <p>Hi,</p>
+    <p>Your event <strong>${escapeHtml(eventTitle || 'your event')}</strong> just received a new payout from ticket sales.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;width:140px;">Gross amount</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:500;">${formatCurrency(grossAmount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee (10%)</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(feeAmount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Net credited</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:600;">${formatCurrency(netAmount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Wallet balance</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(walletBalanceAfter)}</td>
+      </tr>
+    </table>
+    <p style="color:${MUTED};font-size:13px;">You can withdraw from your wallet once you are ready, based on Jaaiye payout rules.</p>
+  `;
+  return baseLayout({ title, previewText, bodyHtml });
+}
+
+function walletGroupCreditedEmail({ groupName, hangoutTitle, amount, feeAmount, netAmount, walletBalanceAfter }) {
+  const title = 'Your group wallet has been funded';
+  const previewText = `Your group ${groupName || 'group'} just received ${formatCurrency(netAmount)}.`;
+  const bodyHtml = `
+    <p>Hi,</p>
+    <p>Your group <strong>${escapeHtml(groupName || 'your group')}</strong>${hangoutTitle ? ` (hangout: <strong>${escapeHtml(hangoutTitle)}</strong>)` : ''} just received a new contribution.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;width:140px;">Amount</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:500;">${formatCurrency(amount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee (10%)</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(feeAmount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Net credited</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:600;">${formatCurrency(netAmount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Wallet balance</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(walletBalanceAfter)}</td>
+      </tr>
+    </table>
+  `;
+  return baseLayout({ title, previewText, bodyHtml });
+}
+
+function walletWithdrawalSuccessEmail({ ownerLabel, payoutAmountNet, feeAmount, walletBalanceAfter, destinationMasked }) {
+  const title = 'Your withdrawal was successful';
+  const previewText = `We have sent ${formatCurrency(payoutAmountNet)} from your ${ownerLabel} wallet.`;
+  const bodyHtml = `
+    <p>Hi,</p>
+    <p>Your withdrawal from your <strong>${escapeHtml(ownerLabel || 'Jaaiye')}</strong> wallet has been completed.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;width:160px;">Amount received</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:600;">${formatCurrency(payoutAmountNet)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(feeAmount)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Wallet balance</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(walletBalanceAfter)}</td>
+      </tr>
+      ${destinationMasked ? `
+      <tr>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Destination</td>
+        <td style="padding:6px 0;color:${TEXT};font-size:14px;">${escapeHtml(destinationMasked)}</td>
+      </tr>` : ''}
+    </table>
+    <p style="color:${MUTED};font-size:13px;">Depending on your bank, it may take some time for the funds to appear in your account.</p>
+  `;
+  return baseLayout({ title, previewText, bodyHtml });
+}
+
+function walletWithdrawalFailedEmail({ ownerLabel, payoutAmountNet, failureReason }) {
+  const title = 'Your withdrawal could not be completed';
+  const previewText = `We could not complete your withdrawal of ${formatCurrency(payoutAmountNet)} from your ${ownerLabel} wallet.`;
+  const bodyHtml = `
+    <p>Hi,</p>
+    <p>We were unable to complete your withdrawal from your <strong>${escapeHtml(ownerLabel || 'Jaaiye')}</strong> wallet.</p>
+    <p><strong>Requested amount:</strong> ${formatCurrency(payoutAmountNet)}</p>
+    ${failureReason ? `<p><strong>Reason:</strong> ${escapeHtml(failureReason)}</p>` : ''}
+    <p style="margin-top:12px;color:${MUTED};font-size:13px;">Your funds are still available in your wallet. Please try again later or contact support if the issue persists.</p>
+  `;
+  return baseLayout({ title, previewText, bodyHtml });
+}
+
+function walletAdjustedRefundEmail({ eventTitle, amount, reason, walletBalanceAfter }) {
+  const title = 'Your wallet was adjusted due to a refund';
+  const previewText = `A refund of ${formatCurrency(amount)} was processed for ${eventTitle || 'an event'}.`;
+  const bodyHtml = `
+    <p>Hi,</p>
+    <p>Your wallet for <strong>${escapeHtml(eventTitle || 'your event')}</strong> has been adjusted due to a refund or chargeback.</p>
+    <p><strong>Amount debited:</strong> ${formatCurrency(amount)}</p>
+    ${reason ? `<p><strong>Details:</strong> ${escapeHtml(reason)}</p>` : ''}
+    <p><strong>New wallet balance:</strong> ${formatCurrency(walletBalanceAfter)}</p>
+  `;
+  return baseLayout({ title, previewText, bodyHtml });
+}
+
+function walletAdjustedManualEmail({ ownerLabel, amount, reason, walletBalanceAfter }) {
+  const title = 'Your wallet balance was updated';
+  const previewText = `${amount >= 0 ? 'A credit' : 'A debit'} of ${formatCurrency(Math.abs(amount))} was applied to your ${ownerLabel} wallet.`;
+  const bodyHtml = `
+    <p>Hi,</p>
+    <p>Your <strong>${escapeHtml(ownerLabel || 'Jaaiye')}</strong> wallet balance has been updated by our team.</p>
+    <p><strong>${amount >= 0 ? 'Amount credited' : 'Amount debited'}:</strong> ${formatCurrency(Math.abs(amount))}</p>
+    ${reason ? `<p><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : ''}
+    <p><strong>New wallet balance:</strong> ${formatCurrency(walletBalanceAfter)}</p>
+  `;
+  return baseLayout({ title, previewText, bodyHtml });
+}
+
 module.exports = {
   baseLayout,
   verificationEmail,
@@ -403,5 +529,11 @@ module.exports = {
   welcomeEmail,
   reportEmail,
   LOGO_CID,
-  paymentConfirmationEmail
+  paymentConfirmationEmail,
+  walletEventCreditedEmail,
+  walletGroupCreditedEmail,
+  walletWithdrawalSuccessEmail,
+  walletWithdrawalFailedEmail,
+  walletAdjustedRefundEmail,
+  walletAdjustedManualEmail
 };

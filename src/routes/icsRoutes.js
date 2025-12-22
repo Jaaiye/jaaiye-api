@@ -11,8 +11,8 @@ const crypto = require('crypto');
 const { successResponse, errorResponse } = require('../utils/response');
 const { protect } = require('../middleware/authMiddleware');
 const { apiLimiter } = require('../middleware/securityMiddleware');
-const sharedContainer = require('../domains/shared/config/container');
-const calendarContainer = require('../domains/calendar/config/container');
+const commonModule = require('../modules/common/common.module');
+const calendarModule = require('../modules/calendar/calendar.module');
 
 // Helper to build feed URL
 function buildFeedUrl(req, userId, token) {
@@ -23,7 +23,7 @@ function buildFeedUrl(req, userId, token) {
 // Protected: issue ICS token if not present
 router.post('/token/issue', apiLimiter, protect, async (req, res) => {
   try {
-    const userRepository = sharedContainer.getUserRepository();
+    const userRepository = commonModule.getUserRepository();
     const user = await userRepository.findByIdWithICSToken(req.user._id || req.user.id);
 
     if (!user) {
@@ -47,7 +47,7 @@ router.post('/token/issue', apiLimiter, protect, async (req, res) => {
 // Protected: rotate ICS token (invalidate previous)
 router.post('/token/rotate', apiLimiter, protect, async (req, res) => {
   try {
-    const userRepository = sharedContainer.getUserRepository();
+    const userRepository = commonModule.getUserRepository();
     const user = await userRepository.findByIdWithICSToken(req.user._id || req.user.id);
 
     if (!user) {
@@ -69,8 +69,8 @@ router.get('/unified/:userId', async (req, res) => {
     const { userId } = req.params;
     const { token } = req.query;
 
-    const userRepository = sharedContainer.getUserRepository();
-    const calendarRepository = calendarContainer.getCalendarRepository();
+    const userRepository = commonModule.getUserRepository();
+    const calendarRepository = calendarModule.getCalendarRepository();
 
     const user = await userRepository.findByIdWithICSToken(userId);
     if (!user || !user.ics?.token || user.ics.token !== token) {
@@ -86,7 +86,7 @@ router.get('/unified/:userId', async (req, res) => {
     const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     // Use EventSchema directly for complex MongoDB queries
-    const EventSchema = require('../domains/event/infrastructure/persistence/schemas/Event.schema');
+    const EventSchema = require('../modules/event/entities/Event.schema');
     const events = await EventSchema.find({
       calendar: { $in: calendarIds },
       startTime: { $gte: now },

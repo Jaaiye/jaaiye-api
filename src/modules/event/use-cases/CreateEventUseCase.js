@@ -46,9 +46,26 @@ class CreateEventUseCase {
         throw new Error('Access denied to calendar');
       }
     } else {
+      // Get or create user's default calendar
       calendar = await this.calendarRepository.findByOwner(userId);
       if (!calendar) {
-        throw new NotFoundError('No calendar found for user');
+        // Auto-create calendar if it doesn't exist (should have been created during registration, but handle edge case)
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+          throw new NotFoundError('User not found');
+        }
+
+        calendar = await this.calendarRepository.create({
+          owner: userId,
+          name: `${user.username || user.fullName}'s Calendar`,
+          isDefault: true,
+          isPublic: false
+        });
+
+        console.log('Auto-created calendar for user during event creation:', {
+          userId,
+          calendarId: calendar.id
+        });
       }
     }
 
@@ -183,8 +200,9 @@ class CreateEventUseCase {
     const isJaaiyeEvent = origin === 'jaaiye';
 
     if (this.calendarSyncService && user) {
-      // Sync to creator's Jaaiye calendar (event already in their calendar via calendar field)
-      // Sync to creator's Google calendar ONLY if NOT a Jaaiye event
+      // Event is already added to creator's calendar via calendar field
+      // Sync to creator's Jaaiye calendar (ensures participant record exists) and Google calendar
+      // Skip Google sync for Jaaiye events (admin/superadmin created events)
       this.calendarSyncService.syncEventToUserCalendars(userId, event, {
         skipGoogle: isJaaiyeEvent // Skip Google sync for Jaaiye events
       }).catch(error => {

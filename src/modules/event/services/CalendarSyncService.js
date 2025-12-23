@@ -72,11 +72,27 @@ class CalendarSyncService {
    */
   async _syncToJaaiyeCalendar(userId, event) {
     try {
-      // Check if user has a calendar
-      const userCalendar = await this.calendarRepository.findByOwner(userId);
+      // Get or create user's calendar (ensure it exists)
+      let userCalendar = await this.calendarRepository.findByOwner(userId);
       if (!userCalendar) {
-        console.warn('[CalendarSync] User has no Jaaiye calendar, skipping Jaaiye sync:', userId);
-        return;
+        // Auto-create calendar if it doesn't exist (should have been created during registration, but handle edge case)
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+          console.warn('[CalendarSync] User not found, skipping Jaaiye sync:', userId);
+          return;
+        }
+
+        userCalendar = await this.calendarRepository.create({
+          owner: userId,
+          name: `${user.username || user.fullName}'s Calendar`,
+          isDefault: true,
+          isPublic: false
+        });
+
+        console.log('[CalendarSync] Auto-created calendar for user during event sync:', {
+          userId,
+          calendarId: userCalendar.id
+        });
       }
 
       // Check if already a participant

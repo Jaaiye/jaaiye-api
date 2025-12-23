@@ -20,6 +20,8 @@ class CalendarController {
     setPrimaryGoogleCalendarUseCase,
     linkGoogleAccountUseCase,
     unlinkGoogleAccountUseCase,
+    initiateGoogleOAuthUseCase,
+    handleGoogleOAuthCallbackUseCase,
     refreshGoogleTokenUseCase,
     listGoogleCalendarsUseCase,
     selectGoogleCalendarsUseCase,
@@ -46,6 +48,8 @@ class CalendarController {
     this.setPrimaryGoogleCalendarUseCase = setPrimaryGoogleCalendarUseCase;
     this.linkGoogleAccountUseCase = linkGoogleAccountUseCase;
     this.unlinkGoogleAccountUseCase = unlinkGoogleAccountUseCase;
+    this.initiateGoogleOAuthUseCase = initiateGoogleOAuthUseCase;
+    this.handleGoogleOAuthCallbackUseCase = handleGoogleOAuthCallbackUseCase;
     this.refreshGoogleTokenUseCase = refreshGoogleTokenUseCase;
     this.listGoogleCalendarsUseCase = listGoogleCalendarsUseCase;
     this.selectGoogleCalendarsUseCase = selectGoogleCalendarsUseCase;
@@ -149,6 +153,51 @@ class CalendarController {
   unlinkGoogleAccount = asyncHandler(async (req, res) => {
     await this.unlinkGoogleAccountUseCase.execute(req.user.id);
     return successResponse(res, null, 200, 'Google account unlinked successfully');
+  });
+
+  /**
+   * Initiate Google OAuth flow for Calendar linking
+   * GET /api/v1/calendars/google/oauth/initiate
+   * Query params: redirectUri (required)
+   * Returns: { authUrl: string, state: string }
+   */
+  initiateGoogleOAuth = asyncHandler(async (req, res) => {
+    const { redirectUri } = req.query;
+
+    if (!redirectUri) {
+      return res.status(400).json({
+        success: false,
+        message: 'redirectUri query parameter is required'
+      });
+    }
+
+    const result = await this.initiateGoogleOAuthUseCase.execute(req.user.id, redirectUri);
+    return successResponse(res, result, 200, 'OAuth URL generated successfully');
+  });
+
+  /**
+   * Handle Google OAuth callback
+   * GET /api/v1/calendars/google/oauth/callback
+   * Query params: code, state, redirectUri
+   * Returns: { message: string, linked: boolean }
+   */
+  handleGoogleOAuthCallback = asyncHandler(async (req, res) => {
+    const { code, state, redirectUri } = req.query;
+
+    if (!code || !state) {
+      return res.status(400).json({
+        success: false,
+        message: 'code and state query parameters are required'
+      });
+    }
+
+    // redirectUri is optional - it's extracted from state parameter if included
+    // If not in state, it can be provided as query param for backward compatibility
+    const result = await this.handleGoogleOAuthCallbackUseCase.execute(code, state, redirectUri || null);
+
+    // Redirect to success page (frontend should handle this)
+    // For now, return JSON response - frontend can redirect based on this
+    return successResponse(res, result, 200, result.message);
   });
 
   refreshGoogleToken = asyncHandler(async (req, res) => {

@@ -16,9 +16,11 @@ class GoogleOAuthDTO {
   validate() {
     const errors = [];
 
-    if (!this.idToken) {
-      errors.push('Google ID token is required');
+    if (!this.idToken && !this.serverAuthCode) {
+      errors.push('Google ID token or server auth code is required');
     }
+
+
 
     return {
       valid: errors.length === 0,

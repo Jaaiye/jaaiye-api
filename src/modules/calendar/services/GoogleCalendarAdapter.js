@@ -5,6 +5,7 @@
  */
 
 const { google } = require('googleapis');
+const crypto = require('crypto');
 const { GoogleAccountNotLinkedError, GoogleTokenExpiredError, GoogleRefreshTokenInvalidError } = require('../errors');
 const logger = require('../../../utils/logger');
 
@@ -21,9 +22,20 @@ class GoogleCalendarAdapter {
   _createOAuth2Client(redirectUri = null) {
     // For server-side auth codes, redirect URI can be empty, 'postmessage', or 'urn:ietf:wg:oauth:2.0:oob'
     // Use provided redirectUri, or fall back to env var, or use empty string for server auth codes
-    const finalRedirectUri = redirectUri !== null
-      ? redirectUri
-      : (process.env.GOOGLE_REDIRECT_URI || '');
+    let finalRedirectUri;
+
+    if (redirectUri === null) {
+      // Use environment variable as fallback
+      finalRedirectUri = process.env.GOOGLE_REDIRECT_URI || 'postmessage';
+    } else {
+      // Use provided redirect URI (including empty string)
+      finalRedirectUri = redirectUri;
+    }
+
+    logger.debug('Creating OAuth2 client:', {
+      redirectUri: finalRedirectUri,
+      clientIdPrefix: process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + '...'
+    });
 
     return new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -139,7 +151,6 @@ class GoogleCalendarAdapter {
           ageMinutes: Math.round(timeSinceReceived / 60000),
           maxAgeMinutes: 10
         });
-        // Don't throw - still try to exchange, but log warning
       }
 
       // Log exchange attempt for debugging
@@ -150,64 +161,63 @@ class GoogleCalendarAdapter {
         ageSeconds: Math.round(timeSinceReceived / 1000),
         clientId: process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + '...'
       });
+      console.log(process.env.GOOGLE_REDIRECT_URI)
 
-      // For server-side auth codes, try without redirect URI first (or with 'postmessage')
-      // Server auth codes don't require a redirect URI match
-      let client = this._createOAuth2Client('postmessage');
-      let tokens;
-      let redirectUriUsed = 'postmessage';
+      // Try multiple redirect URI strategies for server-side auth codes
+      const redirectUriStrategies = [
+        process.env.GOOGLE_REDIRECT_URI,
+        'postmessage',  // Standard for server-side auth codes
+        '',             // Empty string for some mobile SDKs
+        'urn:ietf:wg:oauth:2.0:oob'  // Out-of-band flow
+      ];
 
-      try {
-        const { tokens: tokenResult } = await client.getToken(serverAuthCode);
-        tokens = tokenResult;
-        logger.info('Successfully exchanged auth code with postmessage redirect URI');
-      } catch (firstError) {
-        // If postmessage fails with invalid_grant, try with empty string (some mobile SDKs use this)
-        const isInvalidGrant = firstError.message?.includes('invalid_grant') ||
-                              firstError.code === 'invalid_grant' ||
-                              firstError.response?.data?.error === 'invalid_grant';
+      let tokens = null;
+      let lastError = null;
+      let successfulRedirectUri = null;
 
-        if (isInvalidGrant) {
-          logger.warn('Failed with postmessage redirect, trying empty redirect URI:', {
-            error: firstError.message,
-            code: firstError.code
+      for (const redirectUri of redirectUriStrategies) {
+        try {
+          logger.debug(`Attempting exchange with redirect URI: '${redirectUri}'`);
+
+          const client = this._createOAuth2Client(redirectUri);
+          const result = await client.getToken(serverAuthCode);
+
+          tokens = result.tokens;
+          successfulRedirectUri = redirectUri;
+          logger.info('Successfully exchanged auth code:', {
+            redirectUri: successfulRedirectUri,
+            hasAccessToken: !!tokens.access_token,
+            hasRefreshToken: !!tokens.refresh_token
           });
-
-          try {
-            client = this._createOAuth2Client('');
-            redirectUriUsed = 'empty';
-            const { tokens: tokenResult } = await client.getToken(serverAuthCode);
-            tokens = tokenResult;
-            logger.info('Successfully exchanged auth code with empty redirect URI');
-          } catch (secondError) {
-            // Both attempts failed - provide detailed error
-            logger.error('Both redirect URI attempts failed:', {
-              postmessageError: firstError.message,
-              emptyError: secondError.message,
-              postmessageCode: firstError.code,
-              emptyCode: secondError.code
-            });
-            throw secondError; // Throw the second error (most recent)
-          }
-        } else {
-          // Not an invalid_grant error, throw immediately
-          throw firstError;
+          break;
+        } catch (error) {
+          lastError = error;
+          logger.debug(`Failed with redirect URI '${redirectUri}':`, {
+            error: error.message,
+            code: error.code
+          });
+          // Continue to next strategy
         }
+      }
+
+      // If all strategies failed, throw the last error with enhanced information
+      if (!tokens) {
+        throw lastError;
       }
 
       logger.info('Exchanged Google server auth code successfully:', {
         hasAccessToken: !!tokens.access_token,
         hasRefreshToken: !!tokens.refresh_token,
-        redirectUriUsed,
+        redirectUriUsed: successfulRedirectUri,
         scope: tokens.scope?.substring(0, 50) + '...'
       });
 
-      return tokens; // { access_token, refresh_token, scope, expiry_date, id_token }
+      return tokens;
     } catch (error) {
       // Determine specific cause of invalid_grant
       const isInvalidGrant = error.code === 'invalid_grant' ||
-                            error.message?.toLowerCase().includes('invalid_grant') ||
-                            error.response?.data?.error === 'invalid_grant';
+        error.message?.toLowerCase().includes('invalid_grant') ||
+        error.response?.data?.error === 'invalid_grant';
 
       let errorMessage = error.message || 'Failed to exchange auth code';
       let errorDetails = {
@@ -229,7 +239,7 @@ class GoogleCalendarAdapter {
           errorMessage = 'Auth code has already been used. Each code can only be exchanged once. Please request a new code from the client.';
           errorDetails.cause = 'already_used';
         } else if (error.response?.data?.error_description?.toLowerCase().includes('redirect_uri')) {
-          errorMessage = 'Auth code redirect URI mismatch. Please ensure the redirect URI matches the one used to obtain the code.';
+          errorMessage = 'Auth code redirect URI mismatch. The code may have been generated with a different redirect URI configuration.';
           errorDetails.cause = 'redirect_uri_mismatch';
         } else {
           errorMessage = 'Auth code is invalid, expired, or already used. Please request a new code from the client.';
@@ -244,8 +254,7 @@ class GoogleCalendarAdapter {
         codeLength: serverAuthCode?.length,
         codePrefix: serverAuthCode?.substring(0, 10) + '...',
         source: source || 'unknown',
-        ageSeconds: Math.round((Date.now() - codeReceivedTime.getTime()) / 1000),
-        redirectUriAttempts: ['postmessage', 'empty']
+        ageSeconds: Math.round((Date.now() - codeReceivedTime.getTime()) / 1000)
       });
 
       // Re-throw with enhanced error information
@@ -256,6 +265,159 @@ class GoogleCalendarAdapter {
       enhancedError.details = errorDetails;
       throw enhancedError;
     }
+  }
+
+  /**
+   * Generate OAuth2 authorization URL for Google Calendar
+   * @param {string} userId - User ID (for state parameter)
+   * @param {string} redirectUri - Callback redirect URI
+   * @returns {Object} { url: string, state: string }
+   */
+  generateOAuthUrl(userId, redirectUri) {
+    if (!redirectUri) {
+      throw new Error('redirectUri is required for OAuth flow');
+    }
+
+    // Generate state parameter for CSRF protection
+    // Format: randomHex:userId:base64EncodedRedirectUri
+    // This allows us to extract both userId and redirectUri from callback
+    const state = crypto.randomBytes(32).toString('hex');
+    const encodedRedirectUri = Buffer.from(redirectUri).toString('base64');
+    const stateWithData = `${state}:${userId}:${encodedRedirectUri}`;
+
+    const client = this._createOAuth2Client(redirectUri);
+
+    // Required scopes for Google Calendar
+    const scopes = [
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.calendarlist.readonly'
+    ];
+
+    const authUrl = client.generateAuthUrl({
+      access_type: 'offline', // Required for refresh token
+      prompt: 'consent', // Force consent screen to ensure refresh token
+      scope: scopes,
+      state: stateWithData,
+      include_granted_scopes: true
+    });
+
+    logger.info('Generated OAuth URL for Google Calendar:', {
+      userId,
+      redirectUri,
+      stateLength: state.length
+    });
+
+    return {
+      url: authUrl,
+      state: stateWithData
+    };
+  }
+
+  /**
+   * Exchange OAuth callback code for tokens (direct Google OAuth, not Firebase)
+   * @param {string} code - OAuth authorization code from Google callback
+   * @param {string} redirectUri - Redirect URI used in OAuth flow (must match)
+   * @returns {Promise<Object>} Tokens { access_token, refresh_token, scope, expiry_date }
+   */
+  async exchangeOAuthCallbackCode(code, redirectUri) {
+    if (!code || typeof code !== 'string') {
+      throw new Error('Invalid OAuth code: code must be a non-empty string');
+    }
+
+    if (!redirectUri) {
+      throw new Error('redirectUri is required and must match the one used in OAuth flow');
+    }
+
+    try {
+      logger.debug('Exchanging OAuth code with redirectUri:', {
+        redirectUri,
+        codeLength: code.length,
+        codePrefix: code.substring(0, 10) + '...'
+      });
+
+      const client = this._createOAuth2Client(redirectUri);
+      const { tokens } = await client.getToken(code);
+
+      logger.info('Successfully exchanged OAuth callback code for tokens:', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        scope: tokens.scope?.substring(0, 50) + '...'
+      });
+
+      // Validate that we got a refresh token (critical for offline access)
+      if (!tokens.refresh_token) {
+        logger.warn('No refresh token received - user may need to re-authenticate with prompt=consent');
+        throw new Error('No refresh token received. Please ensure access_type=offline and prompt=consent are set in OAuth flow.');
+      }
+
+      return tokens;
+    } catch (error) {
+      logger.error('Failed to exchange OAuth callback code:', {
+        error: error.message,
+        code: error.code,
+        redirectUri,
+        errorResponse: error.response?.data,
+        errorDetails: error.response?.data?.error_description
+      });
+
+      if (error.code === 'invalid_grant' || error.response?.data?.error === 'invalid_grant') {
+        const errorDesc = error.response?.data?.error_description || '';
+        let errorMessage = 'OAuth code is invalid, expired, or already used.';
+
+        if (errorDesc.includes('redirect_uri_mismatch') || errorDesc.includes('redirect_uri')) {
+          errorMessage = `Redirect URI mismatch. The redirect URI used to exchange the code ("${redirectUri}") must exactly match the one used to generate the OAuth URL. Please ensure it's added to Google Cloud Console and matches exactly.`;
+        } else if (errorDesc.includes('expired') || errorDesc.includes('invalid')) {
+          errorMessage = 'OAuth code has expired or is invalid. Please restart the OAuth flow and exchange the code immediately.';
+        } else if (errorDesc.includes('already been used')) {
+          errorMessage = 'OAuth code has already been used. Each code can only be exchanged once. Please restart the OAuth flow.';
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Extract data from OAuth state parameter
+   * @param {string} state - State parameter from OAuth callback
+   * @returns {Object} { userId: string, redirectUri: string }
+   */
+  extractOAuthState(state) {
+    if (!state) {
+      throw new Error('State parameter is required for OAuth security');
+    }
+
+    // Extract userId and redirectUri from state (format: "randomHex:userId:base64EncodedRedirectUri")
+    const parts = state.split(':');
+    if (parts.length < 2) {
+      throw new Error('Invalid state format - missing user ID');
+    }
+
+    const userId = parts[1];
+    let redirectUri;
+
+    // Handle both old format (without redirectUri) and new format (with redirectUri)
+    if (parts.length >= 3) {
+      // New format: includes redirectUri
+      redirectUri = Buffer.from(parts[2], 'base64').toString('utf-8');
+    } else {
+      // Old format: fallback to environment variable or default
+      redirectUri = process.env.GOOGLE_REDIRECT_URI || '';
+      logger.warn('State parameter missing redirectUri, using fallback:', {
+        redirectUri,
+        stateFormat: 'legacy'
+      });
+    }
+
+    if (!redirectUri) {
+      throw new Error('Redirect URI is required but not found in state parameter');
+    }
+
+    return { userId, redirectUri };
   }
 
   /**
@@ -287,8 +449,8 @@ class GoogleCalendarAdapter {
 
       // Check for invalid_grant error (refresh token invalid/revoked)
       const isInvalidGrant = error.code === 'invalid_grant' ||
-                            error.message?.toLowerCase().includes('invalid_grant') ||
-                            error.response?.data?.error === 'invalid_grant';
+        error.message?.toLowerCase().includes('invalid_grant') ||
+        error.response?.data?.error === 'invalid_grant';
 
       if (isInvalidGrant) {
         logger.warn('Google refresh token is invalid or revoked:', {
@@ -438,8 +600,30 @@ class GoogleCalendarAdapter {
 
       const calendar = google.calendar({ version: 'v3', auth: client });
 
+      // If we have a stored calendar ID, verify it exists before returning it
       if (user.googleCalendar && user.googleCalendar.jaaiyeCalendarId) {
-        return user.googleCalendar.jaaiyeCalendarId;
+        try {
+          // Verify the calendar exists and is accessible
+          await calendar.calendars.get({ calendarId: user.googleCalendar.jaaiyeCalendarId });
+          logger.debug('Verified stored Jaaiye calendar exists:', {
+            calendarId: user.googleCalendar.jaaiyeCalendarId,
+            userId: user.id || user._id
+          });
+          return user.googleCalendar.jaaiyeCalendarId;
+        } catch (verifyError) {
+          // Calendar doesn't exist or is inaccessible - clear it and continue to find/create
+          logger.warn('Stored Jaaiye calendar ID is invalid, will find or create new one:', {
+            calendarId: user.googleCalendar.jaaiyeCalendarId,
+            error: verifyError.message,
+            userId: user.id || user._id
+          });
+          // Clear the invalid calendar ID from database
+          await this.userRepository.update(user.id, {
+            'googleCalendar.jaaiyeCalendarId': null
+          });
+          // Clear from in-memory user object
+          user.googleCalendar.jaaiyeCalendarId = null;
+        }
       }
 
       // Try to find existing by summary
@@ -449,10 +633,17 @@ class GoogleCalendarAdapter {
         await this.userRepository.update(user.id, {
           'googleCalendar.jaaiyeCalendarId': existing.id
         });
+        // Update in-memory user object
+        if (!user.googleCalendar) {
+          user.googleCalendar = {};
+        }
+        user.googleCalendar.jaaiyeCalendarId = existing.id;
+        logger.info('Found existing Jaaiye calendar:', { calendarId: existing.id, userId: user.id || user._id });
         return existing.id;
       }
 
       // Create new calendar
+      logger.info('Creating new Jaaiye calendar:', { userId: user.id || user._id });
       const created = await calendar.calendars.insert({ requestBody: { summary: 'Jaaiye – Hangouts' } });
       const calId = created.data.id;
       // Insert into calendar list (ensures it appears)
@@ -460,6 +651,12 @@ class GoogleCalendarAdapter {
       await this.userRepository.update(user.id, {
         'googleCalendar.jaaiyeCalendarId': calId
       });
+      // Update in-memory user object
+      if (!user.googleCalendar) {
+        user.googleCalendar = {};
+      }
+      user.googleCalendar.jaaiyeCalendarId = calId;
+      logger.info('Created new Jaaiye calendar:', { calendarId: calId, userId: user.id || user._id });
       return calId;
     } catch (error) {
       logger.error('Failed to ensure Jaaiye calendar', { error: error.message, userId: user.id || user._id });
@@ -600,12 +797,51 @@ class GoogleCalendarAdapter {
       const client = this._createOAuth2Client();
       await this._setUserCredentials(client, user);
       const calendar = google.calendar({ version: 'v3', auth: client });
-      const calendarId = explicitCalendarId || user.googleCalendar.jaaiyeCalendarId || await this.ensureJaaiyeCalendar(user);
+
+      // Determine calendar ID - try explicit, then ensure/create (which will verify stored ID)
+      let calendarId = explicitCalendarId;
+
+      // If no explicit calendar ID, ensure/create one (this will verify stored ID exists)
+      if (!calendarId) {
+        calendarId = await this.ensureJaaiyeCalendar(user);
+      }
+
+      logger.debug('Inserting event into Google Calendar:', {
+        calendarId,
+        eventTitle: eventBody.summary,
+        userId: user.id || user._id
+      });
+
       const res = await calendar.events.insert({ calendarId, requestBody: eventBody });
       return res.data; // contains id, etag, etc.
     } catch (error) {
       if (error.name === 'GoogleAccountNotLinkedError') throw error;
-      logger.error('Failed to insert Google event', { error: error.message, userId: user.id || user._id });
+
+      // Enhanced error logging
+      const errorDetails = {
+        error: error.message,
+        code: error.code,
+        status: error.response?.status,
+        userId: user.id || user._id,
+        calendarId: explicitCalendarId || user.googleCalendar?.jaaiyeCalendarId || 'none',
+        eventTitle: eventBody?.summary
+      };
+
+      // Check if it's a "Not Found" error for calendar
+      if (error.code === 404 || error.response?.status === 404) {
+        logger.error('Google Calendar not found - calendar may have been deleted:', errorDetails);
+        // Clear the invalid calendar ID so it will be recreated next time
+        if (user.googleCalendar?.jaaiyeCalendarId) {
+          await this.userRepository.update(user.id, {
+            'googleCalendar.jaaiyeCalendarId': null
+          }).catch(err => {
+            logger.warn('Failed to clear invalid calendar ID:', { userId: user.id, error: err.message });
+          });
+        }
+        throw new Error('Google Calendar not found. The calendar may have been deleted. Please re-link your Google account.');
+      }
+
+      logger.error('Failed to insert Google event', errorDetails);
       throw error;
     }
   }

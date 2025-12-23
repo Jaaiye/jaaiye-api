@@ -2,6 +2,12 @@ const ApiKey = require('../modules/common/entities/ApiKey.schema');
 
 // Validate mobile API key
 exports.validateMobileApiKey = async (req, res, next) => {
+  // Skip API key validation for public OAuth callback endpoint
+  // Google redirects here without API key, and user ID is extracted from state parameter
+  if (req.path && req.path.includes('/calendars/google/oauth/callback')) {
+    return next();
+  }
+
   const apiKey = req.headers['x-api-key'];
 
   if (!apiKey) {

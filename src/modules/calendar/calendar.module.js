@@ -33,7 +33,9 @@ const {
   StartWatchUseCase,
   StopWatchUseCase,
   GetDiagnosticsUseCase,
-  GetSharedCalendarViewUseCase
+  GetSharedCalendarViewUseCase,
+  InitiateGoogleOAuthUseCase,
+  HandleGoogleOAuthCallbackUseCase
 } = require('./use-cases');
 const CalendarController = require('./calendar.controller');
 const createCalendarRoutes = require('./calendar.routes');
@@ -207,6 +209,26 @@ class CalendarModule {
       });
     }
     return this._instances.unlinkGoogleAccountUseCase;
+  }
+
+  getInitiateGoogleOAuthUseCase() {
+    if (!this._instances.initiateGoogleOAuthUseCase) {
+      this._instances.initiateGoogleOAuthUseCase = new InitiateGoogleOAuthUseCase({
+        googleCalendarAdapter: this.getGoogleCalendarAdapter()
+      });
+    }
+    return this._instances.initiateGoogleOAuthUseCase;
+  }
+
+  getHandleGoogleOAuthCallbackUseCase() {
+    if (!this._instances.handleGoogleOAuthCallbackUseCase) {
+      this._instances.handleGoogleOAuthCallbackUseCase = new HandleGoogleOAuthCallbackUseCase({
+        userRepository: this.getUserRepository(),
+        googleCalendarAdapter: this.getGoogleCalendarAdapter(),
+        calendarSyncAdapter: this.getCalendarSyncAdapter()
+      });
+    }
+    return this._instances.handleGoogleOAuthCallbackUseCase;
   }
 
   getRefreshGoogleTokenUseCase() {
@@ -391,6 +413,8 @@ class CalendarModule {
         setPrimaryGoogleCalendarUseCase: this.getSetPrimaryGoogleCalendarUseCase(),
         linkGoogleAccountUseCase: this.getLinkGoogleAccountUseCase(),
         unlinkGoogleAccountUseCase: this.getUnlinkGoogleAccountUseCase(),
+        initiateGoogleOAuthUseCase: this.getInitiateGoogleOAuthUseCase(),
+        handleGoogleOAuthCallbackUseCase: this.getHandleGoogleOAuthCallbackUseCase(),
         refreshGoogleTokenUseCase: this.getRefreshGoogleTokenUseCase(),
         listGoogleCalendarsUseCase: this.getListGoogleCalendarsUseCase(),
         selectGoogleCalendarsUseCase: this.getSelectGoogleCalendarsUseCase(),

@@ -92,38 +92,13 @@ class GoogleOAuthUseCase {
       });
     }
 
-    // Auto-link Google Calendar if serverAuthCode is provided
-    if (dto.serverAuthCode && this.googleCalendarAdapter) {
-      try {
-        // Exchange the auth code for tokens
-        const tokens = await this.googleCalendarAdapter.exchangeServerAuthCode(dto.serverAuthCode);
-
-        // Save tokens to user
-        await this.googleCalendarAdapter.saveTokensToUser(user, tokens);
-
-        // Refresh user to get updated tokens
-        user = await this.userRepository.findById(user.id);
-
-        // Ensure the Jaaiye calendar exists using fresh tokens
-        await this.googleCalendarAdapter.ensureJaaiyeCalendar(user, tokens);
-
-        // Sync existing events (non-blocking)
-        if (this.calendarSyncAdapter) {
-          this.calendarSyncAdapter.syncExistingEventsToCalendar(user.id).catch(err => {
-            console.error('Failed to sync existing events to calendar', {
-              userId: user.id,
-              error: err.message
-            });
-          });
-        }
-
-        console.log('Google Calendar automatically linked during OAuth sign-in');
-      } catch (error) {
-        // Log but don't fail authentication if calendar linking fails
-        console.warn('Failed to auto-link Google Calendar during OAuth:', error.message);
-        // Refresh user even if linking failed, in case tokens were partially saved
-        user = await this.userRepository.findById(user.id);
-      }
+    // Note: Firebase auth codes cannot be exchanged for Google Calendar tokens
+    // Users must use the separate Google Calendar OAuth flow:
+    // GET /api/v1/calendars/google/oauth/initiate
+    // This ensures proper refresh token handling and avoids invalid_grant errors
+    if (dto.serverAuthCode) {
+      console.log('Note: serverAuthCode provided but Calendar linking requires separate OAuth flow');
+      // Don't attempt to exchange Firebase codes for Calendar tokens
     }
 
     // Create user entity (use refreshed user if calendar was linked)

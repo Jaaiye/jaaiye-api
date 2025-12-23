@@ -73,7 +73,7 @@ class GroupController {
 
   updateGroup = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { UpdateGroupDTO } = require('../../dto');
+    const { UpdateGroupDTO } = require('./dto');
     const dto = new UpdateGroupDTO(req.body);
     const result = await this.updateGroupUseCase.execute(id, req.user.id, dto);
 

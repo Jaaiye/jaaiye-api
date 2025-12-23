@@ -41,7 +41,7 @@ class NotificationController {
   });
 
   getNotifications = asyncHandler(async (req, res) => {
-    const { GetNotificationsDTO } = require('../../dto');
+    const { GetNotificationsDTO } = require('./dto');
     const dto = new GetNotificationsDTO(req.query);
     const result = await this.getNotificationsUseCase.execute(req.user.id, dto);
 
@@ -49,7 +49,7 @@ class NotificationController {
   });
 
   markAsRead = asyncHandler(async (req, res) => {
-    const { MarkAsReadDTO } = require('../../dto');
+    const { MarkAsReadDTO } = require('./dto');
     const dto = new MarkAsReadDTO(req.body);
     const result = await this.markAsReadUseCase.execute(req.user.id, dto);
 
@@ -57,7 +57,7 @@ class NotificationController {
   });
 
   deleteNotifications = asyncHandler(async (req, res) => {
-    const { DeleteNotificationsDTO } = require('../../dto');
+    const { DeleteNotificationsDTO } = require('./dto');
     const dto = new DeleteNotificationsDTO(req.body);
     const result = await this.deleteNotificationsUseCase.execute(req.user.id, dto);
 

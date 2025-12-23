@@ -68,7 +68,7 @@ class CalendarController {
   // ============================================================================
 
   createCalendar = asyncHandler(async (req, res) => {
-    const { CreateCalendarDTO } = require('../../dto');
+    const { CreateCalendarDTO } = require('./dto');
     const dto = new CreateCalendarDTO(req.body);
     const result = await this.createCalendarUseCase.execute(req.user.id, dto);
 
@@ -95,7 +95,7 @@ class CalendarController {
   });
 
   updateCalendar = asyncHandler(async (req, res) => {
-    const { UpdateCalendarDTO } = require('../../dto');
+    const { UpdateCalendarDTO } = require('./dto');
     const dto = new UpdateCalendarDTO(req.body);
     const result = await this.updateCalendarUseCase.execute(req.params.id, req.user.id, dto);
 
@@ -119,7 +119,7 @@ class CalendarController {
   });
 
   linkGoogleCalendars = asyncHandler(async (req, res) => {
-    const { LinkGoogleCalendarsDTO } = require('../../dto');
+    const { LinkGoogleCalendarsDTO } = require('./dto');
     const dto = new LinkGoogleCalendarsDTO(req.body);
     const result = await this.linkGoogleCalendarsUseCase.execute(req.params.id, req.user.id, dto);
 
@@ -127,7 +127,7 @@ class CalendarController {
   });
 
   setPrimaryGoogleCalendar = asyncHandler(async (req, res) => {
-    const { SetPrimaryGoogleCalendarDTO } = require('../../dto');
+    const { SetPrimaryGoogleCalendarDTO } = require('./dto');
     const dto = new SetPrimaryGoogleCalendarDTO(req.body);
     const result = await this.setPrimaryGoogleCalendarUseCase.execute(req.params.id, req.user.id, dto);
 
@@ -139,7 +139,7 @@ class CalendarController {
   // ============================================================================
 
   linkGoogleAccount = asyncHandler(async (req, res) => {
-    const { LinkGoogleAccountDTO } = require('../../dto');
+    const { LinkGoogleAccountDTO } = require('./dto');
     const dto = new LinkGoogleAccountDTO(req.body);
     const result = await this.linkGoogleAccountUseCase.execute(req.user.id, dto.serverAuthCode);
 
@@ -172,7 +172,7 @@ class CalendarController {
   });
 
   selectGoogleCalendars = asyncHandler(async (req, res) => {
-    const { SelectGoogleCalendarsDTO } = require('../../dto');
+    const { SelectGoogleCalendarsDTO } = require('./dto');
     const dto = new SelectGoogleCalendarsDTO(req.body);
     const result = await this.selectGoogleCalendarsUseCase.execute(
       req.user.id,
@@ -189,7 +189,7 @@ class CalendarController {
   });
 
   createCalendarMapping = asyncHandler(async (req, res) => {
-    const { CreateCalendarMappingDTO } = require('../../dto');
+    const { CreateCalendarMappingDTO } = require('./dto');
     const dto = new CreateCalendarMappingDTO(req.body);
     const result = await this.createCalendarMappingUseCase.execute(
       req.user.id,
@@ -206,7 +206,7 @@ class CalendarController {
   });
 
   listGoogleEvents = asyncHandler(async (req, res) => {
-    const { ListGoogleEventsDTO } = require('../../dto');
+    const { ListGoogleEventsDTO } = require('./dto');
     const dto = new ListGoogleEventsDTO(req.body);
     const result = await this.listGoogleEventsUseCase.execute(req.user.id, dto.timeMin, dto.timeMax, {
       includeAllDay: dto.includeAllDay,
@@ -218,7 +218,7 @@ class CalendarController {
   });
 
   getFreeBusy = asyncHandler(async (req, res) => {
-    const { GetFreeBusyDTO } = require('../../dto');
+    const { GetFreeBusyDTO } = require('./dto');
     const dto = new GetFreeBusyDTO(req.body);
     const result = await this.getFreeBusyUseCase.execute(
       req.user.id,
@@ -235,7 +235,7 @@ class CalendarController {
   // ============================================================================
 
   getUnifiedCalendar = asyncHandler(async (req, res) => {
-    const { GetUnifiedCalendarDTO } = require('../../dto');
+    const { GetUnifiedCalendarDTO } = require('./dto');
     const dto = new GetUnifiedCalendarDTO(req.query);
     const result = await this.getUnifiedCalendarUseCase.execute(
       req.user.id,
@@ -252,7 +252,7 @@ class CalendarController {
   });
 
   getMonthlyCalendar = asyncHandler(async (req, res) => {
-    const { GetMonthlyCalendarDTO } = require('../../dto');
+    const { GetMonthlyCalendarDTO } = require('./dto');
     const dto = new GetMonthlyCalendarDTO(req.params, req.query);
     const result = await this.getMonthlyCalendarUseCase.execute(
       req.user.id,
@@ -277,7 +277,7 @@ class CalendarController {
   });
 
   backfillSync = asyncHandler(async (req, res) => {
-    const { BackfillSyncDTO } = require('../../dto');
+    const { BackfillSyncDTO } = require('./dto');
     const dto = new BackfillSyncDTO(req.body);
     const result = await this.backfillSyncUseCase.execute(
       req.user.id,
@@ -293,7 +293,7 @@ class CalendarController {
   // ============================================================================
 
   startWatch = asyncHandler(async (req, res) => {
-    const { StartWatchDTO } = require('../../dto');
+    const { StartWatchDTO } = require('./dto');
     const dto = new StartWatchDTO(req.body);
     const result = await this.startWatchUseCase.execute(req.user.id, dto.calendarId);
 
@@ -301,7 +301,7 @@ class CalendarController {
   });
 
   stopWatch = asyncHandler(async (req, res) => {
-    const { StopWatchDTO } = require('../../dto');
+    const { StopWatchDTO } = require('./dto');
     const dto = new StopWatchDTO(req.body);
     await this.stopWatchUseCase.execute(req.user.id, dto.calendarId);
 
@@ -322,7 +322,7 @@ class CalendarController {
   // ============================================================================
 
   getSharedCalendarView = asyncHandler(async (req, res) => {
-    const { GetSharedCalendarViewDTO } = require('../../dto');
+    const { GetSharedCalendarViewDTO } = require('./dto');
     const dto = new GetSharedCalendarViewDTO(req.body);
     const result = await this.getSharedCalendarViewUseCase.execute(
       req.user.id,

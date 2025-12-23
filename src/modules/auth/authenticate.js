@@ -37,6 +37,12 @@ function createAuthMiddleware({ userRepository, tokenBlacklistRepository }) {
     // Find user
     const user = await userRepository.findById(decoded.id);
     if (!user) {
+      console.error('[Auth Middleware] User lookup failed:', {
+        userId: decoded.id,
+        userIdType: typeof decoded.id,
+        path: req.path,
+        method: req.method
+      });
       throw new UnauthorizedError('User not found');
     }
 

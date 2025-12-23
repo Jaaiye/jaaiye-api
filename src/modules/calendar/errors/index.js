@@ -53,6 +53,13 @@ class GoogleTokenExpiredError extends AppError {
   }
 }
 
+class GoogleRefreshTokenInvalidError extends AppError {
+  constructor(message = 'Google refresh token is invalid or revoked. Please re-link your Google account.') {
+    super(message, 401);
+    this.name = 'GoogleRefreshTokenInvalidError';
+  }
+}
+
 module.exports = {
   CalendarNotFoundError,
   CalendarAlreadyExistsError,
@@ -60,6 +67,7 @@ module.exports = {
   CalendarEditDeniedError,
   InvalidGoogleCalendarMappingError,
   GoogleAccountNotLinkedError,
-  GoogleTokenExpiredError
+  GoogleTokenExpiredError,
+  GoogleRefreshTokenInvalidError
 };
 

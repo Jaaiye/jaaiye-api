@@ -14,13 +14,17 @@ class CreateTicketUseCase {
     eventRepository,
     userRepository,
     qrCodeAdapter,
-    emailAdapter
+    emailAdapter,
+    eventParticipantRepository,
+    calendarSyncService
   }) {
     this.ticketRepository = ticketRepository;
     this.eventRepository = eventRepository;
     this.userRepository = userRepository;
     this.qrCodeAdapter = qrCodeAdapter;
     this.emailAdapter = emailAdapter;
+    this.eventParticipantRepository = eventParticipantRepository;
+    this.calendarSyncService = calendarSyncService;
   }
 
   async execute(dto) {
@@ -166,6 +170,46 @@ class CreateTicketUseCase {
 
     // Increment event's sold ticket count
     await eventDoc.incrementTicketSales(ticketTypeIdForSales, dto.quantity, dto.bypassCapacity);
+
+    // Add buyer as event participant and sync to their calendars (non-blocking)
+    // Check if user has account and calendar, then sync
+    if (this.eventParticipantRepository && this.calendarSyncService) {
+      setImmediate(async () => {
+        try {
+          const targetUser = await this.userRepository.findById(targetUserId);
+
+          // Check if user has account and calendar
+          if (targetUser) {
+            // Check if already a participant
+            const existingParticipant = await this.eventParticipantRepository.findByEventAndUser(
+              dto.eventId,
+              targetUserId
+            );
+
+            if (!existingParticipant) {
+              // Add as participant
+              await this.eventParticipantRepository.create({
+                event: dto.eventId,
+                user: targetUserId,
+                role: 'attendee',
+                status: 'accepted'
+              });
+
+              // Sync event to buyer's calendars (Jaaiye + Google)
+              const event = await this.eventRepository.findById(dto.eventId);
+              if (event) {
+                await this.calendarSyncService.syncEventToUserCalendars(targetUserId, event, {
+                  skipGoogle: false // Sync to Google for ticket buyers
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('[CreateTicket] Failed to add participant or sync calendar:', error);
+          // Don't fail ticket creation if participant/calendar sync fails
+        }
+      });
+    }
 
     // Send email notification (non-blocking)
     try {

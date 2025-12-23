@@ -17,7 +17,8 @@ class CreateEventUseCase {
     notificationAdapter,
     groupRepository,
     firebaseAdapter,
-    walletRepository
+    walletRepository,
+    calendarSyncService
   }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
@@ -29,6 +30,7 @@ class CreateEventUseCase {
     this.groupRepository = groupRepository;
     this.firebaseAdapter = firebaseAdapter;
     this.walletRepository = walletRepository;
+    this.calendarSyncService = calendarSyncService;
   }
 
   async execute(userId, dto, file = null) {
@@ -176,36 +178,50 @@ class CreateEventUseCase {
       }
     }
 
-    // Sync with Google Calendar
-    try {
-      if (user && user.providerLinks?.google && user.googleCalendar?.refreshToken) {
-        const targetGoogleCalId = dto.googleCalendarId || calendar.google?.primaryId || user.googleCalendar?.jaaiyeCalendarId;
-        if (targetGoogleCalId) {
-          const eventBody = {
-            summary: event.title,
-            description: event.description,
-            start: { dateTime: startTime.toISOString() },
-            end: { dateTime: endTime.toISOString() },
-            location: event.venue
-          };
+    // Sync creator's event to their calendars (non-blocking)
+    // Skip Google sync for Jaaiye events (admin/superadmin created)
+    const isJaaiyeEvent = origin === 'jaaiye';
 
-          const googleEvent = await this.googleCalendarAdapter.insertEvent(user, eventBody, targetGoogleCalId);
+    if (this.calendarSyncService && user) {
+      // Sync to creator's Jaaiye calendar (event already in their calendar via calendar field)
+      // Sync to creator's Google calendar ONLY if NOT a Jaaiye event
+      this.calendarSyncService.syncEventToUserCalendars(userId, event, {
+        skipGoogle: isJaaiyeEvent // Skip Google sync for Jaaiye events
+      }).catch(error => {
+        console.warn('[CreateEvent] Calendar sync failed for creator:', error);
+      });
+    } else if (!isJaaiyeEvent && user && user.providerLinks?.google && user.googleCalendar?.refreshToken) {
+      // Fallback: Direct Google sync for non-Jaaiye events (legacy behavior)
+      // This is non-blocking - runs in background
+      setImmediate(async () => {
+        try {
+          const targetGoogleCalId = dto.googleCalendarId || calendar.google?.primaryId || user.googleCalendar?.jaaiyeCalendarId;
+          if (targetGoogleCalId) {
+            const eventBody = {
+              summary: event.title,
+              description: event.description,
+              start: { dateTime: startTime.toISOString() },
+              end: { dateTime: endTime.toISOString() },
+              location: event.venue
+            };
 
-          // Update event with Google sync info
-          await this.eventRepository.update(event.id, {
-            external: {
-              google: {
-                calendarId: targetGoogleCalId,
-                eventId: googleEvent.id,
-                etag: googleEvent.etag
+            const googleEvent = await this.googleCalendarAdapter.insertEvent(user, eventBody, targetGoogleCalId);
+
+            // Update event with Google sync info
+            await this.eventRepository.update(event.id, {
+              external: {
+                google: {
+                  calendarId: targetGoogleCalId,
+                  eventId: googleEvent.id,
+                  etag: googleEvent.etag
+                }
               }
-            }
-          });
+            });
+          }
+        } catch (error) {
+          console.warn('[CreateEvent] Google calendar sync failed during event creation', error);
         }
-      }
-    } catch (error) {
-      // Log but don't fail event creation
-      console.warn('Google calendar sync failed during event creation', error);
+      });
     }
 
     // Handle participants - only for hangouts
@@ -265,27 +281,42 @@ class CreateEventUseCase {
             })
           );
 
-          // Add to Google Calendar for participants
-          await Promise.all(
-            createdParticipants.map(async (participant) => {
-              try {
-                const participantUser = await this.userRepository.findById(participant.user);
-                if (participantUser && participantUser.providerLinks?.google && participantUser.googleCalendar?.refreshToken) {
-                  const eventBody = {
-                    summary: event.title,
-                    description: event.description || `You've been invited to ${event.title}`,
-                    start: { dateTime: startTime.toISOString() },
-                    end: { dateTime: endTime.toISOString() },
-                    location: event.venue || undefined
-                  };
+          // Sync event to participants' calendars (Jaaiye + Google) - non-blocking
+          if (this.calendarSyncService) {
+            const participantUserIds = createdParticipants.map(p =>
+              p.user?.toString ? p.user.toString() : String(p.user)
+            );
 
-                  await this.googleCalendarAdapter.insertEvent(participantUser, eventBody);
-                }
-              } catch (error) {
-                console.warn('Failed to add event to participant Google Calendar', error);
-              }
-            })
-          );
+            this.calendarSyncService.syncEventToMultipleUsers(participantUserIds, event, {
+              skipGoogle: false // Sync to Google for participants
+            }).catch(error => {
+              console.warn('[CreateEvent] Calendar sync failed for participants:', error);
+            });
+          } else {
+            // Fallback: Direct Google sync (legacy behavior) - non-blocking
+            setImmediate(async () => {
+              await Promise.all(
+                createdParticipants.map(async (participant) => {
+                  try {
+                    const participantUser = await this.userRepository.findById(participant.user);
+                    if (participantUser && participantUser.providerLinks?.google && participantUser.googleCalendar?.refreshToken) {
+                      const eventBody = {
+                        summary: event.title,
+                        description: event.description || `You've been invited to ${event.title}`,
+                        start: { dateTime: startTime.toISOString() },
+                        end: { dateTime: endTime.toISOString() },
+                        location: event.venue || undefined
+                      };
+
+                      await this.googleCalendarAdapter.insertEvent(participantUser, eventBody);
+                    }
+                  } catch (error) {
+                    console.warn('Failed to add event to participant Google Calendar', error);
+                  }
+                })
+              );
+            });
+          }
 
           // Handle group for hangout (only for hangouts)
           if (this.groupRepository) {

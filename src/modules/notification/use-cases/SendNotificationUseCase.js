@@ -28,12 +28,15 @@ class SendNotificationUseCase {
     });
 
     // Send push notification (non-blocking, fire-and-forget)
-    setImmediate(() => {
-      this.pushNotificationAdapter.send(userId, notification, data)
-        .catch(error => {
-          console.error('Failed to send push notification:', error);
-        });
-    });
+    // Only send if pushNotificationAdapter is available
+    if (this.pushNotificationAdapter) {
+      setImmediate(() => {
+        this.pushNotificationAdapter.send(userId, notification, data)
+          .catch(error => {
+            console.error('Failed to send push notification:', error);
+          });
+      });
+    }
 
     return notificationEntity.toJSON();
   }

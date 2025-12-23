@@ -22,7 +22,11 @@ const TicketRoutes = require('./ticket.routes');
 
 // Import shared dependencies
 const { EventRepository } = require('../event/repositories');
+const { EventParticipantRepository } = require('../event/repositories');
 const { UserRepository } = require('../common/repositories');
+const CalendarSyncService = require('../event/services/CalendarSyncService');
+const { GoogleCalendarAdapter } = require('../event/services');
+const { CalendarRepository } = require('../calendar/repositories');
 
 class TicketModule {
   constructor() {
@@ -91,6 +95,42 @@ class TicketModule {
     return this._emailAdapter;
   }
 
+  // Shared services
+  getEventParticipantRepository() {
+    if (!this._eventParticipantRepository) {
+      this._eventParticipantRepository = new EventParticipantRepository();
+    }
+    return this._eventParticipantRepository;
+  }
+
+  getCalendarRepository() {
+    if (!this._calendarRepository) {
+      this._calendarRepository = new CalendarRepository();
+    }
+    return this._calendarRepository;
+  }
+
+  getGoogleCalendarAdapter() {
+    if (!this._googleCalendarAdapter) {
+      this._googleCalendarAdapter = new GoogleCalendarAdapter({
+        userRepository: this.getUserRepository()
+      });
+    }
+    return this._googleCalendarAdapter;
+  }
+
+  getCalendarSyncService() {
+    if (!this._calendarSyncService) {
+      this._calendarSyncService = new CalendarSyncService({
+        eventParticipantRepository: this.getEventParticipantRepository(),
+        calendarRepository: this.getCalendarRepository(),
+        userRepository: this.getUserRepository(),
+        googleCalendarAdapter: this.getGoogleCalendarAdapter()
+      });
+    }
+    return this._calendarSyncService;
+  }
+
   // Use Cases
   getCreateTicketUseCase() {
     if (!this._createTicketUseCase) {
@@ -99,7 +139,9 @@ class TicketModule {
         eventRepository: this.getEventRepository(),
         userRepository: this.getUserRepository(),
         qrCodeAdapter: this.getQRCodeAdapter(),
-        emailAdapter: this.getEmailAdapter()
+        emailAdapter: this.getEmailAdapter(),
+        eventParticipantRepository: this.getEventParticipantRepository(),
+        calendarSyncService: this.getCalendarSyncService()
       });
     }
     return this._createTicketUseCase;

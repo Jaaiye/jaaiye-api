@@ -16,7 +16,9 @@ const WalletNotificationService = require('../wallet/services/WalletNotification
 const WalletEmailAdapter = require('../wallet/services/WalletEmailAdapter');
 const { FirebaseAdapter } = require('../common/services');
 const { GoogleCalendarAdapter, CloudinaryAdapter } = require('./services');
+const { GoogleCalendarAdapter: CalendarGoogleCalendarAdapter } = require('../calendar/services');
 const { NotificationAdapter } = require('./services');
+const CalendarSyncService = require('./services/CalendarSyncService');
 const { SendNotificationUseCase } = require('../notification/use-cases');
 const { NotificationRepository } = require('../notification/repositories');
 const { PushNotificationAdapter } = require('../notification/services');
@@ -138,7 +140,9 @@ class EventModule {
 
   getGoogleCalendarAdapter() {
     if (!this._instances.googleCalendarAdapter) {
-      this._instances.googleCalendarAdapter = new GoogleCalendarAdapter();
+      this._instances.googleCalendarAdapter = new GoogleCalendarAdapter({
+        userRepository: this.getUserRepository()
+      });
     }
     return this._instances.googleCalendarAdapter;
   }
@@ -148,6 +152,23 @@ class EventModule {
       this._instances.cloudinaryAdapter = new CloudinaryAdapter();
     }
     return this._instances.cloudinaryAdapter;
+  }
+
+  getCalendarSyncService() {
+    if (!this._instances.calendarSyncService) {
+      // Use calendar module's GoogleCalendarAdapter (requires userRepository)
+      const calendarGoogleAdapter = new CalendarGoogleCalendarAdapter({
+        userRepository: this.getUserRepository()
+      });
+
+      this._instances.calendarSyncService = new CalendarSyncService({
+        eventParticipantRepository: this.getEventParticipantRepository(),
+        calendarRepository: this.getCalendarRepository(),
+        userRepository: this.getUserRepository(),
+        googleCalendarAdapter: calendarGoogleAdapter
+      });
+    }
+    return this._instances.calendarSyncService;
   }
 
   // ============================================================================
@@ -166,7 +187,8 @@ class EventModule {
         notificationAdapter: this.getNotificationAdapter(),
         groupRepository: this.getGroupRepository(),
         firebaseAdapter: this.getFirebaseAdapter(),
-        walletRepository: this.getWalletRepository()
+        walletRepository: this.getWalletRepository(),
+        calendarSyncService: this.getCalendarSyncService()
       });
     }
     return this._instances.createEventUseCase;
@@ -225,7 +247,8 @@ class EventModule {
         eventParticipantRepository: this.getEventParticipantRepository(),
         userRepository: this.getUserRepository(),
         notificationAdapter: this.getNotificationAdapter(),
-        googleCalendarAdapter: this.getGoogleCalendarAdapter()
+        googleCalendarAdapter: this.getGoogleCalendarAdapter(),
+        calendarSyncService: this.getCalendarSyncService()
       });
     }
     return this._instances.addParticipantsUseCase;

@@ -5,7 +5,7 @@
  */
 
 const { google } = require('googleapis');
-const { GoogleAccountNotLinkedError, GoogleTokenExpiredError } = require('../errors');
+const { GoogleAccountNotLinkedError, GoogleTokenExpiredError, GoogleRefreshTokenInvalidError } = require('../errors');
 const logger = require('../../../utils/logger');
 
 class GoogleCalendarAdapter {
@@ -72,6 +72,12 @@ class GoogleCalendarAdapter {
         scope: user.googleCalendar.scope
       });
     } catch (error) {
+      // Check if this is an invalid_grant error from refreshAccessToken
+      if (error.name === 'GoogleRefreshTokenInvalidError') {
+        // Re-throw as-is - already handled by refreshAccessToken
+        throw error;
+      }
+
       logger.error('Failed to set user credentials:', {
         error: error.message,
         userId: user.id || user._id
@@ -110,50 +116,144 @@ class GoogleCalendarAdapter {
   /**
    * Exchange server auth code for tokens
    * @param {string} serverAuthCode - Google server auth code
+   * @param {Object} options - Optional metadata for debugging
+   * @param {string} options.source - Source of the code (e.g., 'mobile', 'web')
+   * @param {Date} options.receivedAt - When the code was received
    * @returns {Promise<Object>} Tokens { access_token, refresh_token, scope, expiry_date }
    */
-  async exchangeServerAuthCode(serverAuthCode) {
+  async exchangeServerAuthCode(serverAuthCode, options = {}) {
+    const { source, receivedAt } = options;
+    const codeReceivedTime = receivedAt || new Date();
+
     try {
+      // Validate code format before attempting exchange
+      if (!serverAuthCode || typeof serverAuthCode !== 'string') {
+        throw new Error('Invalid auth code format: code must be a non-empty string');
+      }
+
+      // Check if code might be expired (server auth codes expire in ~10 minutes)
+      const timeSinceReceived = Date.now() - codeReceivedTime.getTime();
+      const tenMinutes = 10 * 60 * 1000;
+      if (timeSinceReceived > tenMinutes) {
+        logger.warn('Server auth code may be expired:', {
+          ageMinutes: Math.round(timeSinceReceived / 60000),
+          maxAgeMinutes: 10
+        });
+        // Don't throw - still try to exchange, but log warning
+      }
+
+      // Log exchange attempt for debugging
+      logger.info('Exchanging Google server auth code:', {
+        codeLength: serverAuthCode.length,
+        codePrefix: serverAuthCode.substring(0, 10) + '...',
+        source: source || 'unknown',
+        ageSeconds: Math.round(timeSinceReceived / 1000),
+        clientId: process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + '...'
+      });
+
       // For server-side auth codes, try without redirect URI first (or with 'postmessage')
       // Server auth codes don't require a redirect URI match
       let client = this._createOAuth2Client('postmessage');
       let tokens;
+      let redirectUriUsed = 'postmessage';
 
       try {
         const { tokens: tokenResult } = await client.getToken(serverAuthCode);
         tokens = tokenResult;
+        logger.info('Successfully exchanged auth code with postmessage redirect URI');
       } catch (firstError) {
-        // If postmessage fails, try with empty string (some mobile SDKs use this)
-        if (firstError.message?.includes('invalid_grant') || firstError.code === 'invalid_grant') {
-          logger.warn('Failed with postmessage redirect, trying empty redirect URI');
-          client = this._createOAuth2Client('');
-          const { tokens: tokenResult } = await client.getToken(serverAuthCode);
-          tokens = tokenResult;
+        // If postmessage fails with invalid_grant, try with empty string (some mobile SDKs use this)
+        const isInvalidGrant = firstError.message?.includes('invalid_grant') ||
+                              firstError.code === 'invalid_grant' ||
+                              firstError.response?.data?.error === 'invalid_grant';
+
+        if (isInvalidGrant) {
+          logger.warn('Failed with postmessage redirect, trying empty redirect URI:', {
+            error: firstError.message,
+            code: firstError.code
+          });
+
+          try {
+            client = this._createOAuth2Client('');
+            redirectUriUsed = 'empty';
+            const { tokens: tokenResult } = await client.getToken(serverAuthCode);
+            tokens = tokenResult;
+            logger.info('Successfully exchanged auth code with empty redirect URI');
+          } catch (secondError) {
+            // Both attempts failed - provide detailed error
+            logger.error('Both redirect URI attempts failed:', {
+              postmessageError: firstError.message,
+              emptyError: secondError.message,
+              postmessageCode: firstError.code,
+              emptyCode: secondError.code
+            });
+            throw secondError; // Throw the second error (most recent)
+          }
         } else {
+          // Not an invalid_grant error, throw immediately
           throw firstError;
         }
       }
 
-      logger.info('Exchanged Google server auth code successfully');
-      return tokens; // { access_token, refresh_token, scope, expiry_date, id_token }
-    } catch (error) {
-      logger.error('Failed to exchange Google server auth code:', {
-        error: error.message,
-        code: error.code,
-        status: error.status
+      logger.info('Exchanged Google server auth code successfully:', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        redirectUriUsed,
+        scope: tokens.scope?.substring(0, 50) + '...'
       });
 
-      // Provide helpful error message for common issues
+      return tokens; // { access_token, refresh_token, scope, expiry_date, id_token }
+    } catch (error) {
+      // Determine specific cause of invalid_grant
+      const isInvalidGrant = error.code === 'invalid_grant' ||
+                            error.message?.toLowerCase().includes('invalid_grant') ||
+                            error.response?.data?.error === 'invalid_grant';
+
       let errorMessage = error.message || 'Failed to exchange auth code';
-      if (error.code === 'invalid_grant') {
-        errorMessage = 'Auth code is invalid, expired, or already used. Please request a new code from the client.';
+      let errorDetails = {
+        code: error.code,
+        status: error.status,
+        message: error.message
+      };
+
+      if (isInvalidGrant) {
+        // Provide specific error messages based on common causes
+        const timeSinceReceived = Date.now() - codeReceivedTime.getTime();
+        const ageMinutes = Math.round(timeSinceReceived / 60000);
+
+        if (ageMinutes > 10) {
+          errorMessage = 'Auth code has expired. Server auth codes expire after 10 minutes. Please request a new code from the client.';
+          errorDetails.cause = 'expired';
+          errorDetails.ageMinutes = ageMinutes;
+        } else if (error.response?.data?.error_description?.toLowerCase().includes('already been used')) {
+          errorMessage = 'Auth code has already been used. Each code can only be exchanged once. Please request a new code from the client.';
+          errorDetails.cause = 'already_used';
+        } else if (error.response?.data?.error_description?.toLowerCase().includes('redirect_uri')) {
+          errorMessage = 'Auth code redirect URI mismatch. Please ensure the redirect URI matches the one used to obtain the code.';
+          errorDetails.cause = 'redirect_uri_mismatch';
+        } else {
+          errorMessage = 'Auth code is invalid, expired, or already used. Please request a new code from the client.';
+          errorDetails.cause = 'unknown';
+        }
+
+        errorDetails.suggestedAction = 'Request a new auth code from the client and exchange it immediately';
       }
+
+      logger.error('Failed to exchange Google server auth code:', {
+        ...errorDetails,
+        codeLength: serverAuthCode?.length,
+        codePrefix: serverAuthCode?.substring(0, 10) + '...',
+        source: source || 'unknown',
+        ageSeconds: Math.round((Date.now() - codeReceivedTime.getTime()) / 1000),
+        redirectUriAttempts: ['postmessage', 'empty']
+      });
 
       // Re-throw with enhanced error information
       const enhancedError = new Error(errorMessage);
       enhancedError.originalError = error;
       enhancedError.code = error.code;
       enhancedError.status = error.status;
+      enhancedError.details = errorDetails;
       throw enhancedError;
     }
   }
@@ -184,6 +284,28 @@ class GoogleCalendarAdapter {
       };
     } catch (error) {
       if (error.name === 'GoogleAccountNotLinkedError') throw error;
+
+      // Check for invalid_grant error (refresh token invalid/revoked)
+      const isInvalidGrant = error.code === 'invalid_grant' ||
+                            error.message?.toLowerCase().includes('invalid_grant') ||
+                            error.response?.data?.error === 'invalid_grant';
+
+      if (isInvalidGrant) {
+        logger.warn('Google refresh token is invalid or revoked:', {
+          userId: user.id || user._id,
+          code: error.code
+        });
+
+        // Mark account as invalid and notify user
+        await this._markGoogleAccountAsInvalid(user.id || user._id);
+
+        const invalidError = new GoogleRefreshTokenInvalidError();
+        invalidError.originalError = error;
+        invalidError.code = error.code;
+        invalidError.status = error.status;
+        throw invalidError;
+      }
+
       logger.error('Failed to refresh Google access token:', {
         error: error.message,
         code: error.code,
@@ -191,12 +313,61 @@ class GoogleCalendarAdapter {
         userId: user.id || user._id
       });
 
-      // Re-throw with enhanced error information
+      // Re-throw with enhanced error information for other errors
       const enhancedError = new GoogleTokenExpiredError(error.message || 'Failed to refresh access token');
       enhancedError.originalError = error;
       enhancedError.code = error.code;
       enhancedError.status = error.status;
       throw enhancedError;
+    }
+  }
+
+  /**
+   * Mark Google account as invalid (refresh token revoked/invalid)
+   * Clears refresh token and notifies user
+   * @private
+   */
+  async _markGoogleAccountAsInvalid(userId) {
+    try {
+      // Clear refresh token but keep other Google calendar data
+      await this.userRepository.update(userId, {
+        'googleCalendar.refreshToken': null,
+        'googleCalendar.accessToken': null,
+        'googleCalendar.expiryDate': null,
+        'googleCalendar.tokenInvalid': true,
+        'googleCalendar.tokenInvalidAt': new Date()
+      });
+
+      // Send notification to user
+      try {
+        const { SendNotificationUseCase } = require('../../notification/use-cases');
+        const { NotificationRepository } = require('../../notification/repositories');
+        const notificationRepository = new NotificationRepository();
+        const sendNotificationUseCase = new SendNotificationUseCase({
+          notificationRepository,
+          pushNotificationAdapter: null // Don't send push, just in-app
+        });
+
+        await sendNotificationUseCase.execute(userId, {
+          title: 'Google Account Re-link Required',
+          body: 'Your Google Calendar connection has expired. Please re-link your Google account to continue syncing events.'
+        }, {
+          type: 'warning',
+          action: 're_link_google_account'
+        });
+      } catch (notifError) {
+        logger.warn('Failed to send notification for invalid Google account:', {
+          userId,
+          error: notifError.message
+        });
+      }
+
+      logger.info('Marked Google account as invalid:', { userId });
+    } catch (error) {
+      logger.error('Failed to mark Google account as invalid:', {
+        userId,
+        error: error.message
+      });
     }
   }
 

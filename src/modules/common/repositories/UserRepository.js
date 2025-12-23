@@ -18,7 +18,7 @@ class UserRepository extends IUserRepository {
     // Explicitly select password and ensure refresh object is included
     // Using lean() to get plain object and avoid transform issues, then convert back
     const userDoc = await UserSchema.findById(id)
-      .select('+password')
+      .select('+password +googleCalendar.refreshToken')
       .lean(false); // Keep as Mongoose document to preserve all fields
 
     if (!userDoc) return null;

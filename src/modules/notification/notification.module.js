@@ -10,7 +10,8 @@ const {
   RemoveDeviceTokenUseCase,
   GetNotificationsUseCase,
   MarkAsReadUseCase,
-  DeleteNotificationsUseCase
+  DeleteNotificationsUseCase,
+  SendNotificationUseCase
 } = require('./use-cases');
 const NotificationController = require('./notification.controller');
 const createNotificationRoutes = require('./notification.routes');
@@ -106,6 +107,16 @@ class NotificationModule {
       });
     }
     return this._instances.deleteNotificationsUseCase;
+  }
+
+  getSendNotificationUseCase() {
+    if (!this._instances.sendNotificationUseCase) {
+      this._instances.sendNotificationUseCase = new SendNotificationUseCase({
+        notificationRepository: this.getNotificationRepository(),
+        pushNotificationAdapter: this.getPushNotificationAdapter()
+      });
+    }
+    return this._instances.sendNotificationUseCase;
   }
 
   // ============================================================================

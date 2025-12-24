@@ -16,7 +16,8 @@ class PaymentService {
     groupRepository,
     emailAdapter,
     walletService,
-    walletNotificationService
+    walletNotificationService,
+    sendNotificationUseCase
   }) {
     this.transactionRepository = transactionRepository;
     this.createTicketUseCase = createTicketUseCase;
@@ -26,6 +27,7 @@ class PaymentService {
     this.emailAdapter = emailAdapter;
     this.walletService = walletService;
     this.walletNotificationService = walletNotificationService;
+    this.sendNotificationUseCase = sendNotificationUseCase;
   }
 
   /**
@@ -89,6 +91,36 @@ class PaymentService {
           } catch (emailError) {
             logger.warn('Failed to send email to assignee', { email, error: emailError.message });
           }
+
+          // Send push notification to assignee if they have an account
+          if (this.sendNotificationUseCase) {
+            try {
+              // Try to find user by email
+              const assigneeUser = await this.userRepository.findByEmail(email);
+              if (assigneeUser) {
+                const event = await this.eventRepository.findById(eventId);
+                if (event) {
+                  await this.sendNotificationUseCase.execute(
+                    assigneeUser.id,
+                    {
+                      title: 'You\'ve Received a Ticket! 🎟️',
+                      body: `${name || 'Someone'} purchased a ticket for "${event.title}" and assigned it to you. Check your email for details.`
+                    },
+                    {
+                      type: 'payment_success',
+                      eventId: eventId.toString(),
+                      ticketId: ticket.id.toString(),
+                      assignedBy: userId.toString(),
+                      priority: 'high',
+                      path: 'ticketsScreen'
+                    }
+                  );
+                }
+              }
+            } catch (notificationError) {
+              logger.warn('Failed to send push notification to assignee', { email, error: notificationError.message });
+            }
+          }
         } catch (ticketError) {
           logger.error('Failed to create ticket for assignee', { assignee, error: ticketError.message });
         }
@@ -122,6 +154,38 @@ class PaymentService {
         }
       } catch (emailError) {
         logger.warn('Failed to send confirmation email', { userId, error: emailError.message });
+      }
+
+      // Send push and in-app notification to buyer
+      if (createdTickets.length > 0 && this.sendNotificationUseCase) {
+        try {
+          const buyer = await this.userRepository.findById(userId);
+          const event = await this.eventRepository.findById(eventId);
+
+          if (buyer && event) {
+            const ticketCount = createdTickets.length;
+            const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
+            const eventTitle = event.title || 'Event';
+
+            await this.sendNotificationUseCase.execute(
+              userId,
+              {
+                title: 'Ticket Purchase Successful! 🎉',
+                body: `You've successfully purchased ${ticketCount} ${ticketText} for ${eventTitle}. Check your email for ticket details.`
+              },
+              {
+                type: 'payment_success',
+                eventId: eventId.toString(),
+                ticketCount,
+                transactionId: transaction.id.toString(),
+                priority: 'high',
+                path: 'ticketsScreen'
+              }
+            );
+          }
+        } catch (notificationError) {
+          logger.warn('Failed to send push notification', { userId, error: notificationError.message });
+        }
       }
     }
 

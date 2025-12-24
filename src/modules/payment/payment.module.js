@@ -30,7 +30,7 @@ const WalletRefundService = require('../wallet/services/WalletRefundService');
 const WalletNotificationService = require('../wallet/services/WalletNotificationService');
 const WalletEmailAdapter = require('../wallet/services/WalletEmailAdapter');
 const { CreateTicketUseCase } = require('../ticket/use-cases');
-const EmailAdapter = require('../email/adapters/email.adapter');
+const EmailAdapter = require('../ticket/services/EmailAdapter');
 
 class PaymentModule {
   constructor() {
@@ -179,6 +179,10 @@ class PaymentModule {
       const ticketModule = require('../ticket/ticket.module');
       const createTicketUseCase = ticketModule.getCreateTicketUseCase();
 
+      // Get SendNotificationUseCase from Notification domain
+      const notificationModule = require('../notification/notification.module');
+      const sendNotificationUseCase = notificationModule.getSendNotificationUseCase();
+
       this._paymentService = new PaymentService({
         transactionRepository: this.getTransactionRepository(),
         createTicketUseCase,
@@ -187,7 +191,8 @@ class PaymentModule {
         groupRepository: this.getGroupRepository(),
         emailAdapter: this.getEmailAdapter(),
         walletService: this.getWalletService(),
-        walletNotificationService: this.getWalletNotificationService()
+        walletNotificationService: this.getWalletNotificationService(),
+        sendNotificationUseCase
       });
     }
     return this._paymentService;

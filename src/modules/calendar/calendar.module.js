@@ -429,7 +429,8 @@ class CalendarModule {
         startWatchUseCase: this.getStartWatchUseCase(),
         stopWatchUseCase: this.getStopWatchUseCase(),
         getDiagnosticsUseCase: this.getGetDiagnosticsUseCase(),
-        getSharedCalendarViewUseCase: this.getGetSharedCalendarViewUseCase()
+        getSharedCalendarViewUseCase: this.getGetSharedCalendarViewUseCase(),
+        googleCalendarAdapter: this.getGoogleCalendarAdapter()
       });
     }
     return this._instances.calendarController;

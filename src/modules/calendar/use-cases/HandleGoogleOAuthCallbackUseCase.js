@@ -33,9 +33,11 @@ class HandleGoogleOAuthCallbackUseCase {
       throw new Error('State parameter is required for security');
     }
 
-    // Extract userId and redirectUri from state parameter
-    // State format: "randomHex:userId:base64EncodedRedirectUri" (new) or "randomHex:userId" (legacy)
-    const { userId, redirectUri: extractedRedirectUri } = this.googleCalendarAdapter.extractOAuthState(state);
+    // Extract userId, redirectUri, and mobileRedirectUri from state parameter
+    // State format: "randomHex:userId:base64EncodedRedirectUri:base64EncodedMobileRedirectUri" (new with mobile)
+    // State format: "randomHex:userId:base64EncodedRedirectUri" (legacy)
+    // State format: "randomHex:userId" (very old)
+    const { userId, redirectUri: extractedRedirectUri, mobileRedirectUri } = this.googleCalendarAdapter.extractOAuthState(state);
 
     // Use redirectUri from state if provided, otherwise use the one passed as parameter
     // For legacy state format, we need redirectUri as parameter
@@ -49,7 +51,8 @@ class HandleGoogleOAuthCallbackUseCase {
       fromState: !!extractedRedirectUri,
       fromParameter: !!redirectUri,
       finalRedirectUri,
-      stateFormat: state.split(':').length >= 3 ? 'new' : 'legacy'
+      hasMobileRedirect: !!mobileRedirectUri,
+      stateFormat: state.split(':').length >= 4 ? 'new-with-mobile' : state.split(':').length >= 3 ? 'new' : 'legacy'
     });
 
     // Get user
@@ -81,9 +84,12 @@ class HandleGoogleOAuthCallbackUseCase {
       });
     }
 
+    // Return result with mobileRedirectUri if present (for HTML redirect)
     return {
       message: 'Google Calendar account linked successfully',
-      linked: true
+      linked: true,
+      userId,
+      mobileRedirectUri: mobileRedirectUri || null
     };
   }
 }

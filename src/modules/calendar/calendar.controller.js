@@ -36,7 +36,8 @@ class CalendarController {
     startWatchUseCase,
     stopWatchUseCase,
     getDiagnosticsUseCase,
-    getSharedCalendarViewUseCase
+    getSharedCalendarViewUseCase,
+    googleCalendarAdapter
   }) {
     this.createCalendarUseCase = createCalendarUseCase;
     this.getCalendarsUseCase = getCalendarsUseCase;
@@ -65,6 +66,7 @@ class CalendarController {
     this.stopWatchUseCase = stopWatchUseCase;
     this.getDiagnosticsUseCase = getDiagnosticsUseCase;
     this.getSharedCalendarViewUseCase = getSharedCalendarViewUseCase;
+    this.googleCalendarAdapter = googleCalendarAdapter;
   }
 
   // ============================================================================
@@ -162,7 +164,7 @@ class CalendarController {
    * Returns: { authUrl: string, state: string }
    */
   initiateGoogleOAuth = asyncHandler(async (req, res) => {
-    const { redirectUri } = req.query;
+    const { redirectUri, mobileRedirectUri } = req.query;
 
     if (!redirectUri) {
       return res.status(400).json({
@@ -171,7 +173,7 @@ class CalendarController {
       });
     }
 
-    const result = await this.initiateGoogleOAuthUseCase.execute(req.user.id, redirectUri);
+    const result = await this.initiateGoogleOAuthUseCase.execute(req.user.id, redirectUri, mobileRedirectUri || null);
     return successResponse(res, result, 200, 'OAuth URL generated successfully');
   });
 
@@ -179,25 +181,82 @@ class CalendarController {
    * Handle Google OAuth callback
    * GET /api/v1/calendars/google/oauth/callback
    * Query params: code, state, redirectUri
-   * Returns: { message: string, linked: boolean }
+   * Returns: HTML redirect page (if mobileRedirectUri) or JSON response (for API clients)
    */
   handleGoogleOAuthCallback = asyncHandler(async (req, res) => {
     const { code, state, redirectUri } = req.query;
 
     if (!code || !state) {
+      // Check if this is a mobile app request (has mobileRedirectUri in state)
+      try {
+        const { mobileRedirectUri } = this.googleCalendarAdapter.extractOAuthState(state);
+        if (mobileRedirectUri) {
+          // Return HTML error page for mobile
+          const fs = require('fs');
+          const path = require('path');
+          let errorHtml = fs.readFileSync(path.join(__dirname, '../templates/oauth-error.html'), 'utf8');
+          const errorRedirectUrl = `${mobileRedirectUri}?success=false&error=${encodeURIComponent('code and state query parameters are required')}`;
+          errorHtml = errorHtml.replace('{{REDIRECT_URL}}', errorRedirectUrl);
+          errorHtml = errorHtml.replace('{{ERROR_MESSAGE}}', 'Missing required parameters');
+          return res.status(400).send(errorHtml);
+        }
+      } catch (e) {
+        // Fall through to JSON response
+      }
+
       return res.status(400).json({
         success: false,
         message: 'code and state query parameters are required'
       });
     }
 
-    // redirectUri is optional - it's extracted from state parameter if included
-    // If not in state, it can be provided as query param for backward compatibility
-    const result = await this.handleGoogleOAuthCallbackUseCase.execute(code, state, redirectUri || null);
+    try {
+      // redirectUri is optional - it's extracted from state parameter if included
+      // If not in state, it can be provided as query param for backward compatibility
+      const result = await this.handleGoogleOAuthCallbackUseCase.execute(code, state, redirectUri || null);
 
-    // Redirect to success page (frontend should handle this)
-    // For now, return JSON response - frontend can redirect based on this
-    return successResponse(res, result, 200, result.message);
+      // Check if mobileRedirectUri exists (mobile app flow)
+      if (result.mobileRedirectUri) {
+        // Return HTML redirect page for mobile app
+        const fs = require('fs');
+        const path = require('path');
+        let successHtml = fs.readFileSync(path.join(__dirname, '../templates/oauth-success.html'), 'utf8');
+        const successRedirectUrl = `${result.mobileRedirectUri}?success=true&userId=${result.userId}&linked=true`;
+        successHtml = successHtml.replace('{{REDIRECT_URL}}', successRedirectUrl);
+        return res.status(200).send(successHtml);
+      }
+
+      // Return JSON response for API clients
+      return successResponse(res, {
+        message: result.message,
+        linked: result.linked
+      }, 200, result.message);
+    } catch (error) {
+      // Check if this is a mobile app request (has mobileRedirectUri in state)
+      try {
+        const { mobileRedirectUri, userId } = this.googleCalendarAdapter.extractOAuthState(state);
+        if (mobileRedirectUri) {
+          // Return HTML error page for mobile
+          const fs = require('fs');
+          const path = require('path');
+          let errorHtml = fs.readFileSync(path.join(__dirname, '../templates/oauth-error.html'), 'utf8');
+          const errorMessage = error.message || 'An error occurred while linking your calendar';
+          const errorRedirectUrl = `${mobileRedirectUri}?success=false&error=${encodeURIComponent(errorMessage)}${userId ? `&userId=${userId}` : ''}`;
+          errorHtml = errorHtml.replace('{{REDIRECT_URL}}', errorRedirectUrl);
+          errorHtml = errorHtml.replace('{{ERROR_MESSAGE}}', errorMessage);
+          return res.status(error.statusCode || 400).send(errorHtml);
+        }
+      } catch (e) {
+        // Fall through to JSON response
+      }
+
+      // Return JSON error for API clients
+      return res.status(error.statusCode || 400).json({
+        success: false,
+        message: error.message || 'Failed to link Google Calendar',
+        error: error.message
+      });
+    }
   });
 
   refreshGoogleToken = asyncHandler(async (req, res) => {

@@ -13,9 +13,10 @@ class InitiateGoogleOAuthUseCase {
    * Execute initiate Google OAuth
    * @param {string} userId - User ID
    * @param {string} redirectUri - Callback redirect URI (must match Google Cloud Console)
+   * @param {string} mobileRedirectUri - Optional mobile app deep link for redirect after OAuth
    * @returns {Promise<Object>} { url: string, state: string }
    */
-  async execute(userId, redirectUri) {
+  async execute(userId, redirectUri, mobileRedirectUri = null) {
     if (!userId) {
       throw new Error('User ID is required');
     }
@@ -24,8 +25,8 @@ class InitiateGoogleOAuthUseCase {
       throw new Error('Redirect URI is required');
     }
 
-    // Generate OAuth URL with state parameter
-    const { url, state } = this.googleCalendarAdapter.generateOAuthUrl(userId, redirectUri);
+    // Generate OAuth URL with state parameter (includes mobileRedirectUri if provided)
+    const { url, state } = this.googleCalendarAdapter.generateOAuthUrl(userId, redirectUri, mobileRedirectUri);
 
     return {
       authUrl: url,

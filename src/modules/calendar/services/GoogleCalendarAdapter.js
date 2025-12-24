@@ -273,17 +273,23 @@ class GoogleCalendarAdapter {
    * @param {string} redirectUri - Callback redirect URI
    * @returns {Object} { url: string, state: string }
    */
-  generateOAuthUrl(userId, redirectUri) {
+  generateOAuthUrl(userId, redirectUri, mobileRedirectUri = null) {
     if (!redirectUri) {
       throw new Error('redirectUri is required for OAuth flow');
     }
 
     // Generate state parameter for CSRF protection
-    // Format: randomHex:userId:base64EncodedRedirectUri
-    // This allows us to extract both userId and redirectUri from callback
+    // Format: randomHex:userId:base64EncodedRedirectUri:base64EncodedMobileRedirectUri
+    // This allows us to extract userId, redirectUri, and mobileRedirectUri from callback
     const state = crypto.randomBytes(32).toString('hex');
     const encodedRedirectUri = Buffer.from(redirectUri).toString('base64');
-    const stateWithData = `${state}:${userId}:${encodedRedirectUri}`;
+    let stateWithData = `${state}:${userId}:${encodedRedirectUri}`;
+
+    // Add mobile redirect URI if provided (for mobile app redirect after OAuth)
+    if (mobileRedirectUri) {
+      const encodedMobileRedirectUri = Buffer.from(mobileRedirectUri).toString('base64');
+      stateWithData = `${stateWithData}:${encodedMobileRedirectUri}`;
+    }
 
     const client = this._createOAuth2Client(redirectUri);
 
@@ -306,6 +312,7 @@ class GoogleCalendarAdapter {
     logger.info('Generated OAuth URL for Google Calendar:', {
       userId,
       redirectUri,
+      hasMobileRedirect: !!mobileRedirectUri,
       stateLength: state.length
     });
 
@@ -391,7 +398,10 @@ class GoogleCalendarAdapter {
       throw new Error('State parameter is required for OAuth security');
     }
 
-    // Extract userId and redirectUri from state (format: "randomHex:userId:base64EncodedRedirectUri")
+    // Extract userId, redirectUri, and mobileRedirectUri from state
+    // Format: "randomHex:userId:base64EncodedRedirectUri:base64EncodedMobileRedirectUri" (new)
+    // Format: "randomHex:userId:base64EncodedRedirectUri" (legacy)
+    // Format: "randomHex:userId" (very old)
     const parts = state.split(':');
     if (parts.length < 2) {
       throw new Error('Invalid state format - missing user ID');
@@ -399,13 +409,18 @@ class GoogleCalendarAdapter {
 
     const userId = parts[1];
     let redirectUri;
+    let mobileRedirectUri = null;
 
-    // Handle both old format (without redirectUri) and new format (with redirectUri)
-    if (parts.length >= 3) {
-      // New format: includes redirectUri
+    // Handle different state formats
+    if (parts.length >= 4) {
+      // New format: includes redirectUri and mobileRedirectUri
+      redirectUri = Buffer.from(parts[2], 'base64').toString('utf-8');
+      mobileRedirectUri = Buffer.from(parts[3], 'base64').toString('utf-8');
+    } else if (parts.length >= 3) {
+      // Legacy format: includes redirectUri only
       redirectUri = Buffer.from(parts[2], 'base64').toString('utf-8');
     } else {
-      // Old format: fallback to environment variable or default
+      // Very old format: fallback to environment variable
       redirectUri = process.env.GOOGLE_REDIRECT_URI || '';
       logger.warn('State parameter missing redirectUri, using fallback:', {
         redirectUri,
@@ -417,7 +432,7 @@ class GoogleCalendarAdapter {
       throw new Error('Redirect URI is required but not found in state parameter');
     }
 
-    return { userId, redirectUri };
+    return { userId, redirectUri, mobileRedirectUri };
   }
 
   /**

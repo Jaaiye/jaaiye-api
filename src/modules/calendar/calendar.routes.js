@@ -33,14 +33,7 @@ function createCalendarRoutes({ calendarController }) {
   router.use(securityHeaders);
   router.use(sanitizeRequest);
 
-  // ============================================================================
-  // PUBLIC OAUTH CALLBACK (must be before protect middleware)
-  // ============================================================================
-
-  // OAuth callback is public - Google redirects here without auth token
-  router.get('/google/oauth/callback', apiLimiter, calendarController.handleGoogleOAuthCallback);
-
-  // Apply authentication middleware to all other routes
+  // Apply authentication middleware to all routes
   router.use(protect);
 
   // ============================================================================
@@ -66,8 +59,11 @@ function createCalendarRoutes({ calendarController }) {
   // ============================================================================
 
   // New OAuth flow (direct Google OAuth, not Firebase)
-  // Note: callback is handled above (before protect middleware)
+  // Mobile app initiates OAuth and receives callback directly from Google
   router.get('/google/oauth/initiate', apiLimiter, calendarController.initiateGoogleOAuth);
+
+  // Mobile app calls this endpoint after receiving OAuth callback from Google
+  router.post('/google/oauth/complete', apiLimiter, calendarController.completeGoogleOAuth);
 
   // Legacy endpoint (deprecated - use new OAuth flow instead)
   router.post('/google/link', apiLimiter, validateLinkGoogleAccount, validate, calendarController.linkGoogleAccount);

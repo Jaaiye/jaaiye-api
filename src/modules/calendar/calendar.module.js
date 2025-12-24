@@ -35,7 +35,8 @@ const {
   GetDiagnosticsUseCase,
   GetSharedCalendarViewUseCase,
   InitiateGoogleOAuthUseCase,
-  HandleGoogleOAuthCallbackUseCase
+  CompleteGoogleOAuthUseCase,
+  HandleOAuthRedirectUseCase
 } = require('./use-cases');
 const CalendarController = require('./calendar.controller');
 const createCalendarRoutes = require('./calendar.routes');
@@ -220,15 +221,26 @@ class CalendarModule {
     return this._instances.initiateGoogleOAuthUseCase;
   }
 
-  getHandleGoogleOAuthCallbackUseCase() {
-    if (!this._instances.handleGoogleOAuthCallbackUseCase) {
-      this._instances.handleGoogleOAuthCallbackUseCase = new HandleGoogleOAuthCallbackUseCase({
+  getCompleteGoogleOAuthUseCase() {
+    if (!this._instances.completeGoogleOAuthUseCase) {
+      this._instances.completeGoogleOAuthUseCase = new CompleteGoogleOAuthUseCase({
         userRepository: this.getUserRepository(),
         googleCalendarAdapter: this.getGoogleCalendarAdapter(),
         calendarSyncAdapter: this.getCalendarSyncAdapter()
       });
     }
-    return this._instances.handleGoogleOAuthCallbackUseCase;
+    return this._instances.completeGoogleOAuthUseCase;
+  }
+
+  getHandleOAuthRedirectUseCase() {
+    if (!this._instances.handleOAuthRedirectUseCase) {
+      this._instances.handleOAuthRedirectUseCase = new HandleOAuthRedirectUseCase({
+        userRepository: this.getUserRepository(),
+        googleCalendarAdapter: this.getGoogleCalendarAdapter(),
+        calendarSyncAdapter: this.getCalendarSyncAdapter()
+      });
+    }
+    return this._instances.handleOAuthRedirectUseCase;
   }
 
   getRefreshGoogleTokenUseCase() {
@@ -414,7 +426,8 @@ class CalendarModule {
         linkGoogleAccountUseCase: this.getLinkGoogleAccountUseCase(),
         unlinkGoogleAccountUseCase: this.getUnlinkGoogleAccountUseCase(),
         initiateGoogleOAuthUseCase: this.getInitiateGoogleOAuthUseCase(),
-        handleGoogleOAuthCallbackUseCase: this.getHandleGoogleOAuthCallbackUseCase(),
+        completeGoogleOAuthUseCase: this.getCompleteGoogleOAuthUseCase(),
+        handleOAuthRedirectUseCase: this.getHandleOAuthRedirectUseCase(),
         refreshGoogleTokenUseCase: this.getRefreshGoogleTokenUseCase(),
         listGoogleCalendarsUseCase: this.getListGoogleCalendarsUseCase(),
         selectGoogleCalendarsUseCase: this.getSelectGoogleCalendarsUseCase(),

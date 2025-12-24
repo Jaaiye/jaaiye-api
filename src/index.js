@@ -135,10 +135,22 @@ app.get('/test-cors', (req, res) => {
 
 app.use('/webhooks', require('./routes/webhookRoutes'));
 
+// Public OAuth redirect endpoints (must be before API key validation)
+// Google redirects here without auth token
+const handleOAuthRedirect = (req, res, next) => {
+  const controller = require('./modules/calendar/calendar.module').getCalendarController();
+  return controller.handleOAuthRedirect(req, res, next);
+};
+
+// New endpoint
+app.get('/oauth/redirect', handleOAuthRedirect);
+
+// Legacy endpoint (for backward compatibility - redirects to same handler)
+app.get('/api/v1/calendars/google/oauth/callback', handleOAuthRedirect);
+
 // Apply API key validation to all other routes
 app.use(validateMobileApiKey);
 
-// Routes
 app.use('/api/v1/auth', require('./modules/auth/auth.module').getAuthRoutes());
 app.use('/api/v1/users', require('./modules/user/user.module').getUserRoutes());
 app.use('/api/v1/admin', require('./modules/admin/admin.module').getAdminRoutes());

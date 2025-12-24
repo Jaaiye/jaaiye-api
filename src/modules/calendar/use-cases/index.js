@@ -28,7 +28,8 @@ const StopWatchUseCase = require('./StopWatchUseCase');
 const GetDiagnosticsUseCase = require('./GetDiagnosticsUseCase');
 const GetSharedCalendarViewUseCase = require('./GetSharedCalendarViewUseCase');
 const InitiateGoogleOAuthUseCase = require('./InitiateGoogleOAuthUseCase');
-const HandleGoogleOAuthCallbackUseCase = require('./HandleGoogleOAuthCallbackUseCase');
+const CompleteGoogleOAuthUseCase = require('./CompleteGoogleOAuthUseCase');
+const HandleOAuthRedirectUseCase = require('./HandleOAuthRedirectUseCase');
 
 module.exports = {
   CreateCalendarUseCase,
@@ -57,6 +58,7 @@ module.exports = {
   GetDiagnosticsUseCase,
   GetSharedCalendarViewUseCase,
   InitiateGoogleOAuthUseCase,
-  HandleGoogleOAuthCallbackUseCase
+  CompleteGoogleOAuthUseCase,
+  HandleOAuthRedirectUseCase
 };
 

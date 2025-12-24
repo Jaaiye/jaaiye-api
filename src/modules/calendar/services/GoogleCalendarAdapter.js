@@ -270,28 +270,29 @@ class GoogleCalendarAdapter {
   /**
    * Generate OAuth2 authorization URL for Google Calendar
    * @param {string} userId - User ID (for state parameter)
-   * @param {string} redirectUri - Callback redirect URI
+   * @param {string} backendRedirectUri - Backend redirect URI (HTTPS, e.g., https://api.jaaiye.com/oauth/redirect)
+   * @param {string} mobileRedirectUri - Mobile app redirect URI (URL scheme, e.g., jaaiye://oauthredirect)
    * @returns {Object} { url: string, state: string }
    */
-  generateOAuthUrl(userId, redirectUri, mobileRedirectUri = null) {
-    if (!redirectUri) {
-      throw new Error('redirectUri is required for OAuth flow');
+  generateOAuthUrl(userId, backendRedirectUri, mobileRedirectUri) {
+    if (!backendRedirectUri) {
+      throw new Error('backendRedirectUri is required for OAuth flow');
+    }
+
+    if (!mobileRedirectUri) {
+      throw new Error('mobileRedirectUri is required for OAuth flow');
     }
 
     // Generate state parameter for CSRF protection
-    // Format: randomHex:userId:base64EncodedRedirectUri:base64EncodedMobileRedirectUri
-    // This allows us to extract userId, redirectUri, and mobileRedirectUri from callback
-    const state = crypto.randomBytes(32).toString('hex');
-    const encodedRedirectUri = Buffer.from(redirectUri).toString('base64');
-    let stateWithData = `${state}:${userId}:${encodedRedirectUri}`;
+    // Format: randomHex:userId:base64EncodedMobileRedirectUri
+    // Backend will extract mobileRedirectUri from state to redirect to mobile app
+    const randomToken = crypto.randomBytes(32).toString('hex');
+    const encodedMobileRedirectUri = Buffer.from(mobileRedirectUri).toString('base64');
+    const state = `${randomToken}:${userId}:${encodedMobileRedirectUri}`;
 
-    // Add mobile redirect URI if provided (for mobile app redirect after OAuth)
-    if (mobileRedirectUri) {
-      const encodedMobileRedirectUri = Buffer.from(mobileRedirectUri).toString('base64');
-      stateWithData = `${stateWithData}:${encodedMobileRedirectUri}`;
-    }
-
-    const client = this._createOAuth2Client(redirectUri);
+    // Use backendRedirectUri as the OAuth redirect URI (Google requirement)
+    // Google will redirect to backend, backend will redirect to mobile app
+    const client = this._createOAuth2Client(backendRedirectUri);
 
     // Required scopes for Google Calendar
     const scopes = [
@@ -305,20 +306,20 @@ class GoogleCalendarAdapter {
       access_type: 'offline', // Required for refresh token
       prompt: 'consent', // Force consent screen to ensure refresh token
       scope: scopes,
-      state: stateWithData,
+      state: state,
       include_granted_scopes: true
     });
 
     logger.info('Generated OAuth URL for Google Calendar:', {
       userId,
-      redirectUri,
-      hasMobileRedirect: !!mobileRedirectUri,
+      backendRedirectUri,
+      mobileRedirectUri,
       stateLength: state.length
     });
 
     return {
       url: authUrl,
-      state: stateWithData
+      state: state
     };
   }
 
@@ -391,48 +392,33 @@ class GoogleCalendarAdapter {
   /**
    * Extract data from OAuth state parameter
    * @param {string} state - State parameter from OAuth callback
-   * @returns {Object} { userId: string, redirectUri: string }
+   * @returns {Object} { userId: string, mobileRedirectUri: string }
    */
   extractOAuthState(state) {
     if (!state) {
       throw new Error('State parameter is required for OAuth security');
     }
 
-    // Extract userId, redirectUri, and mobileRedirectUri from state
-    // Format: "randomHex:userId:base64EncodedRedirectUri:base64EncodedMobileRedirectUri" (new)
-    // Format: "randomHex:userId:base64EncodedRedirectUri" (legacy)
-    // Format: "randomHex:userId" (very old)
+    // Extract userId and mobileRedirectUri from state
+    // Format: "randomHex:userId:base64EncodedMobileRedirectUri"
     const parts = state.split(':');
     if (parts.length < 2) {
       throw new Error('Invalid state format - missing user ID');
     }
 
     const userId = parts[1];
-    let redirectUri;
+
+    if (!userId) {
+      throw new Error('User ID is required in state parameter');
+    }
+
     let mobileRedirectUri = null;
-
-    // Handle different state formats
-    if (parts.length >= 4) {
-      // New format: includes redirectUri and mobileRedirectUri
-      redirectUri = Buffer.from(parts[2], 'base64').toString('utf-8');
-      mobileRedirectUri = Buffer.from(parts[3], 'base64').toString('utf-8');
-    } else if (parts.length >= 3) {
-      // Legacy format: includes redirectUri only
-      redirectUri = Buffer.from(parts[2], 'base64').toString('utf-8');
-    } else {
-      // Very old format: fallback to environment variable
-      redirectUri = process.env.GOOGLE_REDIRECT_URI || '';
-      logger.warn('State parameter missing redirectUri, using fallback:', {
-        redirectUri,
-        stateFormat: 'legacy'
-      });
+    if (parts.length >= 3) {
+      // Decode mobile redirect URI from base64
+      mobileRedirectUri = Buffer.from(parts[2], 'base64').toString('utf-8');
     }
 
-    if (!redirectUri) {
-      throw new Error('Redirect URI is required but not found in state parameter');
-    }
-
-    return { userId, redirectUri, mobileRedirectUri };
+    return { userId, mobileRedirectUri };
   }
 
   /**

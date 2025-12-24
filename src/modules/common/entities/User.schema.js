@@ -63,6 +63,10 @@ const userSchema = new mongoose.Schema(
       expiryDate: Date,
       scope: String,
       jaaiyeCalendarId: String,
+      selectedCalendarIds: {
+        type: [String],
+        default: []
+      },
       calendars: [{
         id: String,
         summary: String,

@@ -194,7 +194,7 @@ class CalendarController {
           // Return HTML error page for mobile
           const fs = require('fs');
           const path = require('path');
-          let errorHtml = fs.readFileSync(path.join(__dirname, '../templates/oauth-error.html'), 'utf8');
+          let errorHtml = fs.readFileSync(path.join(__dirname, './templates/oauth-error.html'), 'utf8');
           const errorRedirectUrl = `${mobileRedirectUri}?success=false&error=${encodeURIComponent('code and state query parameters are required')}`;
           errorHtml = errorHtml.replace('{{REDIRECT_URL}}', errorRedirectUrl);
           errorHtml = errorHtml.replace('{{ERROR_MESSAGE}}', 'Missing required parameters');
@@ -220,7 +220,7 @@ class CalendarController {
         // Return HTML redirect page for mobile app
         const fs = require('fs');
         const path = require('path');
-        let successHtml = fs.readFileSync(path.join(__dirname, '../templates/oauth-success.html'), 'utf8');
+        let successHtml = fs.readFileSync(path.join(__dirname, './templates/oauth-success.html'), 'utf8');
         const successRedirectUrl = `${result.mobileRedirectUri}?success=true&userId=${result.userId}&linked=true`;
         successHtml = successHtml.replace('{{REDIRECT_URL}}', successRedirectUrl);
         return res.status(200).send(successHtml);
@@ -239,7 +239,7 @@ class CalendarController {
           // Return HTML error page for mobile
           const fs = require('fs');
           const path = require('path');
-          let errorHtml = fs.readFileSync(path.join(__dirname, '../templates/oauth-error.html'), 'utf8');
+          let errorHtml = fs.readFileSync(path.join(__dirname, './templates/oauth-error.html'), 'utf8');
           const errorMessage = error.message || 'An error occurred while linking your calendar';
           const errorRedirectUrl = `${mobileRedirectUri}?success=false&error=${encodeURIComponent(errorMessage)}${userId ? `&userId=${userId}` : ''}`;
           errorHtml = errorHtml.replace('{{REDIRECT_URL}}', errorRedirectUrl);

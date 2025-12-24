@@ -198,7 +198,8 @@ class EventModule {
     if (!this._instances.getEventUseCase) {
       this._instances.getEventUseCase = new GetEventUseCase({
         eventRepository: this.getEventRepository(),
-        calendarRepository: this.getCalendarRepository()
+        calendarRepository: this.getCalendarRepository(),
+        eventTeamRepository: this.getEventTeamRepository()
       });
     }
     return this._instances.getEventUseCase;

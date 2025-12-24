@@ -48,7 +48,17 @@ class ListEventsUseCase {
       }
 
       // Handle scope-specific filters
-      if (dto.scope === 'mine') {
+      if (dto.scope === 'creator') {
+        // For 'creator' scope: only events created by user
+        filters.createdBy = userId;
+
+        // Optionally filter by calendar if calendars exist
+        if (calendarIds.length > 0) {
+          const mongoose = require('mongoose');
+          const objectCalendarIds = calendarIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
+          filters.calendar = objectCalendarIds.length === 1 ? objectCalendarIds[0] : { $in: objectCalendarIds };
+        }
+      } else if (dto.scope === 'mine') {
         // For 'mine' scope: events created by user OR events user is participating in
         const participatingEventIds = await this.eventParticipantRepository.findByUser(userId);
         const eventIds = participatingEventIds.map(p => p.event);

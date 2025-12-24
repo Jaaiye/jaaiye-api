@@ -92,11 +92,11 @@ class EventController {
     const { ListEventsDTO } = require('./dto');
     const dto = new ListEventsDTO(req.query);
 
-    // Validate scope - 'mine' requires authentication
-    if (dto.scope === 'mine' && !req.user) {
+    // Validate scope - 'mine' and 'creator' require authentication
+    if ((dto.scope === 'mine' || dto.scope === 'creator') && !req.user) {
       return res.status(401).json({
         success: false,
-        error: 'Authentication required for "mine" scope'
+        error: 'Authentication required for "mine" and "creator" scopes'
       });
     }
 

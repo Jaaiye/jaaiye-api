@@ -39,7 +39,8 @@ class ListGoogleEventsUseCase {
       throw new GoogleAccountNotLinkedError('No Google account linked. Please link your Google account first.');
     }
 
-    const calendarIds = user.googleCalendar.selectedCalendarIds;
+    // Use selectedCalendarIds - if empty, user doesn't want to share calendar
+    const calendarIds = user.googleCalendar.selectedCalendarIds || [];
     const events = await this.googleCalendarAdapter.listEvents(user, timeMin, timeMax, calendarIds);
 
     // Get calendar information for event enhancement

@@ -140,56 +140,60 @@ class GetSharedCalendarViewUseCase {
           }
         }
 
-        // 2. Fetch Google Calendar events (if user has Google account linked)
-        if (user.googleCalendar && user.googleCalendar.refreshToken && calendar?.google?.linkedIds?.length > 0) {
-          try {
-            const calendarIds = calendar.google.linkedIds;
-            const googleEvents = await this.googleCalendarAdapter.listEvents(user, timeMin, timeMax, calendarIds);
+        // 2. Fetch Google Calendar events (if user has Google account linked and has selected calendars)
+        if (user.googleCalendar && user.googleCalendar.refreshToken) {
+          // Use selectedCalendarIds - if empty, user doesn't want to share calendar
+          const selectedCalendarIds = user.googleCalendar.selectedCalendarIds || [];
+          if (selectedCalendarIds.length > 0) {
+            try {
+              const googleEvents = await this.googleCalendarAdapter.listEvents(user, timeMin, timeMax, selectedCalendarIds);
 
-            // Get calendar information for event enhancement
-            const calendars = await this.googleCalendarAdapter.listCalendars(user);
-            const formattedCalendars = googleUtils.formatGoogleCalendarData(calendars);
+              // Get calendar information for event enhancement
+              const calendars = await this.googleCalendarAdapter.listCalendars(user);
+              const formattedCalendars = googleUtils.formatGoogleCalendarData(calendars);
 
-            // Format Google events
-            const formattedGoogleEvents = googleEvents.map(event => {
-              const calendarId = event.organizer?.email || event.calendarId || 'primary';
-              const calendar = formattedCalendars[calendarId] || {};
+              // Format Google events
+              const formattedGoogleEvents = googleEvents.map(event => {
+                const calendarId = event.organizer?.email || event.calendarId || 'primary';
+                const calendar = formattedCalendars[calendarId] || {};
 
-              return {
-                id: event.id,
-                title: event.summary || 'No Title',
-                description: event.description || '',
-                location: event.location || '',
-                startTime: event.start?.dateTime || event.start?.date,
-                endTime: event.end?.dateTime || event.end?.date,
-                isAllDay: !!event.start?.date,
-                calendar: {
-                  id: calendarId,
-                  name: calendar.name || 'Google Calendar',
-                  color: calendar.color || '#4285F4'
-                },
-                source: 'google',
-                external: {
-                  google: {
-                    calendarId: calendarId,
-                    eventId: event.id,
-                    etag: event.etag,
-                    htmlLink: event.htmlLink
-                  }
-                },
-                attendees: event.attendees || [],
-                recurringEventId: event.recurringEventId,
-                originalStartTime: event.originalStartTime,
-                createdAt: event.created,
-                updatedAt: event.updated
-              };
-            });
+                return {
+                  id: event.id,
+                  title: event.summary || 'No Title',
+                  description: event.description || '',
+                  location: event.location || '',
+                  startTime: event.start?.dateTime || event.start?.date,
+                  endTime: event.end?.dateTime || event.end?.date,
+                  isAllDay: !!event.start?.date,
+                  calendar: {
+                    id: calendarId,
+                    name: calendar.name || 'Google Calendar',
+                    color: calendar.color || '#4285F4'
+                  },
+                  source: 'google',
+                  external: {
+                    google: {
+                      calendarId: calendarId,
+                      eventId: event.id,
+                      etag: event.etag,
+                      htmlLink: event.htmlLink
+                    }
+                  },
+                  attendees: event.attendees || [],
+                  recurringEventId: event.recurringEventId,
+                  originalStartTime: event.originalStartTime,
+                  createdAt: event.created,
+                  updatedAt: event.updated
+                };
+              });
 
-            allEvents.push(...formattedGoogleEvents);
-          } catch (error) {
-            console.error(`Error fetching Google events for user ${userId}:`, error.message);
-            // Continue even if Google fetch fails
+              allEvents.push(...formattedGoogleEvents);
+            } catch (error) {
+              console.error(`Error fetching Google events for user ${userId}:`, error.message);
+              // Continue even if Google fetch fails
+            }
           }
+          // If selectedCalendarIds is empty, return no Google events (user doesn't want to share)
         }
 
         // Sort all events by start time

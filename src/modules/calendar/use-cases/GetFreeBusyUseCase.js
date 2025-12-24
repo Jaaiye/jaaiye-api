@@ -33,11 +33,14 @@ class GetFreeBusyUseCase {
       throw new GoogleAccountNotLinkedError('No Google account linked. Please link your Google account first.');
     }
 
+    // Use provided calendarIds, or fallback to selectedCalendarIds
+    // If both are empty, user doesn't want to share calendar
+    const calendarIdsToUse = calendarIds || user.googleCalendar.selectedCalendarIds || [];
     const freeBusy = await this.googleCalendarAdapter.getFreeBusy(
       user,
       timeMin,
       timeMax,
-      calendarIds || ['primary']
+      calendarIdsToUse.length > 0 ? calendarIdsToUse : null
     );
 
     return { freeBusy };

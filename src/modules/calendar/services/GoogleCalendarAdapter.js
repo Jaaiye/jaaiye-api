@@ -707,7 +707,17 @@ class GoogleCalendarAdapter {
       const client = this._createOAuth2Client();
       await this._setUserCredentials(client, user);
       const calendar = google.calendar({ version: 'v3', auth: client });
-      const ids = (calendarIds && calendarIds.length ? calendarIds : (user.googleCalendar?.selectedCalendarIds || ['primary']));
+
+      // Use provided calendarIds, or fallback to selectedCalendarIds
+      // If both are empty, return empty array (user doesn't want to share calendar)
+      let ids = [];
+      if (calendarIds && calendarIds.length > 0) {
+        ids = calendarIds;
+      } else if (user.googleCalendar?.selectedCalendarIds && user.googleCalendar.selectedCalendarIds.length > 0) {
+        ids = user.googleCalendar.selectedCalendarIds;
+      }
+      // If ids is empty, return empty results (user hasn't selected any calendars)
+
       const results = [];
 
       for (const id of ids) {
@@ -765,8 +775,18 @@ class GoogleCalendarAdapter {
       const client = this._createOAuth2Client();
       await this._setUserCredentials(client, user);
       const calendar = google.calendar({ version: 'v3', auth: client });
-      const items = (calendarIds && calendarIds.length ? calendarIds : (user.googleCalendar?.selectedCalendarIds || ['primary']))
-        .map(id => ({ id }));
+
+      // Use provided calendarIds, or fallback to selectedCalendarIds
+      // If both are empty, return empty free/busy (user doesn't want to share calendar)
+      let ids = [];
+      if (calendarIds && calendarIds.length > 0) {
+        ids = calendarIds;
+      } else if (user.googleCalendar?.selectedCalendarIds && user.googleCalendar.selectedCalendarIds.length > 0) {
+        ids = user.googleCalendar.selectedCalendarIds;
+      }
+      // If ids is empty, return empty free/busy
+
+      const items = ids.map(id => ({ id }));
       const res = await calendar.freebusy.query({
         requestBody: {
           timeMin,
@@ -914,7 +934,11 @@ class GoogleCalendarAdapter {
       const client = this._createOAuth2Client();
       await this._setUserCredentials(client, user);
       const calendar = google.calendar({ version: 'v3', auth: client });
-      const ids = user.googleCalendar?.selectedCalendarIds || ['primary'];
+
+      // Use selectedCalendarIds - if empty, user doesn't want to share calendar
+      const ids = user.googleCalendar?.selectedCalendarIds || [];
+      // If ids is empty, return empty array (user hasn't selected any calendars)
+
       const perCal = [];
 
       for (const id of ids) {
@@ -950,7 +974,11 @@ class GoogleCalendarAdapter {
       await this._setUserCredentials(client, user);
       const calendar = google.calendar({ version: 'v3', auth: client });
       const updates = [];
-      const selected = user.googleCalendar?.selectedCalendarIds || ['primary'];
+
+      // Use selectedCalendarIds - if empty, user doesn't want to share calendar
+      const selected = user.googleCalendar?.selectedCalendarIds || [];
+      // If selected is empty, return empty updates (user hasn't selected any calendars)
+
       const calendars = user.googleCalendar.calendars || [];
 
       for (const id of selected) {

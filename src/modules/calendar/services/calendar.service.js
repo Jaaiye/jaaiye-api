@@ -51,16 +51,22 @@ class CalendarService {
     if (includeGoogle) {
       try {
         const user = await this.userRepository.findById(userId);
-        if (user && user.googleAccount && user.googleAccount.accessToken) {
-          const googleEvents = await this.googleCalendarAdapter.listEvents(
-            userId,
-            timeMin,
-            timeMax
-          );
-          events.push(...(googleEvents || []).map(e => ({
-            ...e,
-            source: 'google'
-          })));
+        if (user && user.googleCalendar && user.googleCalendar.refreshToken) {
+          // Use selectedCalendarIds - if empty, user doesn't want to share calendar
+          const selectedCalendarIds = user.googleCalendar.selectedCalendarIds || [];
+          if (selectedCalendarIds.length > 0) {
+            const googleEvents = await this.googleCalendarAdapter.listEvents(
+              user,
+              timeMin,
+              timeMax,
+              selectedCalendarIds
+            );
+            events.push(...(googleEvents || []).map(e => ({
+              ...e,
+              source: 'google'
+            })));
+          }
+          // If selectedCalendarIds is empty, return no Google events (user doesn't want to share)
         }
       } catch (error) {
         // Silently fail if Google Calendar not linked

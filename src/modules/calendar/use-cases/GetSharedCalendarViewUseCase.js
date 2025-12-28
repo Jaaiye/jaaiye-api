@@ -25,22 +25,53 @@ class GetSharedCalendarViewUseCase {
    * @returns {Promise<Object>} Events grouped by user
    */
   async execute(currentUserId, userIds, timeMin, timeMax) {
-    userIds.unshift(currentUserId);
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      throw new ValidationError('userIds array is required and must not be empty');
+    // Validate inputs with specific error messages
+    if (!currentUserId) {
+      throw new ValidationError('Current user ID is missing. Please ensure you are authenticated.');
     }
+
+    if (!timeMin || !timeMax) {
+      throw new ValidationError(`Missing time range: ${!timeMin ? 'timeMin' : 'timeMax'} is required. Both timeMin and timeMax must be provided in ISO 8601 format.`);
+    }
+
+    // Validate dates
+    const timeMinDate = new Date(timeMin);
+    const timeMaxDate = new Date(timeMax);
+
+    if (isNaN(timeMinDate.getTime())) {
+      throw new ValidationError(`Invalid timeMin format: "${timeMin}". Expected ISO 8601 format (e.g., 2024-01-01T00:00:00Z).`);
+    }
+
+    if (isNaN(timeMaxDate.getTime())) {
+      throw new ValidationError(`Invalid timeMax format: "${timeMax}". Expected ISO 8601 format (e.g., 2024-01-31T23:59:59Z).`);
+    }
+
+    if (timeMinDate >= timeMaxDate) {
+      throw new ValidationError(`Invalid time range: timeMin (${timeMin}) must be before timeMax (${timeMax}).`);
+    }
+
+    // userIds can be empty - if so, we'll only fetch current user's events
+    // Always include current user in the list (deduplicate if already present)
+    const uniqueUserIds = Array.isArray(userIds) ? [...new Set([currentUserId, ...userIds])] : [currentUserId];
 
     const eventsByUser = [];
     let totalEvents = 0;
 
     // Process each user in parallel
-    const userPromises = userIds.map(async (userId) => {
+    const userPromises = uniqueUserIds.map(async (userId) => {
       try {
         // Get user info
         const user = await this.userRepository.findById(userId);
         if (!user) {
           console.warn(`User not found: ${userId}`);
-          return null;
+          return {
+            userId: userId,
+            user: { id: userId },
+            events: [],
+            totalEvents: 0,
+            error: `User with ID "${userId}" not found`,
+            errorType: 'USER_NOT_FOUND'
+          };
         }
 
         // Get user's calendar
@@ -137,6 +168,8 @@ class GetSharedCalendarViewUseCase {
             allEvents.push(...createdEvents);
           } catch (error) {
             console.error(`Error fetching Jaaiye events for user ${userId}:`, error.message);
+            // Don't throw - continue with Google events if available
+            // Error will be included in response
           }
         }
 
@@ -190,7 +223,24 @@ class GetSharedCalendarViewUseCase {
               allEvents.push(...formattedGoogleEvents);
             } catch (error) {
               console.error(`Error fetching Google events for user ${userId}:`, error.message);
-              // Continue even if Google fetch fails
+              // Determine error type for better mobile handling
+              const errorType = error.name === 'GoogleAccountNotLinkedError'
+                ? 'GOOGLE_CALENDAR_NOT_LINKED'
+                : error.name === 'GoogleRefreshTokenInvalidError'
+                ? 'GOOGLE_CALENDAR_TOKEN_INVALID'
+                : error.name === 'GoogleTokenExpiredError'
+                ? 'GOOGLE_CALENDAR_TOKEN_EXPIRED'
+                : 'GOOGLE_CALENDAR_FETCH_ERROR';
+
+              // Store error info but don't fail the entire request
+              // Error will be included in user's response
+              if (!allEvents.find(e => e.errorType === errorType)) {
+                allEvents.push({
+                  error: `Failed to fetch Google Calendar events: ${error.message}`,
+                  errorType: errorType,
+                  source: 'google'
+                });
+              }
             }
           }
           // If selectedCalendarIds is empty, return no Google events (user doesn't want to share)
@@ -203,6 +253,10 @@ class GetSharedCalendarViewUseCase {
           return aTime - bTime;
         });
 
+        // Filter out error objects from events array before returning
+        const validEvents = allEvents.filter(e => !e.errorType);
+        const errors = allEvents.filter(e => e.errorType);
+
         return {
           userId: user.id,
           user: {
@@ -211,12 +265,32 @@ class GetSharedCalendarViewUseCase {
             fullName: user.fullName,
             profilePicture: user.profilePicture
           },
-          events: allEvents,
-          totalEvents: allEvents.length
+          events: validEvents,
+          totalEvents: validEvents.length,
+          ...(errors.length > 0 && {
+            errors: errors.map(e => ({
+              message: e.error,
+              type: e.errorType,
+              source: e.source
+            })),
+            googleCalendarLinked: !errors.some(e => e.errorType === 'GOOGLE_CALENDAR_NOT_LINKED')
+          })
         };
       } catch (error) {
-        console.error(`Error fetching events for user ${userId}:`, error.message);
-        // Return empty events for this user on error
+        console.error(`Error fetching events for user ${userId}:`, error.message, error.stack);
+
+        // Determine error type
+        const errorType = error.name === 'GoogleAccountNotLinkedError'
+          ? 'GOOGLE_CALENDAR_NOT_LINKED'
+          : error.name === 'GoogleRefreshTokenInvalidError'
+          ? 'GOOGLE_CALENDAR_TOKEN_INVALID'
+          : error.name === 'GoogleTokenExpiredError'
+          ? 'GOOGLE_CALENDAR_TOKEN_EXPIRED'
+          : error.name === 'ValidationError'
+          ? 'VALIDATION_ERROR'
+          : 'FETCH_ERROR';
+
+        // Return empty events for this user on error with detailed error info
         try {
           const user = await this.userRepository.findById(userId);
           return {
@@ -229,7 +303,13 @@ class GetSharedCalendarViewUseCase {
             } : { id: userId },
             events: [],
             totalEvents: 0,
-            error: error.message
+            error: error.message,
+            errorType: errorType,
+            errorDetails: process.env.NODE_ENV === 'development' ? {
+              stack: error.stack,
+              name: error.name,
+              code: error.code
+            } : undefined
           };
         } catch (err) {
           return {
@@ -237,7 +317,12 @@ class GetSharedCalendarViewUseCase {
             user: { id: userId },
             events: [],
             totalEvents: 0,
-            error: error.message
+            error: `Failed to fetch events for user ${userId}: ${error.message}`,
+            errorType: errorType,
+            errorDetails: process.env.NODE_ENV === 'development' ? {
+              originalError: error.message,
+              lookupError: err.message
+            } : undefined
           };
         }
       }
@@ -246,23 +331,48 @@ class GetSharedCalendarViewUseCase {
     // Wait for all users to be processed
     const results = await Promise.all(userPromises);
 
-    // Filter out null results and calculate totals
+    // Process results and calculate totals
+    let usersWithErrors = 0;
+    let usersNotFound = 0;
+
     results.forEach(result => {
       if (result) {
         eventsByUser.push(result);
         totalEvents += result.totalEvents || 0;
+
+        if (result.error) {
+          usersWithErrors++;
+        }
+        if (result.errorType === 'USER_NOT_FOUND') {
+          usersNotFound++;
+        }
       }
     });
 
-    return {
+    // Build summary
+    const summary = {
       eventsByUser,
       timeRange: {
         start: timeMin,
         end: timeMax
       },
       totalUsers: eventsByUser.length,
-      totalEvents
+      totalEvents,
+      requestedUsers: uniqueUserIds.length
     };
+
+    // Add warnings if there were issues
+    if (usersWithErrors > 0 || usersNotFound > 0) {
+      summary.warnings = [];
+      if (usersNotFound > 0) {
+        summary.warnings.push(`${usersNotFound} user(s) not found`);
+      }
+      if (usersWithErrors > 0) {
+        summary.warnings.push(`${usersWithErrors} user(s) had errors fetching events`);
+      }
+    }
+
+    return summary;
   }
 }
 

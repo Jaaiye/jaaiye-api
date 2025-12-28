@@ -196,23 +196,25 @@ const validateStopWatch = [
 
 const validateGetSharedCalendarView = [
   body('userIds')
+    .optional()
     .isArray()
-    .withMessage('userIds is required and must be an array')
-    .notEmpty()
-    .withMessage('userIds array must not be empty'),
+    .withMessage('userIds must be an array if provided'),
   body('userIds.*')
+    .optional()
     .isString()
     .withMessage('All userIds must be strings')
     .notEmpty()
     .withMessage('All userIds must be non-empty strings'),
   body('timeMin')
     .notEmpty()
+    .withMessage('timeMin is required')
     .isISO8601()
-    .withMessage('timeMin is required and must be ISO 8601 format'),
+    .withMessage('timeMin must be a valid ISO 8601 date string (e.g., 2024-01-01T00:00:00Z)'),
   body('timeMax')
     .notEmpty()
+    .withMessage('timeMax is required')
     .isISO8601()
-    .withMessage('timeMax is required and must be ISO 8601 format')
+    .withMessage('timeMax must be a valid ISO 8601 date string (e.g., 2024-01-31T23:59:59Z)')
 ];
 
 const validateDeleteCalendar = [

@@ -12,6 +12,20 @@ const logger = require('../../../utils/logger');
 class GoogleCalendarAdapter {
   constructor({ userRepository }) {
     this.userRepository = userRepository;
+
+    // Refresh lock: tracks ongoing refresh operations per user
+    // Format: { userId: Promise<{ access_token, expiry_date, scope }> }
+    this._refreshLocks = new Map();
+
+    // Rate limiting: tracks refresh attempts per user with timestamps
+    // Format: { userId: [timestamp1, timestamp2, ...] }
+    this._refreshAttempts = new Map();
+
+    // Constants
+    this.MAX_REFRESH_ATTEMPTS_PER_MINUTE = 5;
+    this.REFRESH_RETRY_ATTEMPTS = 3;
+    this.REFRESH_RETRY_BASE_DELAY_MS = 1000; // 1 second base delay
+    this.REFRESH_LOCK_TIMEOUT_MS = 30000; // 30 seconds timeout for locks
   }
 
   /**
@@ -56,18 +70,25 @@ class GoogleCalendarAdapter {
     try {
       // Check if access token is expired or will expire soon (within 5 minutes)
       const now = new Date();
-      const tokenExpiry = user.googleCalendar.expiryDate;
+      const tokenExpiry = user.googleCalendar.expiryDate
+        ? new Date(user.googleCalendar.expiryDate)
+        : null;
       const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
-      if (tokenExpiry && now >= tokenExpiry) {
-        logger.info('Access token expired, refreshing...', { userId: user.id || user._id });
+      // Fix: Check if token is expired OR will expire within 5 minutes
+      if (!tokenExpiry || now >= tokenExpiry || tokenExpiry <= fiveMinutesFromNow) {
+        logger.info('Access token expired or expiring soon, refreshing...', {
+          userId: user.id || user._id,
+          isExpired: tokenExpiry ? now >= tokenExpiry : true,
+          expiresInMinutes: tokenExpiry ? Math.round((tokenExpiry.getTime() - now.getTime()) / 60000) : null
+        });
 
-        // Refresh the access token
+        // Refresh the access token (with lock protection)
         const newTokens = await this.refreshAccessToken(user);
 
         // Update user with new tokens
         if (newTokens.access_token) {
-          await this.userRepository.update(user.id, {
+          await this.userRepository.update(user.id || user._id, {
             'googleCalendar.accessToken': newTokens.access_token,
             'googleCalendar.expiryDate': newTokens.expiry_date
           });
@@ -422,67 +443,235 @@ class GoogleCalendarAdapter {
   }
 
   /**
-   * Refresh Google access token
+   * Check if refresh rate limit is exceeded
+   * @private
+   */
+  _checkRefreshRateLimit(userId) {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+
+    let attempts = this._refreshAttempts.get(userId) || [];
+
+    // Remove old attempts (older than 1 minute)
+    attempts = attempts.filter(timestamp => timestamp > oneMinuteAgo);
+
+    if (attempts.length >= this.MAX_REFRESH_ATTEMPTS_PER_MINUTE) {
+      logger.warn('Refresh rate limit exceeded:', {
+        userId,
+        attemptsInLastMinute: attempts.length,
+        maxAllowed: this.MAX_REFRESH_ATTEMPTS_PER_MINUTE
+      });
+      return false;
+    }
+
+    // Add current attempt
+    attempts.push(now);
+    this._refreshAttempts.set(userId, attempts);
+
+    return true;
+  }
+
+  /**
+   * Sleep helper for retry delays
+   * @private
+   */
+  _sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Determine if invalid_grant error is likely transient
+   * @private
+   */
+  _isTransientInvalidGrantError(error) {
+    // Check error response for hints about transient issues
+    const errorDesc = error.response?.data?.error_description?.toLowerCase() || '';
+    const statusCode = error.status || error.response?.status;
+
+    // Rate limiting indicators
+    if (statusCode === 429 || errorDesc.includes('rate') || errorDesc.includes('quota')) {
+      return true;
+    }
+
+    // Temporary server errors
+    if (statusCode >= 500 && statusCode < 600) {
+      return true;
+    }
+
+    // Network/timeout errors
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
+      return true;
+    }
+
+    // If error description mentions "temporary" or "retry"
+    if (errorDesc.includes('temporary') || errorDesc.includes('retry')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Refresh Google access token with lock mechanism and retry logic
    * @param {Object} user - User entity/document with googleCalendar
    * @returns {Promise<Object>} New tokens { access_token, expiry_date, scope }
    */
   async refreshAccessToken(user) {
-    try {
-      if (!user.googleCalendar || !user.googleCalendar.refreshToken) {
-        throw new GoogleAccountNotLinkedError();
+    const userId = user.id || user._id;
+
+    if (!user.googleCalendar || !user.googleCalendar.refreshToken) {
+      throw new GoogleAccountNotLinkedError();
+    }
+
+    // Check if refresh is already in progress for this user (lock mechanism)
+    const existingLock = this._refreshLocks.get(userId);
+    if (existingLock) {
+      logger.debug('Refresh already in progress, waiting for existing refresh:', { userId });
+      try {
+        // Wait for existing refresh with timeout
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Refresh lock timeout')), this.REFRESH_LOCK_TIMEOUT_MS)
+        );
+        return await Promise.race([existingLock, timeoutPromise]);
+      } catch (lockError) {
+        logger.warn('Failed to wait for existing refresh lock:', {
+          userId,
+          error: lockError.message
+        });
+        // Continue with new refresh attempt
       }
+    }
 
-      const client = this._createOAuth2Client();
-      client.setCredentials({
-        refresh_token: user.googleCalendar.refreshToken
-      });
+    // Check rate limiting
+    if (!this._checkRefreshRateLimit(userId)) {
+      throw new GoogleTokenExpiredError('Too many refresh attempts. Please wait a moment and try again.');
+    }
 
-      const { credentials } = await client.refreshAccessToken();
-      logger.info('Refreshed Google access token successfully');
+    // Create refresh promise and store in lock
+    const refreshPromise = this._performRefreshWithRetry(user);
+    this._refreshLocks.set(userId, refreshPromise);
 
-      return {
-        access_token: credentials.access_token,
-        expiry_date: credentials.expiry_date,
-        scope: credentials.scope
-      };
-    } catch (error) {
-      if (error.name === 'GoogleAccountNotLinkedError') throw error;
+    try {
+      const result = await refreshPromise;
+      return result;
+    } finally {
+      // Clean up lock
+      this._refreshLocks.delete(userId);
+    }
+  }
 
-      // Check for invalid_grant error (refresh token invalid/revoked)
-      const isInvalidGrant = error.code === 'invalid_grant' ||
-        error.message?.toLowerCase().includes('invalid_grant') ||
-        error.response?.data?.error === 'invalid_grant';
+  /**
+   * Perform refresh with retry logic
+   * @private
+   */
+  async _performRefreshWithRetry(user) {
+    const userId = user.id || user._id;
+    let lastError = null;
 
-      if (isInvalidGrant) {
-        logger.warn('Google refresh token is invalid or revoked:', {
-          userId: user.id || user._id,
-          code: error.code
+    for (let attempt = 1; attempt <= this.REFRESH_RETRY_ATTEMPTS; attempt++) {
+      try {
+        const client = this._createOAuth2Client();
+        client.setCredentials({
+          refresh_token: user.googleCalendar.refreshToken
         });
 
-        // Mark account as invalid and notify user
-        await this._markGoogleAccountAsInvalid(user.id || user._id);
+        logger.debug('Attempting to refresh Google access token:', {
+          userId,
+          attempt,
+          maxAttempts: this.REFRESH_RETRY_ATTEMPTS
+        });
 
-        const invalidError = new GoogleRefreshTokenInvalidError();
-        invalidError.originalError = error;
-        invalidError.code = error.code;
-        invalidError.status = error.status;
-        throw invalidError;
+        const { credentials } = await client.refreshAccessToken();
+
+        logger.info('Refreshed Google access token successfully:', {
+          userId,
+          attempt,
+          expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : null
+        });
+
+        // Clear rate limit tracking on success
+        this._refreshAttempts.delete(userId);
+
+        return {
+          access_token: credentials.access_token,
+          expiry_date: credentials.expiry_date,
+          scope: credentials.scope
+        };
+      } catch (error) {
+        lastError = error;
+
+        // Check for invalid_grant error
+        const isInvalidGrant = error.code === 'invalid_grant' ||
+          error.message?.toLowerCase().includes('invalid_grant') ||
+          error.response?.data?.error === 'invalid_grant';
+
+        if (isInvalidGrant) {
+          const isTransient = this._isTransientInvalidGrantError(error);
+
+          logger.warn('Google refresh token invalid_grant error:', {
+            userId,
+            attempt,
+            maxAttempts: this.REFRESH_RETRY_ATTEMPTS,
+            isTransient,
+            errorCode: error.code,
+            errorStatus: error.status,
+            errorDescription: error.response?.data?.error_description,
+            willRetry: isTransient && attempt < this.REFRESH_RETRY_ATTEMPTS
+          });
+
+          // If transient and we have retries left, wait and retry
+          if (isTransient && attempt < this.REFRESH_RETRY_ATTEMPTS) {
+            const delayMs = this.REFRESH_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1); // Exponential backoff
+            logger.info('Retrying refresh after delay:', {
+              userId,
+              attempt,
+              delayMs,
+              nextAttempt: attempt + 1
+            });
+            await this._sleep(delayMs);
+            continue; // Retry
+          }
+
+          // Not transient or out of retries - mark as invalid
+          logger.error('Google refresh token is invalid or revoked (non-transient or retries exhausted):', {
+            userId,
+            attempt,
+            errorCode: error.code,
+            errorStatus: error.status,
+            errorDescription: error.response?.data?.error_description,
+            isTransient
+          });
+
+          // Mark account as invalid and notify user
+          await this._markGoogleAccountAsInvalid(userId);
+
+          const invalidError = new GoogleRefreshTokenInvalidError();
+          invalidError.originalError = error;
+          invalidError.code = error.code;
+          invalidError.status = error.status;
+          throw invalidError;
+        }
+
+        // For non-invalid_grant errors, log and re-throw immediately
+        logger.error('Failed to refresh Google access token (non-retryable error):', {
+          error: error.message,
+          code: error.code,
+          status: error.status,
+          userId,
+          attempt
+        });
+
+        // Re-throw with enhanced error information
+        const enhancedError = new GoogleTokenExpiredError(error.message || 'Failed to refresh access token');
+        enhancedError.originalError = error;
+        enhancedError.code = error.code;
+        enhancedError.status = error.status;
+        throw enhancedError;
       }
-
-      logger.error('Failed to refresh Google access token:', {
-        error: error.message,
-        code: error.code,
-        status: error.status,
-        userId: user.id || user._id
-      });
-
-      // Re-throw with enhanced error information for other errors
-      const enhancedError = new GoogleTokenExpiredError(error.message || 'Failed to refresh access token');
-      enhancedError.originalError = error;
-      enhancedError.code = error.code;
-      enhancedError.status = error.status;
-      throw enhancedError;
     }
+
+    // Should never reach here, but handle just in case
+    throw lastError || new Error('Refresh failed after all retry attempts');
   }
 
   /**

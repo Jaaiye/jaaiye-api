@@ -34,12 +34,6 @@ class RegisterUseCase {
       throw new EmailAlreadyInUseError();
     }
 
-    // Check if username exists
-    const usernameExists = await this.userRepository.usernameExists(dto.username);
-    if (usernameExists) {
-      throw new UsernameTakenError();
-    }
-
     // Hash password
     const hashedPassword = await PasswordService.hash(dto.password);
 
@@ -50,8 +44,6 @@ class RegisterUseCase {
     // Create user
     const user = await this.userRepository.create({
       email: dto.email,
-      username: dto.username,
-      fullName: dto.fullName,
       password: hashedPassword,
       emailVerified: false,
       role: 'user',

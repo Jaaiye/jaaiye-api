@@ -24,6 +24,7 @@ const {
   RegisterUseCase,
   LoginUseCase,
   GoogleOAuthUseCase,
+  AppleOAuthUseCase,
   VerifyEmailUseCase,
   ForgotPasswordUseCase,
   ResetPasswordUseCase,
@@ -165,6 +166,20 @@ class AuthModule {
     return this._instances.googleOAuthUseCase;
   }
 
+  getAppleOAuthUseCase() {
+    if (!this._instances.appleOAuthUseCase) {
+      this._instances.appleOAuthUseCase = new AppleOAuthUseCase({
+        userRepository: this.getUserRepository(),
+        calendarAdapter: this.getCalendarAdapter(),
+        emailAdapter: this.getEmailAdapter(),
+        firebaseAdapter: this.getFirebaseAdapter(),
+        emailService: this.getEmailAdapter(),
+        notificationQueue: this.getNotificationQueue()
+      });
+    }
+    return this._instances.appleOAuthUseCase;
+  }
+
   getVerifyEmailUseCase() {
     if (!this._instances.verifyEmailUseCase) {
       this._instances.verifyEmailUseCase = new VerifyEmailUseCase({
@@ -247,6 +262,7 @@ class AuthModule {
         registerUseCase: this.getRegisterUseCase(),
         loginUseCase: this.getLoginUseCase(),
         googleOAuthUseCase: this.getGoogleOAuthUseCase(),
+        appleOAuthUseCase: this.getAppleOAuthUseCase(),
         verifyEmailUseCase: this.getVerifyEmailUseCase(),
         forgotPasswordUseCase: this.getForgotPasswordUseCase(),
         resetPasswordUseCase: this.getResetPasswordUseCase(),

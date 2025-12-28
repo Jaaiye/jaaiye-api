@@ -22,6 +22,9 @@ function createAuthRoutes({ authController, authMiddleware }) {
   // POST /auth/google/signin - Google OAuth login/register
   router.post('/google/signin', authController.googleOAuth);
 
+  // POST /auth/apple/signin - Apple OAuth login/register
+  router.post('/apple/signin', authController.appleOAuth);
+
   // POST /auth/verify-email - Verify email with code
   router.post('/verify-email', authController.verifyEmail);
 

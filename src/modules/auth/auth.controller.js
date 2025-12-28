@@ -6,13 +6,14 @@
 
 const { asyncHandler } = require('../../utils/asyncHandler');
 const { successResponse } = require('../../utils/response');
-const { RegisterDTO, LoginDTO, GoogleOAuthDTO } = require('./dto');
+const { RegisterDTO, LoginDTO, GoogleOAuthDTO, AppleOAuthDTO } = require('./dto');
 
 class AuthController {
   constructor({
     registerUseCase,
     loginUseCase,
     googleOAuthUseCase,
+    appleOAuthUseCase,
     verifyEmailUseCase,
     forgotPasswordUseCase,
     resetPasswordUseCase,
@@ -24,6 +25,7 @@ class AuthController {
     this.registerUseCase = registerUseCase;
     this.loginUseCase = loginUseCase;
     this.googleOAuthUseCase = googleOAuthUseCase;
+    this.appleOAuthUseCase = appleOAuthUseCase;
     this.verifyEmailUseCase = verifyEmailUseCase;
     this.forgotPasswordUseCase = forgotPasswordUseCase;
     this.resetPasswordUseCase = resetPasswordUseCase;
@@ -73,7 +75,7 @@ class AuthController {
 
   /**
    * Google OAuth login/register
-   * POST /auth/google
+   * POST /auth/google/signin
    * Returns: { accessToken, refreshToken, firebaseToken, user }
    */
   googleOAuth = asyncHandler(async (req, res) => {
@@ -95,6 +97,33 @@ class AuthController {
         profilePicture: result.user.profilePicture
       }
     }, 200, 'Google sign-in successful');
+  });
+
+  /**
+   * Apple OAuth login/register
+   * POST /auth/apple/signin
+   * Body: { identityToken, userData?: { fullName, email, firstName, lastName } }
+   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   */
+  appleOAuth = asyncHandler(async (req, res) => {
+    const { identityToken, userData } = req.body;
+    const dto = new AppleOAuthDTO({ identityToken, userData });
+    const result = await this.appleOAuthUseCase.execute(dto);
+
+    return successResponse(res, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      firebaseToken: result.firebaseToken,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        username: result.user.username,
+        fullName: result.user.fullName,
+        role: result.user.role,
+        emailVerified: result.user.emailVerified,
+        profilePicture: result.user.profilePicture
+      }
+    }, 200, 'Apple sign-in successful');
   });
 
   /**

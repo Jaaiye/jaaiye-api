@@ -8,8 +8,9 @@ class UpdateProfileDTO {
     this.username = data.username;
     this.fullName = data.fullName;
     this.preferences = data.preferences;
-    this.emoji = data.emoji;
-    this.color = data.color;
+    // Support both flat structure (emoji/color) and nested structure (profilePicture.emoji/profilePicture.color)
+    this.emoji = data.profilePicture?.emoji || data.emoji;
+    this.color = data.profilePicture?.color || data.profilePicture?.backgroundColor || data.color;
   }
 
   /**

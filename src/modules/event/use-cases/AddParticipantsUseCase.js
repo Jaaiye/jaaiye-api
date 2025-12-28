@@ -14,7 +14,9 @@ class AddParticipantsUseCase {
     userRepository,
     notificationAdapter,
     googleCalendarAdapter,
-    calendarSyncService
+    calendarSyncService,
+    groupRepository,
+    firebaseAdapter
   }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
@@ -23,6 +25,8 @@ class AddParticipantsUseCase {
     this.notificationAdapter = notificationAdapter;
     this.googleCalendarAdapter = googleCalendarAdapter;
     this.calendarSyncService = calendarSyncService;
+    this.groupRepository = groupRepository;
+    this.firebaseAdapter = firebaseAdapter;
   }
 
   async execute(eventId, userId, dto) {
@@ -84,6 +88,77 @@ class AddParticipantsUseCase {
         })
       )
     );
+
+    // Add participants to associated group if event has one
+    if (this.groupRepository) {
+      try {
+        const group = await this.groupRepository.findByEvent(eventId);
+        if (group) {
+          // Get existing group member IDs
+          const existingMemberIds = new Set(
+            group.members.map(m => {
+              const memberUserId = typeof m.user === 'object' ? m.user.id || m.user._id : m.user;
+              return memberUserId.toString();
+            })
+          );
+
+          // Add only new participants to the group (filter out existing members)
+          const participantUserIds = createdParticipants.map(p => {
+            const participantUserId = typeof p.user === 'object' ? p.user.id || p.user._id : p.user;
+            return participantUserId.toString();
+          });
+
+          const newParticipantIds = participantUserIds.filter(id => !existingMemberIds.has(id));
+
+          if (newParticipantIds.length > 0) {
+            await Promise.all(
+              newParticipantIds.map(async (participantUserId) => {
+                try {
+                  await this.groupRepository.addMember(group.id, participantUserId, userId, 'member');
+                } catch (error) {
+                  console.warn(`Failed to add participant ${participantUserId} to group:`, error.message);
+                }
+              })
+            );
+
+            // Sync group members to Firebase (non-blocking)
+            if (this.firebaseAdapter) {
+              setImmediate(async () => {
+                try {
+                  // Get updated group with all members
+                  const updatedGroup = await this.groupRepository.findById(group.id);
+
+                  // Build members object for Firebase
+                  const plainMembers = {};
+                  for (const member of updatedGroup.members) {
+                    if (member.user) {
+                      const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+                      const memberUser = await this.userRepository.findById(memberUserId);
+                      if (memberUser) {
+                        plainMembers[memberUserId.toString()] = {
+                          name: String(memberUser.fullName || memberUser.username || 'Unknown User'),
+                          avatar: String(memberUser.profilePicture || ''),
+                          role: String(member.role || 'member')
+                        };
+                      }
+                    }
+                  }
+
+                  await this.firebaseAdapter.updateGroup(updatedGroup.id, {
+                    members: plainMembers
+                  });
+                } catch (error) {
+                  console.error('[AddParticipants] Failed to sync group to Firebase:', error);
+                }
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // Log but don't fail participant addition if group operation fails
+        console.warn('[AddParticipants] Failed to add participants to group:', error.message);
+      }
+    }
 
     // Sync event to participants' calendars (Jaaiye + Google) - non-blocking
     if (this.calendarSyncService) {

@@ -249,7 +249,9 @@ class EventModule {
         userRepository: this.getUserRepository(),
         notificationAdapter: this.getNotificationAdapter(),
         googleCalendarAdapter: this.getGoogleCalendarAdapter(),
-        calendarSyncService: this.getCalendarSyncService()
+        calendarSyncService: this.getCalendarSyncService(),
+        groupRepository: this.getGroupRepository(),
+        firebaseAdapter: this.getFirebaseAdapter()
       });
     }
     return this._instances.addParticipantsUseCase;

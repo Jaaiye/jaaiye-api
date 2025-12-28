@@ -189,11 +189,14 @@ class CalendarController {
   handleOAuthRedirect = asyncHandler(async (req, res) => {
     const { code, state } = req.query;
 
+    // Universal deeplink URL (can be overridden via env var)
+    const UNIVERSAL_DEEPLINK = process.env.UNIVERSAL_DEEPLINK_URL || 'https://jaaiye-4439b.web.app';
+
     if (!code || !state) {
       // Redirect to mobile app with error
       const errorMessage = encodeURIComponent('code and state query parameters are required');
       // Try to extract mobileRedirectUri from state to redirect
-      let mobileRedirectUri = 'jaaiye://oauthredirect'; // Default fallback
+      let mobileRedirectUri = UNIVERSAL_DEEPLINK; // Default fallback to universal deeplink
       try {
         const extracted = this.googleCalendarAdapter.extractOAuthState(state);
         if (extracted.mobileRedirectUri) {
@@ -217,7 +220,7 @@ class CalendarController {
       return res.redirect(successRedirectUrl);
     } catch (error) {
       // Try to extract mobileRedirectUri from state to redirect with error
-      let mobileRedirectUri = 'jaaiye://oauthredirect'; // Default fallback
+      let mobileRedirectUri = UNIVERSAL_DEEPLINK; // Default fallback to universal deeplink
       let userId = null;
       try {
         const extracted = this.googleCalendarAdapter.extractOAuthState(state);

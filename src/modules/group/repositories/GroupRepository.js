@@ -62,6 +62,11 @@ class GroupRepository extends IGroupRepository {
     return docs.map(doc => this._toEntity(doc));
   }
 
+  async findByEvent(eventId) {
+    const doc = await GroupSchema.findOne({ events: eventId, isActive: true }).lean();
+    return doc ? this._toEntity(doc) : null;
+  }
+
   async search(searchTerm, userId, limit = 20) {
     const docs = await GroupSchema.searchGroups(searchTerm, userId, limit).lean();
     return docs.map(doc => this._toEntity(doc));

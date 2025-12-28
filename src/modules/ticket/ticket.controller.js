@@ -13,9 +13,7 @@ const {
   GetEventTicketsUseCase,
   GetTicketByIdUseCase,
   GetTicketByPublicIdUseCase,
-  ScanTicketUseCase,
-  VerifyAndUseTicketUseCase,
-  VerifyAndUseTicketByPublicIdUseCase,
+  ScanAndVerifyTicketUseCase,
   CancelTicketUseCase
 } = require('./use-cases');
 
@@ -27,9 +25,7 @@ class TicketController {
     getEventTicketsUseCase,
     getTicketByIdUseCase,
     getTicketByPublicIdUseCase,
-    scanTicketUseCase,
-    verifyAndUseTicketUseCase,
-    verifyAndUseTicketByPublicIdUseCase,
+    scanAndVerifyTicketUseCase,
     cancelTicketUseCase
   }) {
     this.createTicket = asyncHandler(async (req, res) => {
@@ -78,13 +74,6 @@ class TicketController {
       return successResponse(res, result);
     });
 
-    this.scanTicket = asyncHandler(async (req, res) => {
-      const { t: token } = req.query;
-      console.log("token: ", token)
-      const result = await scanTicketUseCase.execute(token);
-      return res.json(result);
-    });
-
     this.getTicketByPublicId = asyncHandler(async (req, res) => {
       const { publicId } = req.params;
       const { eventId } = req.query;
@@ -92,59 +81,28 @@ class TicketController {
       return successResponse(res, result);
     });
 
-    this.verifyAndUseTicket = asyncHandler(async (req, res) => {
-      const { token } = req.body;
+    /**
+     * Unified scan and verify endpoint
+     * Accepts either token or publicId in request body
+     * Automatically detects type and verifies/marks ticket as used
+     */
+    this.scanAndVerify = asyncHandler(async (req, res) => {
+      const { identifier, eventId } = req.body;
       const userId = req.user._id || req.user.id;
-      try {
-        const result = await verifyAndUseTicketUseCase.execute(token, userId);
-        return successResponse(res, result);
-      } catch (error) {
-        // If ticket is already used, return the ticket info with error message
-        if (error.name === 'TicketAlreadyUsedError' && error.ticket) {
-          return res.status(400).json({
-            success: false,
-            error: error.message,
-            ticket: {
-              id: error.ticket.id,
-              publicId: error.ticket.publicId,
-              status: error.ticket.status,
-              usedAt: error.ticket.usedAt,
-              verifiedBy: error.ticket.verifiedBy,
-              event: error.ticket.event,
-              user: error.ticket.user
-            }
-          });
-        }
-        throw error;
-      }
-    });
 
-    this.verifyAndUseTicketByPublicId = asyncHandler(async (req, res) => {
-      const { publicId } = req.body;
-      const { eventId } = req.body;
-      const userId = req.user._id || req.user.id;
-      try {
-        const result = await verifyAndUseTicketByPublicIdUseCase.execute(publicId, userId, eventId || null);
-        return successResponse(res, result);
-      } catch (error) {
-        // If ticket is already used, return the ticket info with error message
-        if (error.name === 'TicketAlreadyUsedError' && error.ticket) {
-          return res.status(400).json({
-            success: false,
-            error: error.message,
-            ticket: {
-              id: error.ticket.id,
-              publicId: error.ticket.publicId,
-              status: error.ticket.status,
-              usedAt: error.ticket.usedAt,
-              verifiedBy: error.ticket.verifiedBy,
-              event: error.ticket.event,
-              user: error.ticket.user
-            }
-          });
-        }
-        throw error;
+      const result = await scanAndVerifyTicketUseCase.execute(
+        identifier,
+        userId,
+        eventId || null
+      );
+
+      // If ticket is already used, return 400 with standardized format
+      if (result.status === 'used') {
+        return res.status(400).json(result);
       }
+
+      // Success - ticket verified and marked as used
+      return successResponse(res, result);
     });
 
     this.cancelTicket = asyncHandler(async (req, res) => {

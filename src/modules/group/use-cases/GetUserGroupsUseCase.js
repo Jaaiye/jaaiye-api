@@ -15,28 +15,28 @@ class GetUserGroupsUseCase {
   async execute(userId, includeInactive = false) {
     const groups = await this.groupRepository.findByUser(userId, includeInactive);
 
-    // Enrich with Firebase data
-    const enrichedGroups = await Promise.all(
+    // Return groups immediately without blocking on Firebase
+    // Mobile clients fetch Firebase data directly, so we don't need to include it
+    const groupsData = groups.map(group => group.toJSON());
+
+    // Fetch Firebase data in background (non-blocking) for potential caching/web clients
+    // Fire-and-forget approach - don't await, don't block response
+    Promise.all(
       groups.map(async group => {
         try {
-          const fbData = await this.firebaseAdapter.getGroupSnapshot(group.id);
-          return {
-            ...group.toJSON(),
-            lastMessage: fbData?.lastMessage || null,
-            updatedAtFirebase: fbData?.updatedAt || null
-          };
+          await this.firebaseAdapter.getGroupSnapshot(group.id);
+          // Could cache here if needed for web clients
         } catch (error) {
-          console.warn('Failed to fetch Firebase data for group:', error);
-          return {
-            ...group.toJSON(),
-            lastMessage: null,
-            updatedAtFirebase: null
-          };
+          // Silently fail - Firebase data is optional and mobile handles it
+          console.debug('Background Firebase fetch failed for group:', group.id, error.message);
         }
       })
-    );
+    ).catch(err => {
+      // Prevent unhandled promise rejection
+      console.debug('Background Firebase fetch error:', err.message);
+    });
 
-    return enrichedGroups;
+    return groupsData;
   }
 }
 

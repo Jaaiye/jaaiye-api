@@ -12,9 +12,7 @@ const {
   getTicketByIdValidator,
   getEventTicketsValidator,
   getTicketByPublicIdValidator,
-  scanTicketValidator,
-  verifyAndUseTicketValidator,
-  verifyAndUseTicketByPublicIdValidator,
+  scanAndVerifyTicketValidator,
   cancelTicketValidator
 } = require('./validators/ticketValidators');
 
@@ -24,11 +22,9 @@ class TicketRoutes {
   }
 
   getRoutes() {
-    // Public scanning (view only) - MUST come before /:ticketId to avoid route matching conflict
-    router.get('/scan', ...scanTicketValidator, validate, this.ticketController.scanTicket);
-
-    // Authenticated scanner (mark as used) - uses same endpoint but with auth
-    router.get('/scan/auth', protect, scanner, ...scanTicketValidator, validate, this.ticketController.scanTicket);
+    // Unified scan and verify endpoint (authenticated scanner)
+    // Accepts either token or publicId in request body
+    router.post('/scan', protect, scanner, ...scanAndVerifyTicketValidator, validate, this.ticketController.scanAndVerify);
 
     // Ticket management routes
     router.post('/', protect, admin, ...createTicketValidator, validate, this.ticketController.createTicket);
@@ -39,12 +35,6 @@ class TicketRoutes {
 
     // Parameterized routes MUST come last to avoid matching specific routes
     router.get('/:ticketId', protect, ...getTicketByIdValidator, validate, this.ticketController.getTicketById);
-
-    // Verify and use ticket by token (for scanner)
-    router.post('/verify', protect, scanner, ...verifyAndUseTicketValidator, validate, this.ticketController.verifyAndUseTicket);
-
-    // Verify and use ticket by public ID (for scanner)
-    router.post('/verify/public', protect, scanner, ...verifyAndUseTicketByPublicIdValidator, validate, this.ticketController.verifyAndUseTicketByPublicId);
 
     // Cancel ticket
     router.patch('/cancel', protect, ...cancelTicketValidator, validate, this.ticketController.cancelTicket);

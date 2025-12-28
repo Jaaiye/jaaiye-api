@@ -12,9 +12,7 @@ const {
   GetEventTicketsUseCase,
   GetTicketByIdUseCase,
   GetTicketByPublicIdUseCase,
-  ScanTicketUseCase,
-  VerifyAndUseTicketUseCase,
-  VerifyAndUseTicketByPublicIdUseCase,
+  ScanAndVerifyTicketUseCase,
   CancelTicketUseCase
 } = require('./use-cases');
 const TicketController = require('./ticket.controller');
@@ -46,9 +44,7 @@ class TicketModule {
     this._getEventTicketsUseCase = null;
     this._getTicketByIdUseCase = null;
     this._getTicketByPublicIdUseCase = null;
-    this._scanTicketUseCase = null;
-    this._verifyAndUseTicketUseCase = null;
-    this._verifyAndUseTicketByPublicIdUseCase = null;
+    this._scanAndVerifyTicketUseCase = null;
     this._cancelTicketUseCase = null;
 
     // Controller
@@ -192,33 +188,14 @@ class TicketModule {
     return this._getTicketByPublicIdUseCase;
   }
 
-  getScanTicketUseCase() {
-    if (!this._scanTicketUseCase) {
-      this._scanTicketUseCase = new ScanTicketUseCase({
+  getScanAndVerifyTicketUseCase() {
+    if (!this._scanAndVerifyTicketUseCase) {
+      this._scanAndVerifyTicketUseCase = new ScanAndVerifyTicketUseCase({
         ticketRepository: this.getTicketRepository(),
         qrCodeAdapter: this.getQRCodeAdapter()
       });
     }
-    return this._scanTicketUseCase;
-  }
-
-  getVerifyAndUseTicketUseCase() {
-    if (!this._verifyAndUseTicketUseCase) {
-      this._verifyAndUseTicketUseCase = new VerifyAndUseTicketUseCase({
-        ticketRepository: this.getTicketRepository(),
-        qrCodeAdapter: this.getQRCodeAdapter()
-      });
-    }
-    return this._verifyAndUseTicketUseCase;
-  }
-
-  getVerifyAndUseTicketByPublicIdUseCase() {
-    if (!this._verifyAndUseTicketByPublicIdUseCase) {
-      this._verifyAndUseTicketByPublicIdUseCase = new VerifyAndUseTicketByPublicIdUseCase({
-        ticketRepository: this.getTicketRepository()
-      });
-    }
-    return this._verifyAndUseTicketByPublicIdUseCase;
+    return this._scanAndVerifyTicketUseCase;
   }
 
   getCancelTicketUseCase() {
@@ -240,9 +217,7 @@ class TicketModule {
         getEventTicketsUseCase: this.getGetEventTicketsUseCase(),
         getTicketByIdUseCase: this.getGetTicketByIdUseCase(),
         getTicketByPublicIdUseCase: this.getGetTicketByPublicIdUseCase(),
-        scanTicketUseCase: this.getScanTicketUseCase(),
-        verifyAndUseTicketUseCase: this.getVerifyAndUseTicketUseCase(),
-        verifyAndUseTicketByPublicIdUseCase: this.getVerifyAndUseTicketByPublicIdUseCase(),
+        scanAndVerifyTicketUseCase: this.getScanAndVerifyTicketUseCase(),
         cancelTicketUseCase: this.getCancelTicketUseCase()
       });
     }

@@ -47,18 +47,6 @@ const getEventTicketsValidator = [
     .withMessage('Invalid event ID')
 ];
 
-const scanTicketValidator = [
-  query('t')
-    .notEmpty()
-    .withMessage('Token is required')
-];
-
-const verifyAndUseTicketValidator = [
-  body('token')
-    .notEmpty()
-    .withMessage('Token is required')
-];
-
 const cancelTicketValidator = [
   body('ticketId')
     .notEmpty()
@@ -80,13 +68,13 @@ const getTicketByPublicIdValidator = [
     .withMessage('Invalid event ID')
 ];
 
-const verifyAndUseTicketByPublicIdValidator = [
-  body('publicId')
+const scanAndVerifyTicketValidator = [
+  body('identifier')
     .notEmpty()
-    .withMessage('Public ID is required')
+    .withMessage('Identifier (token or publicId) is required')
     .isString()
     .trim()
-    .withMessage('Public ID must be a string'),
+    .withMessage('Identifier must be a string'),
   body('eventId')
     .optional()
     .isMongoId()
@@ -98,9 +86,7 @@ module.exports = {
   getTicketByIdValidator,
   getEventTicketsValidator,
   getTicketByPublicIdValidator,
-  scanTicketValidator,
-  verifyAndUseTicketValidator,
-  verifyAndUseTicketByPublicIdValidator,
+  scanAndVerifyTicketValidator,
   cancelTicketValidator
 };
 

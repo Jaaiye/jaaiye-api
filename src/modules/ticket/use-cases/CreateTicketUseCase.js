@@ -225,6 +225,7 @@ class CreateTicketUseCase {
         // Get populated ticket for email - use raw Mongoose document to preserve populated fields
         const TicketSchema = require('../../entities/Ticket.schema');
         const populatedDoc = await TicketSchema.findById(ticket.id)
+          .select('+qrCode +publicId') // Explicitly select qrCode and publicId
           .populate('eventId', 'title startTime endTime venue image ticketTypes')
           .populate('userId', 'username fullName email')
           .lean();
@@ -238,7 +239,7 @@ class CreateTicketUseCase {
           hasQrCode: !!ticket.qrCode
         });
 
-        if (populatedDoc && populatedDoc.eventId) {
+        if (populatedDoc && populatedDoc.eventId && typeof populatedDoc.eventId === 'object' && populatedDoc.eventId.title) {
           // Convert to plain object with populated fields preserved
           const ticketForEmail = {
             ...populatedDoc,
@@ -255,10 +256,26 @@ class CreateTicketUseCase {
           };
 
           console.log('[CreateTicket] Sending email to:', targetUser.email);
+          console.log('[CreateTicket] Ticket data for email:', {
+            hasEventId: !!ticketForEmail.eventId,
+            eventTitle: ticketForEmail.eventId?.title,
+            hasQrCode: !!ticketForEmail.qrCode,
+            qrCodeType: typeof ticketForEmail.qrCode,
+            qrCodeLength: ticketForEmail.qrCode ? ticketForEmail.qrCode.length : 0,
+            publicId: ticketForEmail.publicId,
+            hasPublicId: !!ticketForEmail.publicId,
+            ticketId: ticketForEmail.id
+          });
+
           await this.emailAdapter.sendPaymentConfirmationEmail(targetUser, ticketForEmail);
-          console.log('[CreateTicket] Email sent successfully');
+          console.log('[CreateTicket] Email sent successfully to:', targetUser.email);
         } else {
-          console.warn('[CreateTicket] Cannot send email - missing populated ticket or event data');
+          console.warn('[CreateTicket] Cannot send email - missing populated ticket or event data', {
+            hasPopulatedDoc: !!populatedDoc,
+            hasEventId: !!(populatedDoc && populatedDoc.eventId),
+            eventIdType: populatedDoc?.eventId ? typeof populatedDoc.eventId : 'undefined',
+            hasEventTitle: !!(populatedDoc?.eventId && typeof populatedDoc.eventId === 'object' && populatedDoc.eventId.title)
+          });
         }
       } else {
         console.warn('[CreateTicket] Cannot send email - user not found or no email address');

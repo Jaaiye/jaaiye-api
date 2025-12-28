@@ -84,12 +84,59 @@ class PaymentService {
 
           // Send email to assignee
           try {
-            await this.emailAdapter.sendPaymentConfirmationEmail(
-              { email, fullName: name },
-              ticket
-            );
+            // Populate ticket with event data for email
+            const TicketSchema = require('../../ticket/entities/Ticket.schema');
+            const populatedTicket = await TicketSchema.findById(ticket.id || ticket._id)
+              .select('+qrCode +publicId') // Ensure these fields are included
+              .populate('eventId', 'title startTime endTime venue image ticketTypes')
+              .populate('userId', 'username fullName email')
+              .lean();
+
+            if (populatedTicket && populatedTicket.eventId && typeof populatedTicket.eventId === 'object') {
+              const ticketForEmail = {
+                ...populatedTicket,
+                id: populatedTicket._id?.toString() || populatedTicket.id,
+                qrCode: ticket.qrCode || populatedTicket.qrCode || null,
+                ticketData: ticket.ticketData || populatedTicket.ticketData || null,
+                publicId: ticket.publicId || populatedTicket.publicId || null,
+                price: ticket.price || populatedTicket.price,
+                quantity: ticket.quantity || populatedTicket.quantity,
+                ticketTypeName: ticket.ticketTypeName || populatedTicket.ticketTypeName,
+                status: ticket.status || populatedTicket.status
+              };
+
+              logger.info('Sending ticket email to assignee', {
+                email,
+                name,
+                hasQrCode: !!ticketForEmail.qrCode,
+                hasPublicId: !!ticketForEmail.publicId,
+                publicId: ticketForEmail.publicId
+              });
+
+              await this.emailAdapter.sendPaymentConfirmationEmail(
+                { email, fullName: name },
+                ticketForEmail
+              );
+
+              logger.info('Ticket email sent to assignee successfully', {
+                email,
+                hasQrCode: !!ticketForEmail.qrCode,
+                publicId: ticketForEmail.publicId
+              });
+            } else {
+              logger.warn('Cannot send email to assignee - ticket missing event data', {
+                email,
+                ticketId: ticket.id || ticket._id,
+                hasPopulatedTicket: !!populatedTicket,
+                hasEventId: !!(populatedTicket && populatedTicket.eventId)
+              });
+            }
           } catch (emailError) {
-            logger.warn('Failed to send email to assignee', { email, error: emailError.message });
+            logger.error('Failed to send email to assignee', {
+              email,
+              error: emailError.message,
+              stack: emailError.stack
+            });
           }
 
           // Send push notification to assignee if they have an account
@@ -147,13 +194,91 @@ class PaymentService {
       try {
         const buyer = await this.userRepository.findById(userId);
         if (buyer && buyer.email && createdTickets.length > 0) {
-          await this.emailAdapter.sendPaymentConfirmationEmail(
-            buyer,
-            createdTickets.length === 1 ? createdTickets[0] : createdTickets
+          // Populate tickets with event data for email
+          const TicketSchema = require('../../ticket/entities/Ticket.schema');
+          const populatedTickets = await Promise.all(
+            createdTickets.map(async (ticket) => {
+              try {
+                // Explicitly select qrCode and publicId fields
+                const populated = await TicketSchema.findById(ticket.id || ticket._id)
+                  .select('+qrCode +publicId') // Ensure these fields are included
+                  .populate('eventId', 'title startTime endTime venue image ticketTypes')
+                  .populate('userId', 'username fullName email')
+                  .lean();
+
+                if (populated && populated.eventId) {
+                  // Ensure qrCode and publicId are included (from ticket entity or populated doc)
+                  const ticketForEmail = {
+                    ...populated,
+                    id: populated._id?.toString() || populated.id,
+                    qrCode: ticket.qrCode || populated.qrCode || null,
+                    ticketData: ticket.ticketData || populated.ticketData || null,
+                    publicId: ticket.publicId || populated.publicId || null,
+                    price: ticket.price || populated.price,
+                    quantity: ticket.quantity || populated.quantity,
+                    ticketTypeName: ticket.ticketTypeName || populated.ticketTypeName,
+                    status: ticket.status || populated.status
+                  };
+
+                  logger.debug('Ticket prepared for email', {
+                    ticketId: ticketForEmail.id,
+                    hasQrCode: !!ticketForEmail.qrCode,
+                    hasPublicId: !!ticketForEmail.publicId,
+                    publicId: ticketForEmail.publicId,
+                    qrCodeType: typeof ticketForEmail.qrCode
+                  });
+
+                  return ticketForEmail;
+                }
+                return ticket;
+              } catch (populateError) {
+                logger.warn('Failed to populate ticket for email', {
+                  ticketId: ticket.id || ticket._id,
+                  error: populateError.message
+                });
+                return ticket;
+              }
+            })
           );
+
+          // Filter out tickets without event data
+          const validTickets = populatedTickets.filter(t => t.eventId && typeof t.eventId === 'object' && t.eventId.title);
+
+          if (validTickets.length > 0) {
+            logger.info('Sending ticket confirmation email', {
+              userId,
+              email: buyer.email,
+              ticketCount: validTickets.length
+            });
+
+            await this.emailAdapter.sendPaymentConfirmationEmail(
+              buyer,
+              validTickets.length === 1 ? validTickets[0] : validTickets
+            );
+
+            logger.info('Ticket confirmation email sent successfully', { userId, email: buyer.email });
+          } else {
+            logger.warn('Cannot send email - tickets missing event data', {
+              userId,
+              totalTickets: createdTickets.length,
+              validTickets: validTickets.length
+            });
+          }
+        } else {
+          logger.warn('Cannot send email - missing buyer or email', {
+            userId,
+            hasBuyer: !!buyer,
+            hasEmail: !!(buyer && buyer.email),
+            ticketCount: createdTickets.length
+          });
         }
       } catch (emailError) {
-        logger.warn('Failed to send confirmation email', { userId, error: emailError.message });
+        logger.error('Failed to send confirmation email', {
+          userId,
+          error: emailError.message,
+          stack: emailError.stack,
+          ticketCount: createdTickets.length
+        });
       }
 
       // Send push and in-app notification to buyer
@@ -167,7 +292,13 @@ class PaymentService {
             const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
             const eventTitle = event.title || 'Event';
 
-            await this.sendNotificationUseCase.execute(
+            logger.info('Sending ticket purchase notification', {
+              userId,
+              ticketCount,
+              eventTitle
+            });
+
+            const notificationResult = await this.sendNotificationUseCase.execute(
               userId,
               {
                 title: 'Ticket Purchase Successful! 🎉',
@@ -182,10 +313,33 @@ class PaymentService {
                 path: 'ticketsScreen'
               }
             );
+
+            logger.info('Ticket purchase notification sent successfully', {
+              userId,
+              notificationId: notificationResult?.id
+            });
+          } else {
+            logger.warn('Cannot send notification - missing buyer or event', {
+              userId,
+              hasBuyer: !!buyer,
+              hasEvent: !!event,
+              eventId
+            });
           }
         } catch (notificationError) {
-          logger.warn('Failed to send push notification', { userId, error: notificationError.message });
+          logger.error('Failed to send push notification', {
+            userId,
+            error: notificationError.message,
+            stack: notificationError.stack,
+            ticketCount: createdTickets.length
+          });
         }
+      } else {
+        logger.warn('Notification not sent - missing requirements', {
+          userId,
+          hasTickets: createdTickets.length > 0,
+          hasNotificationUseCase: !!this.sendNotificationUseCase
+        });
       }
     }
 

@@ -25,15 +25,28 @@ class PushNotificationAdapter {
     try {
       // Check user preferences
       const user = await UserSchema.findById(userId).select('preferences deviceTokens');
-      if (!user || !user.preferences?.notifications?.push) {
-        return { success: false, reason: 'User not found or push notifications disabled' };
+      if (!user) {
+        console.warn('Push notification failed - user not found', { userId });
+        return { success: false, reason: 'User not found' };
+      }
+
+      if (!user.preferences?.notifications?.push) {
+        console.info('Push notification skipped - user has push notifications disabled', { userId });
+        return { success: false, reason: 'Push notifications disabled by user' };
       }
 
       // Get device tokens
       const deviceTokens = user.deviceTokens?.map(dt => dt.token) || [];
       if (deviceTokens.length === 0) {
+        console.warn('Push notification failed - no device tokens found', { userId });
         return { success: false, reason: 'No device tokens found' };
       }
+
+      console.log('Sending push notification', {
+        userId,
+        tokenCount: deviceTokens.length,
+        notificationTitle: notification.title
+      });
 
       // Send via Firebase
       const response = await this.firebaseAdapter.sendMulticast(deviceTokens, notification, data);

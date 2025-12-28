@@ -30,12 +30,35 @@ class SendNotificationUseCase {
     // Send push notification (non-blocking, fire-and-forget)
     // Only send if pushNotificationAdapter is available
     if (this.pushNotificationAdapter) {
-      setImmediate(() => {
-        this.pushNotificationAdapter.send(userId, notification, data)
-          .catch(error => {
-            console.error('Failed to send push notification:', error);
+      setImmediate(async () => {
+        try {
+          const result = await this.pushNotificationAdapter.send(userId, notification, data);
+
+          if (result.success) {
+            console.log('Push notification sent successfully', {
+              userId,
+              notificationTitle: notification.title,
+              successCount: result.successCount,
+              failureCount: result.failureCount
+            });
+          } else {
+            console.warn('Push notification failed', {
+              userId,
+              notificationTitle: notification.title,
+              reason: result.reason || result.error
+            });
+          }
+        } catch (error) {
+          console.error('Failed to send push notification:', {
+            userId,
+            notificationTitle: notification.title,
+            error: error.message,
+            stack: error.stack
           });
+        }
       });
+    } else {
+      console.warn('Push notification not sent - pushNotificationAdapter not available', { userId });
     }
 
     return notificationEntity.toJSON();

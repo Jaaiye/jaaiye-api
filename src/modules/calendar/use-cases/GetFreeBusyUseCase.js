@@ -3,7 +3,7 @@
  * Application layer - use case
  */
 
-const { ValidationError, GoogleAccountNotLinkedError } = require('../errors');
+const { ValidationError } = require('../errors');
 
 class GetFreeBusyUseCase {
   constructor({ userRepository, googleCalendarAdapter }) {
@@ -29,8 +29,13 @@ class GetFreeBusyUseCase {
       throw new Error('User not found');
     }
 
+    // Return empty response with flag if Google Calendar not linked (instead of throwing)
     if (!user.googleCalendar || !user.googleCalendar.refreshToken) {
-      throw new GoogleAccountNotLinkedError('No Google account linked. Please link your Google account first.');
+      return {
+        freeBusy: {},
+        googleCalendarLinked: false,
+        message: 'Google Calendar is not linked. Please link your Google account to view free/busy information.'
+      };
     }
 
     // Use provided calendarIds, or fallback to selectedCalendarIds
@@ -43,7 +48,10 @@ class GetFreeBusyUseCase {
       calendarIdsToUse.length > 0 ? calendarIdsToUse : null
     );
 
-    return { freeBusy };
+    return {
+      freeBusy,
+      googleCalendarLinked: true
+    };
   }
 }
 

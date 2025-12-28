@@ -4,7 +4,6 @@
  */
 
 const { ValidationError } = require('../errors');
-const { GoogleAccountNotLinkedError } = require('../errors');
 const googleUtils = require('../../../utils/googleUtils');
 
 class ListGoogleEventsUseCase {
@@ -35,8 +34,16 @@ class ListGoogleEventsUseCase {
       throw new Error('User not found');
     }
 
+    // Return empty response with flag if Google Calendar not linked (instead of throwing)
     if (!user.googleCalendar || !user.googleCalendar.refreshToken) {
-      throw new GoogleAccountNotLinkedError('No Google account linked. Please link your Google account first.');
+      return {
+        events: [],
+        total: 0,
+        timeRange: { start: timeMin, end: timeMax },
+        viewType: viewType,
+        googleCalendarLinked: false,
+        message: 'Google Calendar is not linked. Please link your Google account to view Google Calendar events.'
+      };
     }
 
     // Use selectedCalendarIds - if empty, user doesn't want to share calendar
@@ -86,7 +93,8 @@ class ListGoogleEventsUseCase {
       events: enhancedEvents,
       total: enhancedEvents.length,
       timeRange: { start: timeMin, end: timeMax },
-      viewType: viewType
+      viewType: viewType,
+      googleCalendarLinked: true
     };
   }
 }

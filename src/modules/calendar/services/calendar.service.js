@@ -48,10 +48,12 @@ class CalendarService {
     }
 
     // Get Google events
+    let googleCalendarLinked = false;
     if (includeGoogle) {
       try {
         const user = await this.userRepository.findById(userId);
         if (user && user.googleCalendar && user.googleCalendar.refreshToken) {
+          googleCalendarLinked = true;
           // Use selectedCalendarIds - if empty, user doesn't want to share calendar
           const selectedCalendarIds = user.googleCalendar.selectedCalendarIds || [];
           if (selectedCalendarIds.length > 0) {
@@ -69,7 +71,8 @@ class CalendarService {
           // If selectedCalendarIds is empty, return no Google events (user doesn't want to share)
         }
       } catch (error) {
-        // Silently fail if Google Calendar not linked
+        // Silently fail if Google Calendar not linked or error occurs
+        googleCalendarLinked = false;
       }
     }
 
@@ -83,7 +86,11 @@ class CalendarService {
     return {
       events,
       viewType,
-      timeRange: { timeMin, timeMax }
+      timeRange: { timeMin, timeMax },
+      googleCalendarLinked,
+      ...(includeGoogle && !googleCalendarLinked ? {
+        message: 'Google Calendar is not linked. Please link your Google account to view Google Calendar events.'
+      } : {})
     };
   }
 

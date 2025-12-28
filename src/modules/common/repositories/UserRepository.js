@@ -73,8 +73,16 @@ class UserRepository extends IUserRepository {
    */
   async create(userData) {
     const user = await UserSchema.create(userData);
-    const userWithPassword = await UserSchema.findById(user._id).select('+password +googleCalendar.googleId');
-    return this._toEntity(userWithPassword);
+    // Select verification fields if they exist in userData
+    const selectFields = '+password +googleCalendar.googleId';
+    const verificationSelect = (userData.verification && (userData.verification.code || userData.verification.expires))
+      ? ' +verification.code +verification.expires'
+      : '';
+    const userWithAllFields = await UserSchema.findById(user._id)
+      .select(selectFields + verificationSelect)
+      .lean(false); // Keep as Mongoose document to preserve all fields
+
+    return this._toEntity(userWithAllFields);
   }
 
   /**
@@ -283,13 +291,27 @@ class UserRepository extends IUserRepository {
   /**
    * Find user by verification code
    * @param {string} code - Verification code
-   * @returns {Promise<UserEntity[]>}
+   * @returns {Promise<UserEntity|null>}
    */
   async findByVerificationCode(code) {
+    // Explicitly select verification subfields since they have select: false
     const user = await UserSchema.findOne({ 'verification.code': code })
-      .select('+password +verification +googleCalendar.googleId');
+      .select('+password +verification.code +verification.expires +googleCalendar.googleId')
+      .lean(false); // Keep as Mongoose document to preserve all fields
 
-    return user ? this._toEntity(user) : null;
+    if (!user) return null;
+
+    // Debug: Log raw document verification data
+    if (process.env.NODE_ENV === 'development') {
+      const rawDoc = user.toObject ? user.toObject() : user;
+      console.log('findByVerificationCode - Raw document verification:', {
+        hasVerification: !!rawDoc.verification,
+        verification: rawDoc.verification,
+        verificationType: typeof rawDoc.verification
+      });
+    }
+
+    return this._toEntity(user);
   }
 
   /**
@@ -353,9 +375,27 @@ class UserRepository extends IUserRepository {
   _toEntity(doc) {
     if (!doc) return null;
 
+    // Use toObject to convert Mongoose document to plain object
+    // Include all fields, especially those with select: false
     const obj = doc.toObject
-      ? doc.toObject({ virtuals: true, getters: false, transform: false })
+      ? doc.toObject({
+          virtuals: true,
+          getters: false,
+          transform: false,
+          flattenMaps: false // Preserve nested objects
+        })
       : doc;
+
+    // Debug: Log verification data if present (development only)
+    if (process.env.NODE_ENV === 'development' && obj.verification !== undefined) {
+      console.log('_toEntity - Verification data:', {
+        hasVerification: !!obj.verification,
+        verification: obj.verification,
+        verificationType: typeof obj.verification,
+        hasCode: !!(obj.verification && obj.verification.code),
+        hasExpires: !!(obj.verification && obj.verification.expires)
+      });
+    }
 
     return new UserEntity({
       id: obj._id?.toString() || obj.id,
@@ -371,7 +411,7 @@ class UserRepository extends IUserRepository {
       preferences: obj.preferences,
       googleCalendar: obj.googleCalendar,
       appleId: obj.appleId,
-      verification: obj.verification,
+      verification: obj.verification, // Will be undefined if not selected or empty
       resetPassword: obj.resetPassword,
       refresh: obj.refresh,
       friendSettings: obj.friendSettings,

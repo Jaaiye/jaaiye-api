@@ -8,9 +8,10 @@ const { NotFoundError } = require('../../common/errors');
 const { PasswordService } = require('../../common/services');
 
 class ForgotPasswordUseCase {
-  constructor({ userRepository, emailService, notificationQueue }) {
+  constructor({ userRepository, emailService, emailQueue, notificationQueue }) {
     this.userRepository = userRepository;
     this.emailService = emailService;
+    this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
   }
 
@@ -60,13 +61,12 @@ class ForgotPasswordUseCase {
    * @private
    */
   async _sendResetEmail(user, code) {
-    if (this.notificationQueue) {
-      await this.notificationQueue.add('send-reset-password-email', {
-        userId: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        resetCode: code
-      });
+    if (this.emailQueue) {
+      await this.emailQueue.sendPasswordResetEmailAsync(
+        user.email,
+        code,
+        user.fullName || 'User'
+      );
     } else if (this.emailService) {
       await this.emailService.sendPasswordResetEmail({
         to: user.email,

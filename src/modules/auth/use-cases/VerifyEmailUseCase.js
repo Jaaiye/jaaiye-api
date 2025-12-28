@@ -9,10 +9,11 @@ const { TokenService } = require('../../common/services');
 const { UserEntity } = require('../../common/entities');
 
 class VerifyEmailUseCase {
-  constructor({ userRepository, firebaseAdapter, emailService, notificationQueue }) {
+  constructor({ userRepository, firebaseAdapter, emailService, emailQueue, notificationQueue }) {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
     this.emailService = emailService;
+    this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
   }
 
@@ -111,12 +112,11 @@ class VerifyEmailUseCase {
    * @private
    */
   async _sendWelcomeEmail(user) {
-    if (this.notificationQueue) {
-      await this.notificationQueue.add('send-welcome-email', {
-        userId: user.id,
-        email: user.email,
-        username: user.username
-      });
+    if (this.emailQueue) {
+      await this.emailQueue.sendWelcomeEmailAsync(
+        user.email,
+        user.username || user.fullName || 'User'
+      );
     } else if (this.emailService) {
       await this.emailService.sendWelcomeEmail({
         to: user.email,
@@ -130,7 +130,7 @@ class VerifyEmailUseCase {
    * @param {string} userId - User ID
    * @returns {Promise<Object>} { success, message }
    */
-  async resend(userId, { emailService, notificationQueue }) {
+  async resend(userId, { emailService, emailQueue, notificationQueue }) {
     if (!userId) {
       throw new ValidationError('User ID is required');
     }
@@ -155,7 +155,7 @@ class VerifyEmailUseCase {
     await this.userRepository.setVerificationCode(userId, verificationCode, codeExpiry);
 
     // Send verification email (async)
-    this._sendVerificationEmail(user, verificationCode, { emailService, notificationQueue })
+    this._sendVerificationEmail(user, verificationCode, { emailService, emailQueue, notificationQueue })
       .catch(err => {
         console.error('Failed to send verification email:', err);
       });
@@ -170,14 +170,13 @@ class VerifyEmailUseCase {
    * Send verification email (private helper)
    * @private
    */
-  async _sendVerificationEmail(user, code, { emailService, notificationQueue }) {
-    if (notificationQueue) {
-      await notificationQueue.add('send-verification-email', {
-        userId: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        verificationCode: code
-      });
+  async _sendVerificationEmail(user, code, { emailService, emailQueue, notificationQueue }) {
+    if (emailQueue) {
+      await emailQueue.sendVerificationEmailAsync(
+        user.email,
+        code,
+        user.fullName || 'User'
+      );
     } else if (emailService) {
       await emailService.sendVerificationEmail({
         to: user.email,

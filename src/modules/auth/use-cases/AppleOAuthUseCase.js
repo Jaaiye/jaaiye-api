@@ -13,12 +13,14 @@ class AppleOAuthUseCase {
     userRepository,
     firebaseAdapter,
     emailService,
+    emailQueue,
     notificationQueue,
     calendarAdapter
   }) {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
     this.emailService = emailService;
+    this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
     this.calendarAdapter = calendarAdapter;
   }
@@ -144,12 +146,11 @@ class AppleOAuthUseCase {
    * @private
    */
   async _sendWelcomeEmail(user) {
-    if (this.notificationQueue) {
-      await this.notificationQueue.add('send-welcome-email', {
-        userId: user.id,
-        email: user.email,
-        username: user.username
-      });
+    if (this.emailQueue) {
+      await this.emailQueue.sendWelcomeEmailAsync(
+        user.email,
+        user.username || user.fullName || 'User'
+      );
     } else if (this.emailService) {
       await this.emailService.sendWelcomeEmail({
         to: user.email,

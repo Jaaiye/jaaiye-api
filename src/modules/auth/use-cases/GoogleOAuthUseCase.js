@@ -13,6 +13,7 @@ class GoogleOAuthUseCase {
     userRepository,
     firebaseAdapter,
     emailService,
+    emailQueue,
     notificationQueue,
     calendarAdapter,
     googleCalendarAdapter,
@@ -21,6 +22,7 @@ class GoogleOAuthUseCase {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
     this.emailService = emailService;
+    this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
     this.calendarAdapter = calendarAdapter;
     this.googleCalendarAdapter = googleCalendarAdapter;

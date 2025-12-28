@@ -18,6 +18,7 @@ const CalendarAdapter = require('./services/calendar.adapter');
 
 // Queue Module (for email notifications)
 const NotificationQueue = require('../queue/notification.queue');
+const EmailQueue = require('../queue/email.queue');
 
 // Application
 const {
@@ -125,6 +126,13 @@ class AuthModule {
     return this._instances.notificationQueue;
   }
 
+  getEmailQueue() {
+    if (!this._instances.emailQueue) {
+      this._instances.emailQueue = EmailQueue;
+    }
+    return this._instances.emailQueue;
+  }
+
   /**
    * Get or create use case instances
    */
@@ -133,6 +141,7 @@ class AuthModule {
       this._instances.registerUseCase = new RegisterUseCase({
         userRepository: this.getUserRepository(),
         emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue(),
         calendarAdapter: this.getCalendarAdapter()
       });
@@ -160,6 +169,7 @@ class AuthModule {
         emailAdapter: this.getEmailAdapter(),
         firebaseAdapter: this.getFirebaseAdapter(),
         emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue()
       });
     }
@@ -174,6 +184,7 @@ class AuthModule {
         emailAdapter: this.getEmailAdapter(),
         firebaseAdapter: this.getFirebaseAdapter(),
         emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue()
       });
     }
@@ -186,6 +197,7 @@ class AuthModule {
         userRepository: this.getUserRepository(),
         firebaseAdapter: this.getFirebaseAdapter(),
         emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue()
       });
     }
@@ -197,6 +209,7 @@ class AuthModule {
       this._instances.forgotPasswordUseCase = new ForgotPasswordUseCase({
         userRepository: this.getUserRepository(),
         emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue()
       });
     }
@@ -237,6 +250,7 @@ class AuthModule {
       this._instances.resendUseCase = new ResendUseCase({
         userRepository: this.getUserRepository(),
         emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue()
       });
     }

@@ -9,9 +9,10 @@ const { PasswordService, TokenService } = require('../../common/services');
 const { UserEntity } = require('../../common/entities');
 
 class RegisterUseCase {
-  constructor({ userRepository, emailService, notificationQueue, calendarAdapter }) {
+  constructor({ userRepository, emailService, emailQueue, notificationQueue, calendarAdapter }) {
     this.userRepository = userRepository;
     this.emailService = emailService;
+    this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
     this.calendarAdapter = calendarAdapter;
   }
@@ -79,14 +80,13 @@ class RegisterUseCase {
    * @private
    */
   async _sendVerificationEmail(user, code) {
-    if (this.notificationQueue) {
-      // Use queue if available
-      await this.notificationQueue.add('send-verification-email', {
-        userId: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        verificationCode: code
-      });
+    if (this.emailQueue) {
+      // Use email queue if available (preferred for async processing)
+      await this.emailQueue.sendVerificationEmailAsync(
+        user.email,
+        code,
+        user.fullName || 'User'
+      );
     } else if (this.emailService) {
       // Fallback to direct email service
       await this.emailService.sendVerificationEmail({

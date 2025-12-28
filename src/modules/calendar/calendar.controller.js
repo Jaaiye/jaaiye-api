@@ -190,7 +190,7 @@ class CalendarController {
     const { code, state } = req.query;
 
     // Universal deeplink URL (can be overridden via env var)
-    const UNIVERSAL_DEEPLINK = process.env.UNIVERSAL_DEEPLINK_URL || 'https://jaaiye-4439b.web.app';
+    const UNIVERSAL_DEEPLINK = process.env.UNIVERSAL_DEEPLINK_URL || 'https://jaaiye-4439b.web.app/profileScreen';
 
     if (!code || !state) {
       // Redirect to mobile app with error

@@ -7,6 +7,7 @@ const { ValidationError } = require('../errors');
 const { NotFoundError, BadRequestError } = require('../../common/errors');
 const { TokenService } = require('../../common/services');
 const { UserEntity } = require('../../common/entities');
+const { addDaysToNow } = require('../../../utils/dateUtils');
 
 class VerifyEmailUseCase {
   constructor({ userRepository, firebaseAdapter, emailService, emailQueue, notificationQueue }) {
@@ -92,7 +93,7 @@ class VerifyEmailUseCase {
       : null;
 
     // Save refresh token to user
-    const refreshExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
     await this.userRepository.updateRefreshData(userEntity.id, {
       refreshToken,
       firebaseToken,
@@ -148,8 +149,9 @@ class VerifyEmailUseCase {
 
     // Generate new verification code
     const { PasswordService } = require('../../common/services');
+    const { addDaysToNow } = require('../../../utils/dateUtils');
     const verificationCode = PasswordService.generateVerificationCode();
-    const codeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const codeExpiry = addDaysToNow(1); // 24 hours from now (UTC)
 
     // Update verification code
     await this.userRepository.setVerificationCode(userId, verificationCode, codeExpiry);

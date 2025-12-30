@@ -58,7 +58,8 @@ class LoginUseCase {
       : null;
 
     // Save refresh token to user
-    const refreshExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    const { addDaysToNow } = require('../../../utils/dateUtils');
+    const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
     await this.userRepository.updateRefreshData(userEntity.id, {
       refreshToken,
       firebaseToken,

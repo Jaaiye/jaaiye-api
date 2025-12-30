@@ -41,15 +41,6 @@ class TicketRepository extends ITicketRepository {
     const eventId = data.eventId;
     const verifiedBy = data.verifiedBy;
 
-    // Debug log to see what we're getting
-    console.log('[TicketRepository] _toEntity - data.userId:', data.userId);
-    console.log('[TicketRepository] _toEntity - data.userId type:', typeof data.userId);
-    if (data.userId && typeof data.userId === 'object') {
-      console.log('[TicketRepository] _toEntity - data.userId constructor:', data.userId.constructor?.name);
-      console.log('[TicketRepository] _toEntity - data.userId keys:', Object.keys(data.userId));
-      console.log('[TicketRepository] _toEntity - data.userId._id:', data.userId._id);
-      console.log('[TicketRepository] _toEntity - data.userId.fullName:', data.userId.fullName);
-    }
 
     const entity = new TicketEntity({
       id: data._id || data.id,
@@ -173,37 +164,18 @@ class TicketRepository extends ITicketRepository {
 
     // First, get the ticket without populate to check if userId exists
     const rawTicket = await TicketSchema.findOne({ publicId }).select('userId').lean();
-    console.log('[TicketRepository] findByPublicId - Raw ticket userId (before populate):', rawTicket?.userId);
 
     // Use .lean() to get plain objects, which preserves populated fields
     const ticket = await query.lean();
 
-    // Debug: log the ticket to see if userId is populated
-    if (ticket) {
-      console.log('[TicketRepository] findByPublicId - ticket.userId (after populate):', ticket.userId);
-      console.log('[TicketRepository] findByPublicId - ticket.userId type:', typeof ticket.userId);
-
-      // If populate returned null but the ticket has a userId, fetch the user separately
-      if ((!ticket.userId || ticket.userId === null) && rawTicket && rawTicket.userId) {
-        console.log('[TicketRepository] findByPublicId - Populate returned null, fetching user separately');
-        // Fetch the user separately
-        const UserSchema = require('../../common/entities/User.schema');
-        const user = await UserSchema.findById(rawTicket.userId).select('fullName email username').lean();
-        if (user) {
-          console.log('[TicketRepository] findByPublicId - Fetched user separately:', user);
-          ticket.userId = user;
-        } else {
-          console.log('[TicketRepository] findByPublicId - User not found for userId:', rawTicket.userId);
-        }
+    // If populate returned null but the ticket has a userId, fetch the user separately
+    if ((!ticket.userId || ticket.userId === null) && rawTicket && rawTicket.userId) {
+      // Fetch the user separately
+      const UserSchema = require('../../common/entities/User.schema');
+      const user = await UserSchema.findById(rawTicket.userId).select('fullName email username').lean();
+      if (user) {
+        ticket.userId = user;
       }
-
-      if (ticket.userId && typeof ticket.userId === 'object') {
-        console.log('[TicketRepository] findByPublicId - Final ticket.userId keys:', Object.keys(ticket.userId));
-        console.log('[TicketRepository] findByPublicId - Final ticket.userId.fullName:', ticket.userId.fullName);
-        console.log('[TicketRepository] findByPublicId - Final ticket.userId.email:', ticket.userId.email);
-      }
-    } else {
-      console.log('[TicketRepository] findByPublicId - ticket is null');
     }
 
     return this._toEntity(ticket);

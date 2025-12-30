@@ -331,6 +331,21 @@ class GetSharedCalendarViewUseCase {
     // Wait for all users to be processed
     const results = await Promise.all(userPromises);
 
+    // Check current user's Google Calendar status for the summary
+    let currentUserGoogleCalendarLinked = false;
+    let googleCalendarMessage = '';
+    try {
+      const currentUser = await this.userRepository.findById(currentUserId);
+      if (currentUser && currentUser.googleCalendar && currentUser.googleCalendar.refreshToken) {
+        currentUserGoogleCalendarLinked = true;
+      } else {
+        googleCalendarMessage = 'Google Calendar is not linked. Please link your Google account to view Google Calendar events.';
+      }
+    } catch (error) {
+      console.warn('Failed to check current user Google Calendar status:', error.message);
+      googleCalendarMessage = 'Unable to verify Google Calendar link status.';
+    }
+
     // Process results and calculate totals
     let usersWithErrors = 0;
     let usersNotFound = 0;
@@ -358,8 +373,14 @@ class GetSharedCalendarViewUseCase {
       },
       totalUsers: eventsByUser.length,
       totalEvents,
-      requestedUsers: uniqueUserIds.length
+      requestedUsers: uniqueUserIds.length,
+      googleCalendarLinked: currentUserGoogleCalendarLinked
     };
+
+    // Add Google Calendar message if not linked
+    if (!currentUserGoogleCalendarLinked && googleCalendarMessage) {
+      summary.message = googleCalendarMessage;
+    }
 
     // Add warnings if there were issues
     if (usersWithErrors > 0 || usersNotFound > 0) {

@@ -214,30 +214,15 @@ class CreateTicketUseCase {
     // Send email notification (non-blocking)
     try {
       const targetUser = await this.userRepository.findById(targetUserId);
-      console.log('[CreateTicket] Target user for email:', {
-        userId: targetUserId,
-        hasUser: !!targetUser,
-        hasEmail: !!targetUser?.email,
-        email: targetUser?.email
-      });
 
       if (targetUser && targetUser.email) {
         // Get populated ticket for email - use raw Mongoose document to preserve populated fields
-        const TicketSchema = require('../../entities/Ticket.schema');
+        const TicketSchema = require('../entities/Ticket.schema');
         const populatedDoc = await TicketSchema.findById(ticket.id)
           .select('+qrCode +publicId') // Explicitly select qrCode and publicId
           .populate('eventId', 'title startTime endTime venue image ticketTypes')
           .populate('userId', 'username fullName email')
           .lean();
-
-        console.log('[CreateTicket] Populated ticket doc:', {
-          hasDoc: !!populatedDoc,
-          hasEventId: !!populatedDoc?.eventId,
-          eventIdType: typeof populatedDoc?.eventId,
-          eventIdIsObject: populatedDoc?.eventId && typeof populatedDoc.eventId === 'object',
-          hasEventTitle: !!populatedDoc?.eventId?.title,
-          hasQrCode: !!ticket.qrCode
-        });
 
         if (populatedDoc && populatedDoc.eventId && typeof populatedDoc.eventId === 'object' && populatedDoc.eventId.title) {
           // Convert to plain object with populated fields preserved
@@ -255,35 +240,12 @@ class CreateTicketUseCase {
             status: ticket.status
           };
 
-          console.log('[CreateTicket] Sending email to:', targetUser.email);
-          console.log('[CreateTicket] Ticket data for email:', {
-            hasEventId: !!ticketForEmail.eventId,
-            eventTitle: ticketForEmail.eventId?.title,
-            hasQrCode: !!ticketForEmail.qrCode,
-            qrCodeType: typeof ticketForEmail.qrCode,
-            qrCodeLength: ticketForEmail.qrCode ? ticketForEmail.qrCode.length : 0,
-            publicId: ticketForEmail.publicId,
-            hasPublicId: !!ticketForEmail.publicId,
-            ticketId: ticketForEmail.id
-          });
-
           await this.emailAdapter.sendPaymentConfirmationEmail(targetUser, ticketForEmail);
-          console.log('[CreateTicket] Email sent successfully to:', targetUser.email);
-        } else {
-          console.warn('[CreateTicket] Cannot send email - missing populated ticket or event data', {
-            hasPopulatedDoc: !!populatedDoc,
-            hasEventId: !!(populatedDoc && populatedDoc.eventId),
-            eventIdType: populatedDoc?.eventId ? typeof populatedDoc.eventId : 'undefined',
-            hasEventTitle: !!(populatedDoc?.eventId && typeof populatedDoc.eventId === 'object' && populatedDoc.eventId.title)
-          });
         }
-      } else {
-        console.warn('[CreateTicket] Cannot send email - user not found or no email address');
       }
     } catch (error) {
-      console.error('[CreateTicket] Failed to send ticket email:', error);
-      console.error('[CreateTicket] Email error stack:', error.stack);
       // Don't fail ticket creation if email fails
+      // Error is logged by the email adapter
     }
 
     return ticket;

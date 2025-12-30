@@ -76,7 +76,8 @@ class RefreshTokenUseCase {
     }
 
     // Check if refresh token is expired (database expiry check)
-    if (user.refresh.expiresAt && new Date() > new Date(user.refresh.expiresAt)) {
+    const { now, isBefore } = require('../../../utils/dateUtils');
+    if (user.refresh.expiresAt && isBefore(user.refresh.expiresAt, now())) {
       throw new InvalidTokenError('Refresh token has expired');
     }
 
@@ -91,7 +92,8 @@ class RefreshTokenUseCase {
     const newRefreshToken = TokenService.generateRefreshToken(userEntity.id);
 
     // Update refresh token in database
-    const refreshExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    const { addDaysToNow } = require('../../../utils/dateUtils');
+    const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
     await this.userRepository.update(userEntity.id, {
       'refresh.token': newRefreshToken,
       'refresh.expiresAt': refreshExpiry

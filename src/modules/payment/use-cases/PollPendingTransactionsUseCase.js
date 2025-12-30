@@ -28,24 +28,48 @@ class PollPendingTransactionsUseCase {
    */
   async pollFlutterwave() {
     try {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       const result = await this.transactionRepository.find({
         provider: 'flutterwave',
         status: 'pending',
-        createdAt: { $gte: new Date(Date.now() - 2 * 60 * 60 * 1000) } // Last 2 hours
+        createdAt: { $gte: twoHoursAgo } // Last 2 hours
       }, {
         limit: 50
       });
 
-      logger.info(`Polling ${result.transactions.length} pending Flutterwave transactions`);
+      logger.info(`Polling ${result.transactions.length} pending Flutterwave transactions`, {
+        queryTime: twoHoursAgo.toISOString(),
+        foundCount: result.transactions.length
+      });
 
       for (const transaction of result.transactions) {
         try {
           if (!transaction.transId) {
+            logger.warn(`Skipping Flutterwave transaction without transId: ${transaction.reference}`);
             continue; // Skip if no transaction ID
           }
 
+          logger.debug(`Verifying Flutterwave transaction`, {
+            reference: transaction.reference,
+            transId: transaction.transId,
+            createdAt: transaction.createdAt
+          });
+
           const verified = await this.flutterwaveAdapter.verify(transaction.transId);
-          if (verified && verified.status === 'successful') {
+
+          if (!verified) {
+            logger.debug(`Flutterwave transaction verification returned null for transId: ${transaction.transId}`);
+            continue;
+          }
+
+          logger.debug(`Flutterwave transaction verification result`, {
+            reference: transaction.reference,
+            transId: transaction.transId,
+            status: verified.status,
+            amount: verified.amount
+          });
+
+          if (verified.status === 'successful') {
             logger.info(`Processing pending Flutterwave transaction: ${transaction.reference}`);
             const metadata = verified.meta || (verified.customer && verified.customer.meta) || {
               userId: transaction.userId,
@@ -61,16 +85,28 @@ class PollPendingTransactionsUseCase {
               metadata,
               raw: verified
             });
-          } else if (verified && verified.status === 'failed') {
+          } else if (verified.status === 'failed') {
             await this.transactionRepository.update(transaction.id, { status: 'failed' });
             logger.info(`Transaction failed: ${transaction.reference}`);
+          } else {
+            logger.debug(`Flutterwave transaction still pending or in other state`, {
+              reference: transaction.reference,
+              status: verified.status
+            });
           }
         } catch (error) {
-          logger.error(`Error polling Flutterwave transaction ${transaction.reference}:`, error.message);
+          logger.error(`Error polling Flutterwave transaction ${transaction.reference}:`, {
+            error: error.message,
+            stack: error.stack,
+            transId: transaction.transId
+          });
         }
       }
     } catch (error) {
-      logger.error('Error in Flutterwave polling job:', error);
+      logger.error('Error in Flutterwave polling job:', {
+        error: error.message,
+        stack: error.stack
+      });
     }
   }
 

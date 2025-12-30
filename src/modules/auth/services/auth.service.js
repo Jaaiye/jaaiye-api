@@ -74,8 +74,10 @@ exports.generateResetCode = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+const { isExpired } = require('../../utils/dateUtils');
+
 exports.isCodeExpired = (expiresAt) => {
-  return !expiresAt || new Date(expiresAt) < new Date();
+  return isExpired(expiresAt);
 };
 
 exports.generateRandomPassword = (length = 32) => {
@@ -85,7 +87,8 @@ exports.generateRandomPassword = (length = 32) => {
 // Blacklist helpers
 exports.addToBlacklist = async (token, expiresAt) => {
   if (!token) return;
-  const expDate = expiresAt ? new Date(expiresAt) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+  const { addDaysToNow, fromISOString } = require('../../utils/dateUtils');
+  const expDate = expiresAt ? fromISOString(expiresAt) : addDaysToNow(90);
   try {
     await TokenBlacklist.create({ token, expiresAt: expDate });
   } catch (e) {

@@ -38,7 +38,16 @@ class NotificationModule {
 
   getFirebaseAdapter() {
     if (!this._instances.firebaseAdapter) {
-      this._instances.firebaseAdapter = new FirebaseAdapter();
+      const adapter = new FirebaseAdapter();
+      // Verify the adapter has the required methods
+      if (typeof adapter.sendMulticast !== 'function') {
+        console.error('FirebaseAdapter instantiated but sendMulticast method is missing', {
+          adapterType: typeof adapter,
+          constructorName: adapter.constructor?.name,
+          availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(adapter))
+        });
+      }
+      this._instances.firebaseAdapter = adapter;
     }
     return this._instances.firebaseAdapter;
   }
@@ -52,8 +61,22 @@ class NotificationModule {
 
   getPushNotificationAdapter() {
     if (!this._instances.pushNotificationAdapter) {
+      const firebaseAdapter = this.getFirebaseAdapter();
+
+      // Validate that firebaseAdapter has the required method
+      if (!firebaseAdapter || typeof firebaseAdapter.sendMulticast !== 'function') {
+        console.error('FirebaseAdapter validation failed in getPushNotificationAdapter', {
+          hasAdapter: !!firebaseAdapter,
+          adapterType: typeof firebaseAdapter,
+          constructorName: firebaseAdapter?.constructor?.name,
+          hasSendMulticast: typeof firebaseAdapter?.sendMulticast,
+          availableMethods: firebaseAdapter ? Object.getOwnPropertyNames(Object.getPrototypeOf(firebaseAdapter)) : []
+        });
+        throw new Error('FirebaseAdapter does not have sendMulticast method');
+      }
+
       this._instances.pushNotificationAdapter = new PushNotificationAdapter({
-        firebaseAdapter: this.getFirebaseAdapter(),
+        firebaseAdapter: firebaseAdapter,
         deviceTokenAdapter: this.getDeviceTokenAdapter()
       });
     }

@@ -6,6 +6,7 @@
 const { ValidationError } = require('../errors');
 const { NotFoundError } = require('../../common/errors');
 const { PasswordService } = require('../../common/services');
+const { addHoursToNow } = require('../../../utils/dateUtils');
 
 class ForgotPasswordUseCase {
   constructor({ userRepository, emailService, emailQueue, notificationQueue }) {
@@ -40,7 +41,7 @@ class ForgotPasswordUseCase {
 
     // Generate reset code
     const resetCode = PasswordService.generateResetCode();
-    const codeExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const codeExpiry = addHoursToNow(1); // 1 hour from now (UTC)
 
     // Save reset code
     await this.userRepository.setResetPasswordCode(user.id, resetCode, codeExpiry);

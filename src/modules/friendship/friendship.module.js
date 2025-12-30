@@ -4,11 +4,11 @@
 
 // Shared Domain
 const { UserRepository } = require('../common/repositories');
-const { NotificationAdapter: SharedNotificationAdapter, FirebaseAdapter } = require('../common/services');
+const { NotificationAdapter: SharedNotificationAdapter } = require('../common/services');
 // Notification Domain
 const { NotificationRepository } = require('../notification/repositories');
 const {FriendshipRepository, FriendRequestRepository} = require('./repositories');
-const { PushNotificationAdapter, DeviceTokenAdapter } = require('../notification/services');
+const { PushNotificationAdapter, FirebaseAdapter: NotificationFirebaseAdapter, DeviceTokenAdapter } = require('../notification/services');
 const { SendNotificationUseCase } = require('../notification/use-cases');
 
 // Application
@@ -61,7 +61,7 @@ class FriendshipModule {
     if (!this._instances.notificationAdapter) {
       // Initialize Notification domain dependencies
       const notificationRepository = new NotificationRepository();
-      const firebaseAdapter = new FirebaseAdapter();
+      const firebaseAdapter = new NotificationFirebaseAdapter();
       const deviceTokenAdapter = new DeviceTokenAdapter();
       const pushNotificationAdapter = new PushNotificationAdapter({
         firebaseAdapter,

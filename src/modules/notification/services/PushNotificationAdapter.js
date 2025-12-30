@@ -48,6 +48,21 @@ class PushNotificationAdapter {
         notificationTitle: notification.title
       });
 
+      // Validate firebaseAdapter
+      if (!this.firebaseAdapter) {
+        console.error('Push notification failed - firebaseAdapter is not set');
+        return { success: false, reason: 'Firebase adapter not initialized' };
+      }
+
+      if (typeof this.firebaseAdapter.sendMulticast !== 'function') {
+        console.error('Push notification failed - firebaseAdapter.sendMulticast is not a function', {
+          firebaseAdapterType: typeof this.firebaseAdapter,
+          firebaseAdapterConstructor: this.firebaseAdapter?.constructor?.name,
+          availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(this.firebaseAdapter))
+        });
+        return { success: false, reason: 'Firebase adapter method not available' };
+      }
+
       // Send via Firebase
       const response = await this.firebaseAdapter.sendMulticast(deviceTokens, notification, data);
 

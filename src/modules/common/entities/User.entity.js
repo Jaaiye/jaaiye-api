@@ -145,9 +145,9 @@ class UserEntity {
       return false;
     }
 
-    const now = new Date();
+    const { now, isBefore } = require('../../../utils/dateUtils');
     const expiresDate = new Date(this.verification.expires);
-    const isValid = now < expiresDate;
+    const isValid = isBefore(now(), expiresDate);
 
     if (process.env.NODE_ENV === 'development') {
       console.log('hasValidVerificationCode check:', {
@@ -170,8 +170,19 @@ class UserEntity {
       return false;
     }
 
-    const now = new Date();
-    return now < this.resetPassword.expires;
+    if (!this.resetPassword.expires) {
+      return false;
+    }
+
+    const { now, isBefore } = require('../../../utils/dateUtils');
+
+    // Ensure expires is a Date object
+    const expiresDate = this.resetPassword.expires instanceof Date
+      ? this.resetPassword.expires
+      : new Date(this.resetPassword.expires);
+
+    const currentTime = now();
+    return isBefore(currentTime, expiresDate);
   }
 
   /**

@@ -307,14 +307,57 @@ class FirebaseAdapter {
         tokens,
       };
 
-      const response = await admin.messaging().sendMulticast(message);
+      // Log request details before sending
+      console.log('[Firebase] Sending multicast message', {
+        tokenCount: tokens.length,
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL
+      });
+
+      const response = await admin.messaging().sendEachForMulticast(message);
       console.log(`Firebase message sent: ${response.successCount} success, ${response.failureCount} failed`);
 
       return response;
     } catch (error) {
+      // Log detailed error information for debugging
+      const errorDetails = {
+        code: error.code,
+        message: error.message,
+        statusCode: error.httpResponse?.statusCode,
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        hasMessaging: !!admin.messaging,
+        errorType: error.constructor?.name,
+        httpResponse: error.httpResponse ? {
+          statusCode: error.httpResponse.statusCode,
+          statusText: error.httpResponse.statusText,
+          headers: error.httpResponse.headers,
+          body: typeof error.httpResponse.body === 'string'
+            ? error.httpResponse.body.substring(0, 500)
+            : error.httpResponse.body
+        } : null
+      };
+
+      // Check if this is the 404 /batch error
+      if (error.message?.includes('/batch') || error.message?.includes('404') || error.httpResponse?.statusCode === 404) {
+        console.error('Firebase sendMulticastMessage - 404 /batch error detected:', {
+          ...errorDetails,
+          troubleshooting: [
+            '1. Verify FCM API is enabled: https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=' + process.env.FIREBASE_PROJECT_ID,
+            '2. Check service account has "Firebase Cloud Messaging Admin" role: https://console.cloud.google.com/iam-admin/iam?project=' + process.env.FIREBASE_PROJECT_ID,
+            '3. Verify service account email matches: ' + process.env.FIREBASE_CLIENT_EMAIL,
+            '4. Check for network/proxy issues that might intercept Firebase API calls',
+            '5. Wait a few minutes after enabling API - propagation can take time'
+          ],
+          apiUrl: `https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`,
+          iamUrl: `https://console.cloud.google.com/iam-admin/iam?project=${process.env.FIREBASE_PROJECT_ID}`
+        });
+      } else {
+        console.error('Firebase sendMulticastMessage error:', errorDetails);
+      }
+
       // Handle specific Firebase errors gracefully
       if (error.code === 'messaging/unknown-error' || error.code === 'messaging/invalid-argument') {
-        console.error('Firebase sendMulticastMessage error:', error.message);
         // Return a response indicating failure but don't throw
         return {
           successCount: 0,
@@ -323,7 +366,7 @@ class FirebaseAdapter {
           error: error.message
         };
       }
-      console.error('Firebase sendMulticastMessage error:', error);
+
       // For other errors, still return gracefully
       return {
         successCount: 0,

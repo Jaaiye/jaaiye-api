@@ -7,6 +7,7 @@ const { ValidationError } = require('../errors');
 const { EmailAlreadyInUseError, UsernameTakenError } = require('../../common/errors');
 const { PasswordService, TokenService } = require('../../common/services');
 const { UserEntity } = require('../../common/entities');
+const { addDaysToNow } = require('../../../utils/dateUtils');
 
 class RegisterUseCase {
   constructor({ userRepository, emailService, emailQueue, notificationQueue, calendarAdapter }) {
@@ -40,7 +41,7 @@ class RegisterUseCase {
 
     // Generate verification code
     const verificationCode = PasswordService.generateVerificationCode();
-    const codeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const codeExpiry = addDaysToNow(1); // 24 hours from now (UTC)
 
     // Create user
     const user = await this.userRepository.create({

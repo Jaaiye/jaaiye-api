@@ -7,6 +7,7 @@
 const { ValidationError } = require('../errors');
 const { NotFoundError, BadRequestError } = require('../../common/errors');
 const { PasswordService } = require('../../common/services');
+const { addMinutesToNow } = require('../../../utils/dateUtils');
 
 class ResendUseCase {
   constructor({ userRepository, emailService, emailQueue, notificationQueue }) {
@@ -62,7 +63,7 @@ class ResendUseCase {
 
     // Generate new verification code
     const verificationCode = PasswordService.generateVerificationCode();
-    const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const codeExpiry = addMinutesToNow(10); // 10 minutes from now (UTC)
 
     // Update verification code
     await this.userRepository.setVerificationCode(user.id, verificationCode, codeExpiry);
@@ -100,7 +101,7 @@ class ResendUseCase {
 
     // Generate new reset code
     const resetCode = PasswordService.generateResetCode();
-    const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const codeExpiry = addMinutesToNow(10); // 10 minutes from now (UTC)
 
     // Update reset code
     await this.userRepository.setResetPasswordCode(user.id, resetCode, codeExpiry);

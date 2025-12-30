@@ -202,12 +202,18 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<void>}
    */
   async setResetPasswordCode(userId, code, expires) {
-    await UserSchema.findByIdAndUpdate(userId, {
-      $set: {
-        'resetPassword.code': code,
-        'resetPassword.expires': expires
+    // Ensure expires is a proper Date object
+    const expiresDate = expires instanceof Date ? expires : new Date(expires);
+
+    await UserSchema.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          'resetPassword.code': code,
+          'resetPassword.expires': expiresDate
+        }
       }
-    });
+    );
   }
 
   /**
@@ -320,8 +326,26 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<UserEntity|null>}
    */
   async findByResetCode(code) {
-    const user = await UserSchema.findOne({ 'resetPassword.code': code }).select('+password +resetPassword +googleCalendar.googleId');
-    return user ? this._toEntity(user) : null;
+    // CRITICAL: Mongoose nested fields with select: false require explicit selection
+    // Use the same pattern as findByVerificationCode which works
+    // IMPORTANT: When querying by nested field, Mongoose may not return the nested object properly
+    // So we query by the code, then explicitly select the nested fields
+
+    // First, find the user ID by code (this will work even if resetPassword isn't selected)
+    const userWithCode = await UserSchema.findOne({ 'resetPassword.code': code })
+      .select('_id resetPassword.code')
+      .lean();
+
+    if (!userWithCode) return null;
+
+    // Now fetch the full user with explicit selection of nested fields
+    const user = await UserSchema.findById(userWithCode._id)
+      .select('+password +resetPassword.code +resetPassword.expires +googleCalendar.googleId')
+      .lean(false); // Keep as Mongoose document to preserve Date objects
+
+    if (!user) return null;
+
+    return this._toEntity(user);
   }
 
   /**
@@ -396,6 +420,7 @@ class UserRepository extends IUserRepository {
         hasExpires: !!(obj.verification && obj.verification.expires)
       });
     }
+
 
     return new UserEntity({
       id: obj._id?.toString() || obj.id,

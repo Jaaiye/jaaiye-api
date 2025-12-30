@@ -5,7 +5,7 @@
  */
 
 const logger = require('../../../utils/logger');
-const { CreateTicketDTO } = require('../../ticket/dto/CreateTicketDTO');
+const CreateTicketDTO = require('../../ticket/dto/CreateTicketDTO');
 
 class PaymentService {
   constructor({

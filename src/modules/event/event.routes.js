@@ -50,6 +50,7 @@ function createEventRoutes(eventController) {
   router.get(
     '/:id',
     validateEventId,
+    protect,
     validate,
     eventController.getEvent
   );

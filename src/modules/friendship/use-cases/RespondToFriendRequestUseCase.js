@@ -63,7 +63,8 @@ class RespondToFriendRequestUseCase {
           body: `${recipient.username || recipient.fullName} accepted your friend request`
         }, {
           type: 'friend_request_accepted',
-          friendshipId: friendship.id
+          friendshipId: friendship.id,
+          path: 'friendRequestsScreen'
         }).catch(err => console.error('Failed to send notification:', err));
       }
 

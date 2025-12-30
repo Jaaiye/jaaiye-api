@@ -60,7 +60,8 @@ class SendFriendRequestUseCase {
         body: `${requester.username || requester.fullName} wants to be your friend`
       }, {
         type: 'friend_request',
-        requestId: friendRequest.id
+        requestId: friendRequest.id,
+        path: 'friendRequestsScreen'
       }).catch(err => console.error('Failed to send notification:', err));
     }
 

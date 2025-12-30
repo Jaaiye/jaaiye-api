@@ -6,10 +6,11 @@
 const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
 
 class GetEventUseCase {
-  constructor({ eventRepository, calendarRepository, eventTeamRepository }) {
+  constructor({ eventRepository, calendarRepository, eventTeamRepository, userRepository }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
     this.eventTeamRepository = eventTeamRepository;
+    this.userRepository = userRepository;
   }
 
   async execute(eventId, userId = null) {
@@ -42,14 +43,16 @@ class GetEventUseCase {
     // Get event data
     const eventData = event.toJSON();
 
-    // Check if user is a team member (for scanner functionality)
+    // Check if user is a team member or has scanner/admin role (for scanner functionality)
     if (userId && event.category === 'event') {
       const teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
-      if (teamMember && teamMember.status === 'accepted') {
-        eventData.isScanner = true;
-      } else {
-        eventData.isScanner = false;
-      }
+      const isTeamMember = teamMember && teamMember.status === 'accepted';
+
+      // Check user role
+      const user = await this.userRepository.findById(userId);
+      const hasScannerRole = user && ['scanner', 'admin', 'superadmin'].includes(user.role);
+
+      eventData.isScanner = isTeamMember || hasScannerRole;
     } else {
       eventData.isScanner = false;
     }

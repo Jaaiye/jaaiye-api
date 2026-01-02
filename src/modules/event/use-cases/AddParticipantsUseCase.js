@@ -84,7 +84,8 @@ class AddParticipantsUseCase {
           body: `You have been invited to the event "${event.title}"`
         }, {
           type: 'event_invitation',
-          eventId: event.id
+          eventId: event.id,
+          path: 'hangoutScreen'
         })
       )
     );

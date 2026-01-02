@@ -286,7 +286,8 @@ class EventModule {
     if (!this._instances.publishEventUseCase) {
       this._instances.publishEventUseCase = new PublishEventUseCase({
         eventRepository: this.getEventRepository(),
-        walletRepository: this.getWalletRepository()
+        walletRepository: this.getWalletRepository(),
+        notificationAdapter: this.getNotificationAdapter()
       });
     }
     return this._instances.publishEventUseCase;

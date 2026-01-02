@@ -286,6 +286,10 @@ class CreateEventUseCase {
           participants = createdParticipants.map(p => p.toJSON());
 
           // Send notifications - use "Hangout Invitation" for hangouts
+          // Fetch event again to get the slug (generated in pre-save hook)
+          const eventWithSlug = await this.eventRepository.findById(event.id);
+          const eventSlug = eventWithSlug?.slug || event.id;
+
           await Promise.all(
             createdParticipants.map(participant => {
               const userId = participant.user?.toString ? participant.user.toString() : String(participant.user);
@@ -294,7 +298,9 @@ class CreateEventUseCase {
                 body: `You have been invited to the hangout "${event.title}"`
               }, {
                 type: 'hangout_invitation',
-                eventId: event.id
+                eventId: event.id,
+                slug: eventSlug,
+                path: `hangoutScreen/${eventSlug}`
               });
             })
           );

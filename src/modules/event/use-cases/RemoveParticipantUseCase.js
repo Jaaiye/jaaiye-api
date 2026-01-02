@@ -44,12 +44,19 @@ class RemoveParticipantUseCase {
     await this.eventParticipantRepository.deleteByEventAndUser(eventId, targetUserId);
 
     // Notify removed participant
+    // Fetch event slug from schema (slug not in entity)
+    const EventSchema = require('../entities/Event.schema');
+    const eventDoc = await EventSchema.findById(eventId).select('slug').lean();
+    const eventSlug = eventDoc?.slug || event.id;
+
     await this.notificationAdapter.send(targetUserId, {
       title: 'Removed from Event',
       body: `You have been removed from the event "${event.title}"`
     }, {
       type: 'event_removal',
-      eventId: event.id
+      eventId: event.id,
+      slug: eventSlug,
+      path: `hangoutScreen/${eventSlug}`
     });
 
     return { success: true };

@@ -168,13 +168,13 @@ class TicketRepository extends ITicketRepository {
     // Use .lean() to get plain objects, which preserves populated fields
     const ticket = await query.lean();
 
-    // If populate returned null but the ticket has a userId, fetch the user separately
-    if ((!ticket.userId || ticket.userId === null) && rawTicket && rawTicket.userId) {
-      // Fetch the user separately
-      const UserSchema = require('../../common/entities/User.schema');
-      const user = await UserSchema.findById(rawTicket.userId).select('fullName email username').lean();
-      if (user) {
-        ticket.userId = user;
+      // If populate returned null but the ticket has a userId, fetch the user separately
+      if ((!ticket.userId || ticket.userId === null) && rawTicket && rawTicket.userId) {
+        // Fetch the user separately
+        const UserSchema = require('../../common/entities/User.schema');
+        const user = await UserSchema.findById(rawTicket.userId).select('fullName email username').lean();
+        if (user) {
+          ticket.userId = user;
       }
     }
 

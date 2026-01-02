@@ -113,10 +113,10 @@ class PaymentService {
                 publicId: ticketForEmail.publicId
               });
 
-              await this.emailAdapter.sendPaymentConfirmationEmail(
-                { email, fullName: name },
+            await this.emailAdapter.sendPaymentConfirmationEmail(
+              { email, fullName: name },
                 ticketForEmail
-              );
+            );
 
               logger.info('Ticket email sent to assignee successfully', {
                 email,
@@ -251,8 +251,8 @@ class PaymentService {
               ticketCount: validTickets.length
             });
 
-            await this.emailAdapter.sendPaymentConfirmationEmail(
-              buyer,
+          await this.emailAdapter.sendPaymentConfirmationEmail(
+            buyer,
               validTickets.length === 1 ? validTickets[0] : validTickets
             );
 

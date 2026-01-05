@@ -7,15 +7,12 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const WebSocket = require('ws');
-const WebSocketService = require('./services/websocketService');
 const dotenv = require('dotenv');
 const connectDB = require('./config/database');
 const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./utils/asyncHandler');
 const logger = require('./utils/logger');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpecs = require('./config/swagger');
 
 // Load environment variables
 dotenv.config();
@@ -25,9 +22,6 @@ const app = express();
 
 // Create HTTP server
 const server = require('http').createServer(app);
-
-// Initialize WebSocket service
-const wss = new WebSocketService(server);
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '../logs');
@@ -47,6 +41,7 @@ const allowedOrigins = [
   'http://localhost:3030',
   'https://jaaiye-checkout.vercel.app',
   'https://tickets.jaaiye.com',
+  'https://events.jaaiye.com',
   'https://admin.jaaiye.com'
 ].filter(Boolean);
 
@@ -67,26 +62,99 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+// Parse JSON bodies, but skip multipart/form-data (handled by multer)
+app.use((req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  // Skip JSON parsing for multipart/form-data requests - multer will handle it
+  // Check for both 'multipart/form-data' and boundary parameter
+  const isMultipart = contentType.includes('multipart/form-data') || contentType.includes('boundary=');
+
+  if (isMultipart) {
+    return next();
+  }
+  // Only parse JSON for non-multipart requests
+  express.json()(req, res, (err) => {
+    // If JSON parsing fails, check if it might be multipart (fallback)
+    if (err && err instanceof SyntaxError && err.message.includes('JSON') && err.message.includes('------')) {
+      // This looks like multipart data that was incorrectly parsed as JSON
+      // Clear the error and let multer handle it
+      return next();
+    }
+    next(err);
+  });
+});
+// Parse URL-encoded bodies, but skip multipart/form-data
+app.use((req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  const isMultipart = contentType.includes('multipart/form-data') || contentType.includes('boundary=');
+  if (isMultipart) {
+    return next();
+  }
+  express.urlencoded({ extended: true })(req, res, next);
+});
 
 // Request logging middleware (comprehensive logging)
 app.use(requestLogger);
 
-// Rate limiting
+// Rate limiting - exclude authenticated/admin routes as they have their own rate limiters
 const limiter = rateLimit({
   windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
-  max: process.env.RATE_LIMIT_MAX_REQUESTS || 100 // limit each IP to 100 requests per windowMs
+  max: process.env.RATE_LIMIT_MAX_REQUESTS || 1000, // limit each IP to 1000 requests per windowMs
+  skip: (req) => {
+    // Skip rate limiting for authenticated routes that have their own limiters
+    // This prevents double counting
+    const path = req.path || '';
+    return path === '/health' ||
+           path.startsWith('/api/v1/health') ||
+           path.startsWith('/api/v1/analytics') ||
+           path.startsWith('/api/v1/admin') ||
+           path.startsWith('/api/v1/auth') && req.headers.authorization;
+  }
 });
 app.use(limiter);
 
-// Health check endpoint
-app.get('/health', (req, res, next) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+// Health check endpoints
+app.get('/health', (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const dbState = mongoose.connection.readyState;
+    const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : dbState === 3 ? 'disconnecting' : 'disconnected';
+
+    const memoryUsage = process.memoryUsage();
+    const memoryMB = {
+      rss: Math.round(memoryUsage.rss / 1024 / 1024),
+      heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+      heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+      external: Math.round(memoryUsage.external / 1024 / 1024)
+    };
+
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      database: {
+        status: dbStatus,
+        connectionState: dbState,
+        name: mongoose.connection.name,
+        host: mongoose.connection.host,
+        port: mongoose.connection.port
+      },
+      memory: {
+        usage: memoryMB,
+        percentage: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100)
+      },
+      nodeVersion: process.version,
+      platform: process.platform
+    });
+  } catch (error) {
+    logger.error('Health check failed', error);
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
 });
 
 app.get('/test-cors', (req, res) => {
@@ -95,28 +163,44 @@ app.get('/test-cors', (req, res) => {
 
 app.use('/webhooks', require('./routes/webhookRoutes'));
 
-// Swagger docs (mounted before API key enforcement)
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+// Public OAuth redirect endpoints (must be before API key validation)
+// Google redirects here without auth token
+const handleOAuthRedirect = (req, res, next) => {
+  const controller = require('./modules/calendar/calendar.module').getCalendarController();
+  return controller.handleOAuthRedirect(req, res, next);
+};
+
+// New endpoint
+app.get('/oauth/redirect', handleOAuthRedirect);
+
+// Legacy endpoint (for backward compatibility - redirects to same handler)
+app.get('/api/v1/calendars/google/oauth/callback', handleOAuthRedirect);
 
 // Apply API key validation to all other routes
 app.use(validateMobileApiKey);
 
-// Routes
-app.use('/api/v1/auth', require('./routes/authRoutes'));
-app.use('/api/v1/users', require('./routes/userRoutes'));
-app.use('/api/v1/admin', require('./routes/adminRoutes'));
-app.use('/api/v1/analytics', require('./routes/analyticsRoutes'));
-app.use('/api/v1/calendars', require('./routes/calendarRoutes'));
-app.use('/api/v1/events', require('./routes/eventRoutes'));
-app.use('/api/v1/notifications', require('./routes/notificationRoutes'));
-app.use('/api/v1/health', require('./routes/healthRoutes'));
-app.use('/api/v1/google', require('./routes/googleRoutes'));
+app.use('/api/v1/auth', require('./modules/auth/auth.module').getAuthRoutes());
+app.use('/api/v1/users', require('./modules/user/user.module').getUserRoutes());
+app.use('/api/v1/admin', require('./modules/admin/admin.module').getAdminRoutes());
+app.use('/api/v1/analytics', require('./modules/analytics/analytics.module').getAnalyticsRoutes());
+app.use('/api/v1/calendars', require('./modules/calendar/calendar.module').getCalendarRoutes());
+try {
+  const eventRoutes = require('./modules/event/event.module').getEventRoutes();
+  if (!eventRoutes) {
+    console.error('Event routes are null or undefined');
+  }
+  app.use('/api/v1/events', eventRoutes);
+} catch (error) {
+  console.error('Failed to register event routes:', error);
+  throw error;
+}
+app.use('/api/v1/notifications', require('./modules/notification/notification.module').getNotificationRoutes());
 app.use('/api/v1/ics', require('./routes/icsRoutes'));
-app.use('/api/v1/calendar-shares', require('./routes/calendarShareRoutes'));
-app.use('/api/v1/groups', require('./routes/groupRoutes'));
-app.use('/api/v1/tickets', require('./routes/ticketRoutes'));
-app.use('/api/v1/transactions', require('./routes/transactionRoutes'));
-app.use('/api/v1/payments', require('./routes/paymentRoutes'));
+app.use('/api/v1/groups', require('./modules/group/group.module').getGroupRoutes());
+app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRoutes());
+app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
+app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
+app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
 
 // 404 handler
@@ -154,8 +238,8 @@ process.on('uncaughtException', (err) => {
 connectDB();
 
 // Start background services
-const { paymentPollingQueue } = require('./queues');
-paymentPollingQueue.start();
+const queueModule = require('./modules/queue/queue.module');
+queueModule.getPaymentPollingQueue().start();
 
 // Start server
 const PORT = process.env.PORT || 3000;

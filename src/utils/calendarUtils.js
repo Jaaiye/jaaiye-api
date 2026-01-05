@@ -1,6 +1,6 @@
-const Calendar = require('../models/Calendar');
-const Event = require('../models/Event');
-const User = require('../models/User');
+const Calendar = require('../modules/common/entities/Calendar.schema');
+const Event = require('../modules/event/entities/Event.schema');
+const User = require('../modules/common/entities/User.schema');
 const logger = require('./logger');
 
 /**

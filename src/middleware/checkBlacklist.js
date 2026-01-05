@@ -1,12 +1,19 @@
-const TokenBlacklist = require('../models/TokenBlacklist');
+const authModule = require('../modules/auth/auth.module');
 
-const isBlacklisted = async (token) => {
-    return await TokenBlacklist.exists({ token });
-};
-
+/**
+ * Check if token is blacklisted
+ * Uses TokenBlacklistRepository from Auth domain
+ */
 module.exports = async (req, res, next) => {
-    if (await isBlacklisted(req.token)) {
-        return res.status(401).json({ error: 'Token revoked' });
+    try {
+        const tokenBlacklistRepository = authModule.getTokenBlacklistRepository();
+        const isBlacklisted = await tokenBlacklistRepository.isBlacklisted(req.token);
+
+        if (isBlacklisted) {
+            return res.status(401).json({ error: 'Token revoked' });
+        }
+        next();
+    } catch (error) {
+        return res.status(500).json({ error: 'Error checking token blacklist' });
     }
-    next();
 };

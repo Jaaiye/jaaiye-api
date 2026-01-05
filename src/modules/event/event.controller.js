@@ -280,6 +280,68 @@ class EventController {
     });
     return successResponse(res, result);
   });
+
+  // Issue ticket (for event creators/co-organizers)
+  issueTicket = asyncHandler(async (req, res) => {
+    const container = require('./event.module');
+    const ticketModule = require('../ticket/ticket.module');
+    const eventRepository = container.getEventRepository();
+    const eventTeamRepository = container.getEventTeamRepository();
+    const createTicketUseCase = ticketModule.getCreateTicketUseCase();
+    const { CreateTicketDTO } = require('../ticket/dto');
+
+    const eventId = req.params.id;
+    const userId = req.user.id;
+
+    // Check if user is creator or co-organizer
+    const event = await eventRepository.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+
+    const isCreator = event.creatorId && String(event.creatorId) === String(userId);
+    let hasPermission = isCreator;
+
+    if (!hasPermission && event.category === 'event') {
+      const teamMember = await eventTeamRepository.findByEventAndUser(eventId, userId);
+      hasPermission = teamMember &&
+        teamMember.status === 'accepted' &&
+        (teamMember.role === 'co_organizer' || teamMember.role === 'creator') &&
+        teamMember.permissions?.manageTickets === true;
+    }
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'You do not have permission to issue tickets for this event'
+      });
+    }
+
+    // Create ticket
+    const dto = new CreateTicketDTO({
+      eventId,
+      ticketTypeId: req.body.ticketTypeId || null,
+      quantity: req.body.quantity || 1,
+      userId: req.body.userId,
+      username: req.body.username,
+      bypassCapacity: req.body.bypassCapacity || false
+    });
+
+    const ticket = await createTicketUseCase.execute(dto);
+
+    return successResponse(res, {
+      ticket: {
+        id: ticket.id,
+        qrCode: ticket.qrCode,
+        publicId: ticket.publicId,
+        ticketTypeName: ticket.ticketTypeName,
+        price: ticket.price,
+        quantity: ticket.quantity,
+        status: ticket.status,
+        createdAt: ticket.createdAt
+      }
+    }, 201, 'Ticket issued successfully');
+  });
 }
 
 module.exports = EventController;

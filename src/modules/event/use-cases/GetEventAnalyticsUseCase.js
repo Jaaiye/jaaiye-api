@@ -18,7 +18,6 @@ class GetEventAnalyticsUseCase {
     if (!event) {
       throw new EventNotFoundError();
     }
-    console.log("event: ", event)
 
     // Check permissions: creator, co-organizer, or admin can view analytics
     let hasAccess = false;
@@ -40,30 +39,46 @@ class GetEventAnalyticsUseCase {
       throw new EventAccessDeniedError('You do not have permission to view analytics for this event');
     }
 
-    // Get all tickets for this event
-    const tickets = await this.transactionRepository.findByEvent(eventId);
-    const successfulTickets = tickets.filter(t => t.status === 'successful');
+    // Get all tickets for this event (for counting)
+    const allTickets = await this.ticketRepository.findByEvent(eventId);
+
+    // Get all transactions for this event (for revenue calculations)
+    const allTransactions = await this.transactionRepository.findByEvent(eventId);
+    const successfulTransactions = allTransactions.filter(t => t.status === 'successful');
 
     // Parse date range
     const start = startDate ? new Date(startDate) : new Date(event.createdAt);
     const end = endDate ? new Date(endDate) : new Date();
 
-    // Filter tickets by date range
-    const filteredTickets = successfulTickets.filter(t => {
+    // Filter tickets by date range (only active/used tickets, exclude cancelled)
+    const filteredTickets = allTickets.filter(t => {
       const ticketDate = new Date(t.createdAt);
-      return ticketDate >= start && ticketDate <= end;
+      return ticketDate >= start && ticketDate <= end && t.status !== 'cancelled';
     });
 
-    // Group by time period
-    const salesByPeriod = this._groupByPeriod(filteredTickets, groupBy, start, end);
-    const revenueByPeriod = this._calculateRevenueByPeriod(filteredTickets, groupBy, start, end);
+    // Filter transactions by date range
+    const filteredTransactions = successfulTransactions.filter(t => {
+      const transactionDate = new Date(t.createdAt);
+      return transactionDate >= start && transactionDate <= end;
+    });
 
-    // Ticket type breakdown
-    const ticketTypeBreakdown = this._calculateTicketTypeBreakdown(event, filteredTickets);
+    // Group by time period (using tickets for counts)
+    const salesByPeriod = this._groupByPeriod(filteredTickets, groupBy, start, end);
+
+    // Calculate revenue by period (using transactions)
+    const revenueByPeriod = this._calculateRevenueByPeriod(filteredTransactions, groupBy, start, end);
+
+    // Ticket type breakdown (soldCount from tickets, revenue from transactions)
+    const ticketTypeBreakdown = this._calculateTicketTypeBreakdown(event, filteredTickets, filteredTransactions);
 
     // Overall metrics
+    // Total tickets sold: count from tickets
     const totalTicketsSold = filteredTickets.reduce((sum, t) => sum + (t.quantity || 1), 0);
-    const totalRevenue = filteredTickets.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    // Total revenue: sum from transactions
+    const totalRevenue = filteredTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    // Average ticket price: revenue / tickets sold
     const averageTicketPrice = totalTicketsSold > 0 ? totalRevenue / totalTicketsSold : 0;
 
     // Conversion metrics (if we had view data, but for now just ticket sales)
@@ -95,7 +110,6 @@ class GetEventAnalyticsUseCase {
 
   _groupByPeriod(tickets, groupBy, start, end) {
     const periods = {};
-    const periodFormat = groupBy === 'day' ? 'YYYY-MM-DD' : groupBy === 'week' ? 'YYYY-[W]WW' : 'YYYY-MM';
 
     tickets.forEach(ticket => {
       const date = new Date(ticket.createdAt);
@@ -119,12 +133,11 @@ class GetEventAnalyticsUseCase {
     return periods;
   }
 
-  _calculateRevenueByPeriod(tickets, groupBy, start, end) {
+  _calculateRevenueByPeriod(transactions, groupBy, start, end) {
     const periods = {};
-    const periodFormat = groupBy === 'day' ? 'YYYY-MM-DD' : groupBy === 'week' ? 'YYYY-[W]WW' : 'YYYY-MM';
 
-    tickets.forEach(ticket => {
-      const date = new Date(ticket.createdAt);
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.createdAt);
       let periodKey;
 
       if (groupBy === 'day') {
@@ -139,13 +152,14 @@ class GetEventAnalyticsUseCase {
       if (!periods[periodKey]) {
         periods[periodKey] = 0;
       }
-      periods[periodKey] += Number(ticket.amount || 0);
+      // Sum transaction amounts (transactions have amount field)
+      periods[periodKey] += Number(transaction.amount || 0);
     });
 
     return periods;
   }
 
-  _calculateTicketTypeBreakdown(event, tickets) {
+  _calculateTicketTypeBreakdown(event, tickets, transactions) {
     const breakdown = {};
 
     // Initialize with event ticket types
@@ -162,21 +176,38 @@ class GetEventAnalyticsUseCase {
       });
     }
 
-    // Count tickets by type
+    // Count tickets by type (soldCount from tickets)
     tickets.forEach(ticket => {
       const typeId = ticket.ticketTypeId?.toString() || 'unknown';
       if (!breakdown[typeId]) {
+        // If ticket type not found in event, create entry with price from ticket
         breakdown[typeId] = {
           ticketTypeId: typeId,
-          name: 'Unknown',
+          name: ticket.ticketTypeName || 'Unknown',
           type: 'custom',
-          price: Number(ticket.amount || 0) / (ticket.quantity || 1),
+          price: Number(ticket.price || 0),
           soldCount: 0,
           revenue: 0
         };
       }
       breakdown[typeId].soldCount += ticket.quantity || 1;
-      breakdown[typeId].revenue += Number(ticket.amount || 0);
+    });
+
+    // Calculate revenue by type (revenue from transactions)
+    transactions.forEach(transaction => {
+      const typeId = transaction.ticketTypeId?.toString() || 'unknown';
+      if (!breakdown[typeId]) {
+        // If transaction type not found, create entry
+        breakdown[typeId] = {
+          ticketTypeId: typeId,
+          name: 'Unknown',
+          type: 'custom',
+          price: Number(transaction.amount || 0) / (transaction.quantity || 1),
+          soldCount: 0,
+          revenue: 0
+        };
+      }
+      breakdown[typeId].revenue += Number(transaction.amount || 0);
     });
 
     return Object.values(breakdown);

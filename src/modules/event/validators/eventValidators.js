@@ -183,12 +183,14 @@ const validateIssueTicket = [
     .optional()
     .isInt({ min: 1, max: 10 })
     .withMessage('Quantity must be between 1 and 10'),
-  body('userId')
-    .optional()
-    .isMongoId()
-    .withMessage('Invalid user ID'),
+  body('email')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isEmail()
+    .withMessage('Invalid email format')
+    .normalizeEmail(),
   body('username')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .notEmpty()
     .withMessage('Username cannot be empty if provided'),
@@ -198,9 +200,9 @@ const validateIssueTicket = [
     .withMessage('Bypass capacity must be a boolean'),
   body()
     .custom((value) => {
-      // At least one of userId or username must be provided
-      if (!value.userId && !value.username) {
-        throw new Error('Either userId or username is required');
+      // At least one of email or username must be provided
+      if (!value.email && !value.username) {
+        throw new Error('Either email or username is required');
       }
       return true;
     })

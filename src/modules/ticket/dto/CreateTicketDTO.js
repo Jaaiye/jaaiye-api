@@ -10,8 +10,9 @@ class CreateTicketDTO {
     this.eventId = data.eventId;
     this.ticketTypeId = data.ticketTypeId || null;
     this.quantity = data.quantity || 1;
-    this.userId = data.userId; // Target user (admin creates for user)
-    this.username = data.username; // Alternative to userId
+    this.userId = data.userId; // Target user (required - resolved from username/email in controller)
+    this.username = data.username; // Legacy support (optional)
+    this.email = data.email; // Legacy support (optional)
     this.bypassCapacity = data.bypassCapacity || false;
   }
 
@@ -24,8 +25,10 @@ class CreateTicketDTO {
       throw new ValidationError('Quantity must be between 1 and 10');
     }
 
-    if (!this.userId && !this.username) {
-      throw new ValidationError('Target user is required (provide userId or username)');
+    // For event controller flow, userId is required (resolved from username/email)
+    // For admin flow, userId, username, or email can be provided
+    if (!this.userId && !this.username && !this.email) {
+      throw new ValidationError('Target user is required (provide userId, username, or email)');
     }
   }
 }

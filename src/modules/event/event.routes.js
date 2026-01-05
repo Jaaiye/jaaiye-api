@@ -5,7 +5,6 @@
 
 const express = require('express');
 const multer = require('multer');
-const router = express.Router();
 
 const { apiLimiter } = require('../../middleware/securityMiddleware');
 const { protect, optionalAuth } = require('../../middleware/authMiddleware');
@@ -17,7 +16,8 @@ const {
   validateUpdateParticipantStatus,
   validateEventId,
   validateDeleteEvent,
-  validateRemoveParticipant
+  validateRemoveParticipant,
+  validateAddTeamMember
 } = require('./validators/eventValidators');
 
 // Configure multer for image uploads
@@ -36,13 +36,15 @@ const upload = multer({
 });
 
 function createEventRoutes(eventController) {
-  // Event CRUD
+  const router = express.Router();
+
+  // Event CRUD - POST must come before GET /:id to avoid route conflicts
   router.post(
     '/',
     apiLimiter,
     protect,
     upload.single('image'),
-    validateCreateEvent,
+    ...validateCreateEvent,
     validate,
     eventController.createEvent
   );
@@ -201,8 +203,16 @@ function createEventRoutes(eventController) {
     apiLimiter,
     protect,
     validateEventId,
+    validateAddTeamMember,
     validate,
     eventController.addTeamMember
+  );
+
+  router.get(
+    '/team',
+    apiLimiter,
+    protect,
+    eventController.getTeamEvents
   );
 
   router.get(

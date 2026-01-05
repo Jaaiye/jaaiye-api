@@ -26,7 +26,8 @@ class EventController {
     updateEventTeamMemberUseCase,
     removeEventTeamMemberUseCase,
     getEventTeamUseCase,
-    getEventAnalyticsUseCase
+    getEventAnalyticsUseCase,
+    getTeamEventsUseCase
   }) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
@@ -47,6 +48,7 @@ class EventController {
     this.removeEventTeamMemberUseCase = removeEventTeamMemberUseCase;
     this.getEventTeamUseCase = getEventTeamUseCase;
     this.getEventAnalyticsUseCase = getEventAnalyticsUseCase;
+    this.getTeamEventsUseCase = getTeamEventsUseCase;
   }
 
   createEvent = asyncHandler(async (req, res) => {
@@ -243,6 +245,16 @@ class EventController {
 
   getTeam = asyncHandler(async (req, res) => {
     const result = await this.getEventTeamUseCase.execute(req.params.id);
+    return successResponse(res, result);
+  });
+
+  getTeamEvents = asyncHandler(async (req, res) => {
+    const { status, page, limit } = req.query;
+    const result = await this.getTeamEventsUseCase.execute(req.user.id, {
+      status,
+      page: page || 1,
+      limit: limit || 12
+    });
     return successResponse(res, result);
   });
 

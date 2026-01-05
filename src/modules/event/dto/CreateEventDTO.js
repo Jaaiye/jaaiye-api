@@ -19,7 +19,18 @@ class CreateEventDTO {
     this.ticketTypes = data.ticketTypes;
     this.isAllDay = data.isAllDay;
     this.recurrence = data.recurrence;
-    this.participants = JSON.parse(data.participants);
+    // Parse participants if provided (only for hangouts)
+    if (data.participants !== undefined && data.participants !== null && data.participants !== '') {
+      if (typeof data.participants === 'string') {
+        this.participants = JSON.parse(data.participants);
+      } else if (Array.isArray(data.participants)) {
+        this.participants = data.participants;
+      } else {
+        this.participants = [];
+      }
+    } else {
+      this.participants = undefined;
+    }
     this.groupId = data.groupId; // Optional, only for hangouts
 
     this.validate();

@@ -147,6 +147,33 @@ const validateRemoveParticipant = [
     .withMessage('Invalid user ID format')
 ];
 
+const validateAddTeamMember = [
+  body('role')
+    .notEmpty()
+    .withMessage('Role is required')
+    .isIn(['co_organizer', 'ticket_scanner'])
+    .withMessage('Role must be either co_organizer or ticket_scanner'),
+  body('username')
+    .optional({ checkFalsy: true })
+    .trim()
+    .notEmpty()
+    .withMessage('Username cannot be empty if provided'),
+  body('email')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isEmail()
+    .withMessage('Invalid email format')
+    .normalizeEmail(),
+  body()
+    .custom((value) => {
+      // At least one of username or email must be provided
+      if (!value.username && !value.email) {
+        throw new Error('Either username or email is required');
+      }
+      return true;
+    })
+];
+
 module.exports = {
   validateCreateEvent,
   validateUpdateEvent,
@@ -154,6 +181,7 @@ module.exports = {
   validateUpdateParticipantStatus,
   validateEventId,
   validateDeleteEvent,
-  validateRemoveParticipant
+  validateRemoveParticipant,
+  validateAddTeamMember
 };
 

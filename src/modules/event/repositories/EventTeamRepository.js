@@ -10,12 +10,42 @@ class EventTeamRepository {
   _toEntity(doc) {
     if (!doc) return null;
     const docObj = doc.toObject ? doc.toObject() : doc;
+
+    // Preserve populated user object if it exists, otherwise convert to string
+    let user = docObj.user;
+    if (user && typeof user === 'object' && user._id) {
+      // User is populated - preserve the object with id, username, fullName, email
+      user = {
+        id: user._id?.toString() || user.id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        profilePicture: user.profilePicture
+      };
+    } else if (user) {
+      // User is just an ID - convert to string
+      user = user.toString();
+    }
+
+    // Preserve populated invitedBy object if it exists
+    let invitedBy = docObj.invitedBy;
+    if (invitedBy && typeof invitedBy === 'object' && invitedBy._id) {
+      invitedBy = {
+        id: invitedBy._id?.toString() || invitedBy.id,
+        username: invitedBy.username,
+        fullName: invitedBy.fullName,
+        email: invitedBy.email
+      };
+    } else if (invitedBy) {
+      invitedBy = invitedBy.toString();
+    }
+
     return new EventTeamEntity({
       id: docObj._id?.toString() || docObj.id,
       event: docObj.event?.toString() || docObj.event,
-      user: docObj.user?.toString() || docObj.user,
+      user: user,
       role: docObj.role,
-      invitedBy: docObj.invitedBy?.toString() || docObj.invitedBy,
+      invitedBy: invitedBy,
       status: docObj.status,
       permissions: docObj.permissions || {},
       createdAt: docObj.createdAt,

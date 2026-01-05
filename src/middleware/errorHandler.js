@@ -147,6 +147,19 @@ const handleDefaultError = (error) => {
 
 // Main error handler middleware
 const errorHandler = (error, req, res, next) => {
+  // Handle JSON parsing errors for multipart/form-data requests
+  if (error instanceof SyntaxError && error.message.includes('JSON')) {
+    const contentType = req.headers['content-type'] || '';
+    if (contentType.includes('multipart/form-data')) {
+      // This is a multipart request that was incorrectly parsed as JSON
+      // Let multer handle it by calling next without error
+      return next();
+    }
+    // Otherwise, it's a real JSON parsing error
+    error.statusCode = 400;
+    error.status = 'fail';
+  }
+
   // Set default status code
   error.statusCode = error.statusCode || 500;
   error.status = error.status || 'error';
@@ -174,6 +187,14 @@ const errorHandler = (error, req, res, next) => {
     return res.status(400).json(handleValidationError(error));
   }
 
+  // Handle SyntaxError (JSON parsing errors)
+  if (error instanceof SyntaxError && error.message.includes('JSON')) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid JSON in request body'
+    });
+  }
+
   if (error.name === 'JsonWebTokenError') {
     return res.status(401).json(handleJWTError(error));
   }
@@ -188,6 +209,14 @@ const errorHandler = (error, req, res, next) => {
 
   if (error.name === 'CastError') {
     return res.status(400).json(handleCastError(error));
+  }
+
+  // Handle NotFoundError specifically
+  if (error.name === 'NotFoundError' || error.statusCode === 404) {
+    return res.status(404).json({
+      success: false,
+      error: error.message || 'Resource not found'
+    });
   }
 
   // Handle operational errors

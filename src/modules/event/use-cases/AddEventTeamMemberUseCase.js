@@ -7,13 +7,14 @@ const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require(
 const { UserNotFoundError } = require('../../common/errors');
 
 class AddEventTeamMemberUseCase {
-  constructor({ eventRepository, eventTeamRepository, userRepository }) {
+  constructor({ eventRepository, eventTeamRepository, userRepository, notificationAdapter }) {
     this.eventRepository = eventRepository;
     this.eventTeamRepository = eventTeamRepository;
     this.userRepository = userRepository;
+    this.notificationAdapter = notificationAdapter;
   }
 
-  async execute(eventId, userId, { teamMemberUserId, role }) {
+  async execute(eventId, userId, { username, email, role }) {
     const event = await this.eventRepository.findById(eventId);
     if (!event) {
       throw new EventNotFoundError();
@@ -34,11 +35,25 @@ class AddEventTeamMemberUseCase {
       throw new ValidationError('Invalid role. Must be co_organizer or ticket_scanner');
     }
 
-    // Validate user exists
-    const teamMember = await this.userRepository.findById(teamMemberUserId);
-    if (!teamMember) {
-      throw new UserNotFoundError();
+    // Validate that either username or email is provided
+    if (!username && !email) {
+      throw new ValidationError('Either username or email is required');
     }
+
+    // Find user by username or email
+    let teamMember = null;
+    if (username) {
+      teamMember = await this.userRepository.findByUsername(username);
+    }
+    if (!teamMember && email) {
+      teamMember = await this.userRepository.findByEmail(email);
+    }
+
+    if (!teamMember) {
+      throw new UserNotFoundError('User not found with the provided username or email');
+    }
+
+    const teamMemberUserId = teamMember.id;
 
     // Cannot add yourself
     if (String(teamMemberUserId) === String(userId)) {
@@ -59,6 +74,31 @@ class AddEventTeamMemberUseCase {
       invitedBy: userId,
       status: 'pending'
     });
+
+    // Send push notification to invited user
+    if (this.notificationAdapter) {
+      const inviter = await this.userRepository.findById(userId);
+      const eventSlug = event.slug || event.id;
+      const roleLabel = role === 'co_organizer' ? 'Co-Organizer' : 'Ticket Scanner';
+
+      setImmediate(async () => {
+        try {
+          await this.notificationAdapter.send(teamMemberUserId, {
+            title: 'Team Invitation',
+            body: `${inviter?.username || inviter?.fullName || 'Someone'} invited you as ${roleLabel} for "${event.title}"`
+          }, {
+            type: 'team_invitation',
+            eventId: event.id,
+            slug: eventSlug,
+            role: role,
+            teamMemberId: teamMemberEntity.id,
+            path: `teamInvitation/${eventSlug}`
+          });
+        } catch (error) {
+          console.error('Failed to send team invitation notification:', error);
+        }
+      });
+    }
 
     return teamMemberEntity;
   }

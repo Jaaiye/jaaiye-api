@@ -39,10 +39,14 @@ class GetEventUseCase {
 
       // Check if user is a team member (for events only)
       let isTeamMember = false;
+      let teamMember = null;
       if (event.category === 'event') {
-        const teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
+        teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
         isTeamMember = teamMember && teamMember.status === 'accepted';
       }
+
+      // Check if user is the creator
+      const isCreator = event.creatorId && String(event.creatorId) === String(userId);
 
       // Published events are publicly accessible
       const isEventPublished = event.isPublished();
@@ -64,6 +68,33 @@ class GetEventUseCase {
         eventData.isScanner = isTeamMember || hasAdminRole;
       } else {
         eventData.isScanner = false;
+      }
+
+      // Add user's role and permissions for events
+      if (event.category === 'event') {
+        if (isCreator) {
+          eventData.userRole = 'creator';
+          eventData.userPermissions = {
+            editEvent: true,
+            manageTickets: true,
+            viewAnalytics: true,
+            viewWallet: true,
+            requestWithdrawal: true,
+            checkInTickets: true,
+            manageTeam: true
+          };
+        } else if (isTeamMember && teamMember) {
+          eventData.userRole = teamMember.role; // 'co_organizer' or 'ticket_scanner'
+          eventData.userPermissions = teamMember.permissions || {};
+          // Co-organizers can do everything except withdraw and manage team
+          if (teamMember.role === 'co_organizer') {
+            eventData.userPermissions.manageTeam = false;
+            eventData.userPermissions.requestWithdrawal = false;
+          }
+        } else {
+          eventData.userRole = null;
+          eventData.userPermissions = null;
+        }
       }
     } else {
       // For unauthenticated users, only allow access to published events

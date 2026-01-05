@@ -62,8 +62,36 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+// Parse JSON bodies, but skip multipart/form-data (handled by multer)
+app.use((req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  // Skip JSON parsing for multipart/form-data requests - multer will handle it
+  // Check for both 'multipart/form-data' and boundary parameter
+  const isMultipart = contentType.includes('multipart/form-data') || contentType.includes('boundary=');
+
+  if (isMultipart) {
+    return next();
+  }
+  // Only parse JSON for non-multipart requests
+  express.json()(req, res, (err) => {
+    // If JSON parsing fails, check if it might be multipart (fallback)
+    if (err && err instanceof SyntaxError && err.message.includes('JSON') && err.message.includes('------')) {
+      // This looks like multipart data that was incorrectly parsed as JSON
+      // Clear the error and let multer handle it
+      return next();
+    }
+    next(err);
+  });
+});
+// Parse URL-encoded bodies, but skip multipart/form-data
+app.use((req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  const isMultipart = contentType.includes('multipart/form-data') || contentType.includes('boundary=');
+  if (isMultipart) {
+    return next();
+  }
+  express.urlencoded({ extended: true })(req, res, next);
+});
 
 // Request logging middleware (comprehensive logging)
 app.use(requestLogger);
@@ -156,7 +184,16 @@ app.use('/api/v1/users', require('./modules/user/user.module').getUserRoutes());
 app.use('/api/v1/admin', require('./modules/admin/admin.module').getAdminRoutes());
 app.use('/api/v1/analytics', require('./modules/analytics/analytics.module').getAnalyticsRoutes());
 app.use('/api/v1/calendars', require('./modules/calendar/calendar.module').getCalendarRoutes());
-app.use('/api/v1/events', require('./modules/event/event.module').getEventRoutes());
+try {
+  const eventRoutes = require('./modules/event/event.module').getEventRoutes();
+  if (!eventRoutes) {
+    console.error('Event routes are null or undefined');
+  }
+  app.use('/api/v1/events', eventRoutes);
+} catch (error) {
+  console.error('Failed to register event routes:', error);
+  throw error;
+}
 app.use('/api/v1/notifications', require('./modules/notification/notification.module').getNotificationRoutes());
 app.use('/api/v1/ics', require('./routes/icsRoutes'));
 app.use('/api/v1/groups', require('./modules/group/group.module').getGroupRoutes());

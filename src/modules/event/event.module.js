@@ -41,7 +41,8 @@ const {
   UpdateEventTeamMemberUseCase,
   RemoveEventTeamMemberUseCase,
   GetEventTeamUseCase,
-  GetEventAnalyticsUseCase
+  GetEventAnalyticsUseCase,
+  GetTeamEventsUseCase
 } = require('./use-cases');
 const EventController = require('./event.controller');
 const createEventRoutes = require('./event.routes');
@@ -361,7 +362,8 @@ class EventModule {
       this._instances.addEventTeamMemberUseCase = new AddEventTeamMemberUseCase({
         eventRepository: this.getEventRepository(),
         eventTeamRepository: this.getEventTeamRepository(),
-        userRepository: this.getUserRepository()
+        userRepository: this.getUserRepository(),
+        notificationAdapter: this.getNotificationAdapter()
       });
     }
     return this._instances.addEventTeamMemberUseCase;
@@ -395,6 +397,16 @@ class EventModule {
       });
     }
     return this._instances.getEventTeamUseCase;
+  }
+
+  getGetTeamEventsUseCase() {
+    if (!this._instances.getTeamEventsUseCase) {
+      this._instances.getTeamEventsUseCase = new GetTeamEventsUseCase({
+        eventRepository: this.getEventRepository(),
+        eventTeamRepository: this.getEventTeamRepository()
+      });
+    }
+    return this._instances.getTeamEventsUseCase;
   }
 
   getGetEventAnalyticsUseCase() {
@@ -436,7 +448,8 @@ class EventModule {
         updateEventTeamMemberUseCase: this.getUpdateEventTeamMemberUseCase(),
         removeEventTeamMemberUseCase: this.getRemoveEventTeamMemberUseCase(),
         getEventTeamUseCase: this.getGetEventTeamUseCase(),
-        getEventAnalyticsUseCase: this.getGetEventAnalyticsUseCase()
+        getEventAnalyticsUseCase: this.getGetEventAnalyticsUseCase(),
+        getTeamEventsUseCase: this.getGetTeamEventsUseCase()
       });
     }
     return this._instances.eventController;
@@ -447,7 +460,22 @@ class EventModule {
   // ============================================================================
 
   getEventRoutes() {
-    return createEventRoutes(this.getEventController());
+    if (!this._instances.eventRoutes) {
+      try {
+        const controller = this.getEventController();
+        if (!controller) {
+          throw new Error('EventController is not available');
+        }
+        this._instances.eventRoutes = createEventRoutes(controller);
+        if (!this._instances.eventRoutes) {
+          throw new Error('Failed to create event routes');
+        }
+      } catch (error) {
+        console.error('Error creating event routes:', error);
+        throw error;
+      }
+    }
+    return this._instances.eventRoutes;
   }
 }
 

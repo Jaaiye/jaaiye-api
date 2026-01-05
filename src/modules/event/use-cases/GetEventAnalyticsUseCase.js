@@ -18,6 +18,7 @@ class GetEventAnalyticsUseCase {
     if (!event) {
       throw new EventNotFoundError();
     }
+    console.log("event: ", event)
 
     // Check permissions: creator, co-organizer, or admin can view analytics
     let hasAccess = false;

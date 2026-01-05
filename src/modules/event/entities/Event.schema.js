@@ -138,6 +138,22 @@ const eventSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Normalized creator reference for permissions (ObjectId as string)
+  creatorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  // Explicit origin flag to distinguish user vs Jaaiye vs others
+  origin: {
+    type: String,
+    enum: ['user', 'jaaiye'],
+    default: 'user'
+  },
+  publishedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

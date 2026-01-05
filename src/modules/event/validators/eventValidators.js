@@ -174,6 +174,38 @@ const validateAddTeamMember = [
     })
 ];
 
+const validateIssueTicket = [
+  body('ticketTypeId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid ticket type ID'),
+  body('quantity')
+    .optional()
+    .isInt({ min: 1, max: 10 })
+    .withMessage('Quantity must be between 1 and 10'),
+  body('userId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid user ID'),
+  body('username')
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('Username cannot be empty if provided'),
+  body('bypassCapacity')
+    .optional()
+    .isBoolean()
+    .withMessage('Bypass capacity must be a boolean'),
+  body()
+    .custom((value) => {
+      // At least one of userId or username must be provided
+      if (!value.userId && !value.username) {
+        throw new Error('Either userId or username is required');
+      }
+      return true;
+    })
+];
+
 module.exports = {
   validateCreateEvent,
   validateUpdateEvent,
@@ -182,6 +214,7 @@ module.exports = {
   validateEventId,
   validateDeleteEvent,
   validateRemoveParticipant,
-  validateAddTeamMember
+  validateAddTeamMember,
+  validateIssueTicket
 };
 

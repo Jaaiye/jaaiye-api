@@ -17,7 +17,8 @@ const {
   validateEventId,
   validateDeleteEvent,
   validateRemoveParticipant,
-  validateAddTeamMember
+  validateAddTeamMember,
+  validateIssueTicket
 } = require('./validators/eventValidators');
 
 // Configure multer for image uploads
@@ -251,6 +252,17 @@ function createEventRoutes(eventController) {
     validateEventId,
     validate,
     eventController.getAnalytics
+  );
+
+  // Issue tickets (for event creators/co-organizers)
+  router.post(
+    '/:id/tickets/issue',
+    apiLimiter,
+    protect,
+    validateEventId,
+    validateIssueTicket,
+    validate,
+    eventController.issueTicket
   );
 
   return router;

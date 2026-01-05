@@ -283,51 +283,140 @@ class EventController {
 
   // Issue ticket (for event creators/co-organizers)
   issueTicket = asyncHandler(async (req, res) => {
+    console.log('[EventController] issueTicket called', {
+      eventId: req.params.id,
+      userId: req.user.id,
+      body: req.body
+    });
+
     const container = require('./event.module');
     const ticketModule = require('../ticket/ticket.module');
+    const { NotFoundError } = require('../common/errors');
     const eventRepository = container.getEventRepository();
     const eventTeamRepository = container.getEventTeamRepository();
+    const userRepository = container.getUserRepository();
     const createTicketUseCase = ticketModule.getCreateTicketUseCase();
     const { CreateTicketDTO } = require('../ticket/dto');
 
     const eventId = req.params.id;
     const userId = req.user.id;
 
+    console.log('[EventController] Checking permissions', { eventId, userId });
+
     // Check if user is creator or co-organizer
     const event = await eventRepository.findById(eventId);
     if (!event) {
+      console.error('[EventController] Event not found', { eventId });
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
+
+    console.log('[EventController] Event found', {
+      eventId: event.id,
+      creatorId: event.creatorId,
+      category: event.category
+    });
 
     const isCreator = event.creatorId && String(event.creatorId) === String(userId);
     let hasPermission = isCreator;
 
+    console.log('[EventController] Permission check', { isCreator, hasPermission });
+
     if (!hasPermission && event.category === 'event') {
+      console.log('[EventController] Checking team membership', { eventId, userId });
       const teamMember = await eventTeamRepository.findByEventAndUser(eventId, userId);
+      console.log('[EventController] Team member found', {
+        hasTeamMember: !!teamMember,
+        status: teamMember?.status,
+        role: teamMember?.role,
+        manageTickets: teamMember?.permissions?.manageTickets
+      });
+
       hasPermission = teamMember &&
         teamMember.status === 'accepted' &&
         (teamMember.role === 'co_organizer' || teamMember.role === 'creator') &&
         teamMember.permissions?.manageTickets === true;
     }
 
+    console.log('[EventController] Final permission check', { hasPermission });
+
     if (!hasPermission) {
+      console.warn('[EventController] Permission denied', { eventId, userId });
       return res.status(403).json({
         success: false,
         error: 'You do not have permission to issue tickets for this event'
       });
     }
 
-    // Create ticket
-    const dto = new CreateTicketDTO({
+    // Search for target user by username or email
+    const { username, email } = req.body;
+    console.log('[EventController] Searching for target user', { username, email });
+
+    if (!username && !email) {
+      console.error('[EventController] Missing username and email');
+      return res.status(400).json({
+        success: false,
+        error: 'Either username or email is required'
+      });
+    }
+
+    let targetUser = null;
+    if (username) {
+      console.log('[EventController] Looking up user by username', { username });
+      targetUser = await userRepository.findByUsername(username);
+      console.log('[EventController] User lookup by username result', {
+        found: !!targetUser,
+        userId: targetUser?.id
+      });
+    }
+    if (!targetUser && email) {
+      console.log('[EventController] Looking up user by email', { email });
+      targetUser = await userRepository.findByEmail(email);
+      console.log('[EventController] User lookup by email result', {
+        found: !!targetUser,
+        userId: targetUser?.id
+      });
+    }
+
+    if (!targetUser) {
+      console.error('[EventController] Target user not found', { username, email });
+      return res.status(404).json({
+        success: false,
+        error: 'User not found with the provided username or email'
+      });
+    }
+
+    const targetUserId = targetUser.id;
+    console.log('[EventController] Target user found', {
+      targetUserId,
+      username: targetUser.username,
+      email: targetUser.email
+    });
+
+    // Create ticket with userId
+    const dtoData = {
       eventId,
       ticketTypeId: req.body.ticketTypeId || null,
       quantity: req.body.quantity || 1,
-      userId: req.body.userId,
-      username: req.body.username,
+      userId: targetUserId,
       bypassCapacity: req.body.bypassCapacity || false
+    };
+
+    console.log('[EventController] Creating CreateTicketDTO', dtoData);
+    const dto = new CreateTicketDTO(dtoData);
+    console.log('[EventController] CreateTicketDTO created', {
+      eventId: dto.eventId,
+      ticketTypeId: dto.ticketTypeId,
+      quantity: dto.quantity,
+      userId: dto.userId,
+      bypassCapacity: dto.bypassCapacity
     });
 
+    console.log('[EventController] Executing createTicketUseCase');
     const ticket = await createTicketUseCase.execute(dto);
+    console.log('[EventController] Ticket created successfully', {
+      ticketId: ticket.id,
+      publicId: ticket.publicId
+    });
 
     return successResponse(res, {
       ticket: {

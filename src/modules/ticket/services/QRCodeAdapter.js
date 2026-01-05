@@ -42,10 +42,30 @@ class QRCodeAdapter {
    * @returns {Promise<{ qrCode: string, token: string, verifyUrl: string }>}
    */
   async generateTicketQRCode(ticket) {
-    const payload = {
+    if (!ticket) {
+      throw new Error('Ticket is required to generate QR code');
+    }
+
+    console.log('[QRCodeAdapter] Generating QR code', {
       ticketId: ticket.id || ticket._id,
-      eventId: ticket.eventId,
-      userId: ticket.userId,
+      ticketUserId: ticket.userId,
+      ticketEventId: ticket.eventId,
+      userIdType: typeof ticket.userId
+    });
+
+    // Ensure userId is available - convert ObjectId to string if needed
+    const userId = ticket.userId?.toString ? ticket.userId.toString() : (ticket.userId || null);
+    const eventId = ticket.eventId?.toString ? ticket.eventId.toString() : (ticket.eventId || null);
+    const ticketId = ticket.id?.toString ? ticket.id.toString() : (ticket._id?.toString ? ticket._id.toString() : ticket.id || ticket._id);
+
+    if (!userId) {
+      throw new Error('Ticket userId is required to generate QR code');
+    }
+
+    const payload = {
+      ticketId,
+      eventId,
+      userId,
       type: 'ticket',
     };
 

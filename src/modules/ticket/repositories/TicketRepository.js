@@ -18,29 +18,9 @@ class TicketRepository extends ITicketRepository {
 
     const data = doc.toObject ? doc.toObject() : doc;
 
-    // Helper to check if a field is populated
-    // With .lean(), populated fields are plain objects with _id and other properties
-    // Unpopulated fields are ObjectId instances or strings
-    const isPopulated = (field) => {
-      if (!field || typeof field !== 'object') return false;
-      // Check if it's an ObjectId instance (not populated)
-      if (field.constructor && field.constructor.name === 'ObjectId') return false;
-      // If it's a plain object with _id, it's likely populated
-      // Also check for common populated field properties
-      const hasId = field._id !== undefined;
-      const hasUserProps = field.fullName !== undefined || field.email !== undefined || field.username !== undefined;
-      const hasEventProps = field.title !== undefined || field.startTime !== undefined || field.venue !== undefined;
-      // If it has _id and at least one other property, it's populated
-      return hasId && (hasUserProps || hasEventProps || Object.keys(field).length > 1);
-    };
-
-    // With .lean(), populated fields are plain objects with _id and other properties
-    // Unpopulated fields are ObjectId instances (which are also objects)
-    // Just preserve all fields as-is - the entity will handle them correctly
     const userId = data.userId;
     const eventId = data.eventId;
     const verifiedBy = data.verifiedBy;
-
 
     const entity = new TicketEntity({
       id: data._id || data.id,
@@ -137,11 +117,32 @@ class TicketRepository extends ITicketRepository {
   }
 
   async update(id, updates) {
+    const ticketId = id?.toString ? id.toString() : id;
+
+    console.log('[TicketRepository] Updating ticket', {
+      ticketId,
+      ticketIdType: typeof ticketId,
+      updates,
+      updateKeys: Object.keys(updates || {})
+    });
+
     const ticket = await TicketSchema.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date() },
+      ticketId,
+      { $set: { ...updates, updatedAt: new Date() } },
       { new: true, runValidators: true }
     );
+
+    console.log('[TicketRepository] Ticket updated', {
+      found: !!ticket,
+      ticketId: ticket?._id?.toString() || ticket?.id,
+      publicId: ticket?.publicId,
+      hasQrCode: !!ticket?.qrCode
+    });
+
+    if (!ticket) {
+      throw new Error(`Ticket not found with ID: ${ticketId}`);
+    }
+
     return this._toEntity(ticket);
   }
 
@@ -149,9 +150,16 @@ class TicketRepository extends ITicketRepository {
     return TicketSchema.countDocuments({ eventId, ticketTypeId });
   }
 
+  /**
+   * Find ticket by publicId
+   * Note: This method should NOT populate by default to avoid errors during uniqueness checks
+   * Only populate when explicitly requested via options
+   */
   async findByPublicId(publicId, options = {}) {
+    // Start with a simple query - no population by default
     let query = TicketSchema.findOne({ publicId });
 
+    // Only populate if explicitly requested
     if (options.populate) {
       if (Array.isArray(options.populate)) {
         options.populate.forEach(pop => {
@@ -160,27 +168,33 @@ class TicketRepository extends ITicketRepository {
       } else {
         query = query.populate(options.populate);
       }
-    }
 
-    // First, get the ticket without populate to check if userId exists
-    const rawTicket = await TicketSchema.findOne({ publicId }).select('userId').lean();
+      // Use .lean() when populating to get plain objects
+      const ticket = await query.lean();
 
-    // Use .lean() to get plain objects, which preserves populated fields
-    const ticket = await query.lean();
+      // Handle case where userId population fails
+      if (ticket && (!ticket.userId || ticket.userId === null)) {
+        const rawTicket = await TicketSchema.findOne({ publicId }).select('userId').lean();
 
-      // If populate returned null but the ticket has a userId, fetch the user separately
-      if ((!ticket.userId || ticket.userId === null) && rawTicket && rawTicket.userId) {
-        // Fetch the user separately
-        const UserSchema = require('../../common/entities/User.schema');
-        const user = await UserSchema.findById(rawTicket.userId).select('fullName email username').lean();
-        if (user) {
-          ticket.userId = user;
+        if (rawTicket && rawTicket.userId) {
+          const UserSchema = require('../../common/entities/User.schema');
+          const user = await UserSchema.findById(rawTicket.userId)
+            .select('fullName email username')
+            .lean();
+
+          if (user) {
+            ticket.userId = user;
+          }
+        }
       }
+
+      return this._toEntity(ticket);
     }
 
+    // For simple existence checks (like uniqueness validation), don't populate
+    const ticket = await query;
     return this._toEntity(ticket);
   }
 }
 
 module.exports = TicketRepository;
-

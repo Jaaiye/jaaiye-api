@@ -35,8 +35,16 @@ class GetTeamEventsUseCase {
       };
     }
 
-    // Get event IDs
-    const eventIds = coOrganizerMemberships.map(tm => tm.event);
+    // Get event IDs - ensure they're strings/ObjectIds
+    const eventIds = coOrganizerMemberships.map(tm => {
+      const eventId = tm.event;
+      // If event is an object (populated), extract the ID
+      if (eventId && typeof eventId === 'object' && eventId.id) {
+        return eventId.id;
+      }
+      // Otherwise, convert to string
+      return String(eventId);
+    }).filter(id => id); // Filter out any null/undefined values
 
     // Build query
     const query = {

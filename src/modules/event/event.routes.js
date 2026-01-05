@@ -49,6 +49,14 @@ function createEventRoutes(eventController) {
     eventController.createEvent
   );
 
+  // Team events route - must come before /:id to avoid route conflicts
+  router.get(
+    '/team',
+    apiLimiter,
+    protect,
+    eventController.getTeamEvents
+  );
+
   router.get(
     '/:id',
     validateEventId,
@@ -206,13 +214,6 @@ function createEventRoutes(eventController) {
     validateAddTeamMember,
     validate,
     eventController.addTeamMember
-  );
-
-  router.get(
-    '/team',
-    apiLimiter,
-    protect,
-    eventController.getTeamEvents
   );
 
   router.get(

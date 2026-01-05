@@ -40,9 +40,19 @@ class EventTeamRepository {
       invitedBy = invitedBy.toString();
     }
 
+    // Handle populated event object if it exists
+    let event = docObj.event;
+    if (event && typeof event === 'object' && event._id) {
+      // Event is populated - extract the ID
+      event = event._id?.toString() || event.id?.toString() || event;
+    } else if (event) {
+      // Event is just an ID - convert to string
+      event = event.toString();
+    }
+
     return new EventTeamEntity({
       id: docObj._id?.toString() || docObj.id,
-      event: docObj.event?.toString() || docObj.event,
+      event: event,
       user: user,
       role: docObj.role,
       invitedBy: invitedBy,

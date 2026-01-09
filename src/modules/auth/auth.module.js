@@ -153,7 +153,8 @@ class AuthModule {
     if (!this._instances.loginUseCase) {
       this._instances.loginUseCase = new LoginUseCase({
         userRepository: this.getUserRepository(),
-        firebaseAdapter: this.getFirebaseAdapter()
+        firebaseAdapter: this.getFirebaseAdapter(),
+        emailQueue: this.getEmailQueue()
       });
     }
     return this._instances.loginUseCase;

@@ -59,9 +59,9 @@ class GroupController {
 
   getUserGroups = asyncHandler(async (req, res) => {
     const includeInactive = req.query.includeInactive === 'true';
-    const result = await this.getUserGroupsUseCase.execute(req.user.id, includeInactive);
+    const {groups, friends} = await this.getUserGroupsUseCase.execute(req.user.id, includeInactive);
 
-    return successResponse(res, { groups: result });
+    return successResponse(res, { groups, friends });
   });
 
   getGroup = asyncHandler(async (req, res) => {

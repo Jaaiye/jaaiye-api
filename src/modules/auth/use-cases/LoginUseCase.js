@@ -3,15 +3,17 @@
  * Handles user login business logic
  */
 
-const { InvalidCredentialsError } = require('../errors');
+const { InvalidCredentialsError, EmailNotVerifiedError } = require('../errors');
 const { NotFoundError } = require('../../common/errors');
 const { PasswordService, TokenService } = require('../../common/services');
 const { UserEntity } = require('../../common/entities');
+const { addMinutesToNow, addDaysToNow } = require('../../../utils/dateUtils');
 
 class LoginUseCase {
-  constructor({ userRepository, firebaseAdapter }) {
+  constructor({ userRepository, firebaseAdapter, emailQueue }) {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
+    this.emailQueue = emailQueue;
   }
 
   /**
@@ -47,7 +49,31 @@ class LoginUseCase {
     // Create user entity to check business rules
     const userEntity = new UserEntity(user);
 
-    // Check if user can login (will throw if blocked or email not verified)
+    // Check if email is verified - if not, send verification email before throwing error
+    if (!userEntity.emailVerified) {
+      // Generate new verification code
+      const verificationCode = PasswordService.generateVerificationCode();
+      const codeExpiry = addMinutesToNow(10); // 10 minutes from now (UTC)
+
+      // Update verification code in database
+      await this.userRepository.setVerificationCode(userEntity.id, verificationCode, codeExpiry);
+
+      // Send verification email (async, don't wait for it)
+      if (this.emailQueue) {
+        this.emailQueue.sendVerificationEmailAsync(
+          userEntity.email,
+          verificationCode,
+          userEntity.fullName || 'User'
+        ).catch(err => {
+          console.error('[LoginUseCase] Failed to send verification email:', err);
+        });
+      }
+
+      // Throw error after sending email
+      throw new EmailNotVerifiedError('Please verify your email before logging in. A verification email has been sent.');
+    }
+
+    // Check if user can login (will throw if blocked)
     userEntity.canLogin();
 
     // Generate tokens
@@ -58,7 +84,6 @@ class LoginUseCase {
       : null;
 
     // Save refresh token to user
-    const { addDaysToNow } = require('../../../utils/dateUtils');
     const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
     await this.userRepository.updateRefreshData(userEntity.id, {
       refreshToken,

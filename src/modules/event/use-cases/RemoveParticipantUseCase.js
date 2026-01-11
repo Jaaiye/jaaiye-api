@@ -43,18 +43,18 @@ class RemoveParticipantUseCase {
     }
 
     // Check if participant exists
-    const participant = await this.eventParticipantRepository.findByEventAndUser(eventId, targetUserId);
+    const participant = await this.eventParticipantRepository.findByEventAndUser(event._id || event.id, targetUserId);
     if (!participant) {
       throw new ParticipantNotFoundError('User is not a participant in this event');
     }
 
     // Delete participant
-    await this.eventParticipantRepository.deleteByEventAndUser(eventId, targetUserId);
+    await this.eventParticipantRepository.deleteByEventAndUser(event._id || event.id, targetUserId);
 
     // Notify removed participant
     // Fetch event slug from schema (slug not in entity)
     const EventSchema = require('../entities/Event.schema');
-    const eventDoc = await EventSchema.findById(eventId).select('slug').lean();
+    const eventDoc = await EventSchema.findById(event._id || event.id).select('slug').lean();
     const eventSlug = eventDoc?.slug || event.id;
 
     await this.notificationAdapter.send(targetUserId, {
@@ -62,7 +62,7 @@ class RemoveParticipantUseCase {
       body: `You have been removed from the event "${event.title}"`
     }, {
       type: 'event_removal',
-      eventId: event.id,
+      eventId: event._id || event.id,
       slug: eventSlug,
       path: `hangoutScreen/${eventSlug}`
     });

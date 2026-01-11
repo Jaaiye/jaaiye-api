@@ -48,7 +48,7 @@ class GetEventUseCase {
 
       // Check if user is a team member (for events only)
       if (event.category === 'event') {
-        teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
+        teamMember = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, userId);
         isTeamMember = teamMember && teamMember.status === 'accepted';
       }
 

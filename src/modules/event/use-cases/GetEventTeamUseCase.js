@@ -26,7 +26,7 @@ class GetEventTeamUseCase {
     }
 
     // Get all team members
-    const teamMembers = await this.eventTeamRepository.findByEvent(eventId);
+    const teamMembers = await this.eventTeamRepository.findByEvent(event._id || event.id);
 
     return {
       team: teamMembers.map(member => ({

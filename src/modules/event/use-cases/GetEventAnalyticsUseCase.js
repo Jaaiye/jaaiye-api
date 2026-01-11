@@ -14,6 +14,7 @@ class GetEventAnalyticsUseCase {
   }
 
   async execute(eventId, userId, { startDate, endDate, groupBy = 'day' }) {
+    console.log(eventId)
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
     let event;
 
@@ -37,7 +38,7 @@ class GetEventAnalyticsUseCase {
       hasAccess = true;
     } else {
       // Check if user is a co-organizer
-      const teamMember = await this.eventTeamRepository.findByEventAndUser(eventId, userId);
+      const teamMember = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, userId);
       if (teamMember && teamMember.role === 'co_organizer' && teamMember.status === 'accepted') {
         hasAccess = teamMember.canPerform('viewAnalytics');
       }
@@ -48,10 +49,10 @@ class GetEventAnalyticsUseCase {
     }
 
     // Get all tickets for this event (for counting)
-    const allTickets = await this.ticketRepository.findByEvent(eventId);
+    const allTickets = await this.ticketRepository.findByEvent(event._id || event.id);
 
     // Get all transactions for this event (for revenue calculations)
-    const allTransactions = await this.transactionRepository.findByEvent(eventId);
+    const allTransactions = await this.transactionRepository.findByEvent(event._id || event.id);
     const successfulTransactions = allTransactions.filter(t => t.status === 'successful');
 
     // Parse date range
@@ -94,7 +95,7 @@ class GetEventAnalyticsUseCase {
 
     return {
       event: {
-        id: event.id,
+        id: event._id || event.id,
         title: event.title,
         startTime: event.startTime,
         endTime: event.endTime

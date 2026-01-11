@@ -54,7 +54,7 @@ class UpdateEventUseCase {
     if (dto.status !== undefined) updateData.status = dto.status;
 
     // Update event
-    const updatedEvent = await this.eventRepository.update(eventId, updateData);
+    const updatedEvent = await this.eventRepository.update(event._id || event.id, updateData);
 
     // Sync with Google Calendar
     try {

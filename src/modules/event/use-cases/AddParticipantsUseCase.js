@@ -59,7 +59,7 @@ class AddParticipantsUseCase {
     // Check for existing participants
     const userIds = normalizedParticipants.map(p => p.user);
     const existingParticipants = await Promise.all(
-      userIds.map(userId => this.eventParticipantRepository.findByEventAndUser(eventId, userId))
+      userIds.map(userId => this.eventParticipantRepository.findByEventAndUser(event._id || event.id, userId))
     );
 
     const existingUserIds = new Set(
@@ -77,7 +77,7 @@ class AddParticipantsUseCase {
 
     // Create participants
     const participantsData = newParticipants.map(p => ({
-      event: eventId,
+      event: event._id || event.id,
       user: p.user,
       role: p.role
     }));
@@ -92,7 +92,7 @@ class AddParticipantsUseCase {
           body: `You have been invited to the event "${event.title}"`
         }, {
           type: 'event_invitation',
-          eventId: event.id,
+          eventId: event._id || event.id,
           path: 'hangoutScreen'
         })
       )
@@ -101,7 +101,7 @@ class AddParticipantsUseCase {
     // Add participants to associated group if event has one
     if (this.groupRepository) {
       try {
-        const group = await this.groupRepository.findByEvent(eventId);
+        const group = await this.groupRepository.findByEvent(event._id || event.id);
         if (group) {
           // Get existing group member IDs
           const existingMemberIds = new Set(

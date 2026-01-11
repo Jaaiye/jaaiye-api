@@ -59,7 +59,7 @@ class DeleteEventUseCase {
     }
 
     // Delete event
-    await this.eventRepository.delete(eventId);
+    await this.eventRepository.delete(event._id || event.id);
 
     return { success: true };
   }

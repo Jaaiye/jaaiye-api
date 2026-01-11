@@ -37,7 +37,7 @@ class UpdateEventTeamMemberUseCase {
     const targetUserId = teamMemberUserId || requestingUserId;
 
     // Find team member
-    const teamMember = await this.eventTeamRepository.findByEventAndUser(eventId, targetUserId);
+    const teamMember = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, targetUserId);
     if (!teamMember) {
       throw new ValidationError('Team member not found');
     }

@@ -4,7 +4,6 @@
  */
 
 const { NotFoundError } = require('../../common/errors');
-const EventSchema = require('../../event/entities/Event.schema');
 
 class GetEventTicketsUseCase {
   constructor({ ticketRepository }) {
@@ -13,7 +12,15 @@ class GetEventTicketsUseCase {
 
   async execute(eventId) {
     // Check if event exists
-    const event = await EventSchema.findById(eventId).lean();
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new NotFoundError('Event not found');
     }

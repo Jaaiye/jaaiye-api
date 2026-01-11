@@ -40,7 +40,7 @@ class UnpublishEventUseCase {
     }
 
     // Update status to draft
-    const updatedEvent = await this.eventRepository.update(eventId, {
+    const updatedEvent = await this.eventRepository.update(event._id || event.id, {
       status: 'draft',
       publishedAt: null
     });

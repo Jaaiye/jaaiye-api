@@ -31,7 +31,7 @@ class RemoveEventTeamMemberUseCase {
     }
 
     // Find team member
-    const teamMember = await this.eventTeamRepository.findByEventAndUser(eventId, teamMemberUserId);
+    const teamMember = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, teamMemberUserId);
     if (!teamMember) {
       throw new ValidationError('Team member not found');
     }
@@ -42,7 +42,7 @@ class RemoveEventTeamMemberUseCase {
     }
 
     // Remove team member
-    await this.eventTeamRepository.deleteByEventAndUser(eventId, teamMemberUserId);
+    await this.eventTeamRepository.deleteByEventAndUser(event._id || event.id, teamMemberUserId);
     return { success: true };
   }
 }

@@ -32,7 +32,7 @@ class UpdateParticipantStatusUseCase {
       throw new EventNotFoundError();
     }
 
-    const participant = await this.eventParticipantRepository.findByEventAndUser(eventId, userId);
+    const participant = await this.eventParticipantRepository.findByEventAndUser(event._id || event.id, userId);
     if (!participant) {
       throw new ParticipantNotFoundError('You are not a participant in this event');
     }
@@ -49,7 +49,7 @@ class UpdateParticipantStatusUseCase {
     if (calendar && calendar.owner) {
       // Fetch event slug from schema (slug not in entity)
       const EventSchema = require('../entities/Event.schema');
-      const eventDoc = await EventSchema.findById(eventId).select('slug').lean();
+      const eventDoc = await EventSchema.findById(event._id || event.id).select('slug').lean();
       const eventSlug = eventDoc?.slug || event.id;
 
       await this.notificationAdapter.send(calendar.owner, {
@@ -57,7 +57,7 @@ class UpdateParticipantStatusUseCase {
         body: `A participant has updated their status to "${status}" for event "${event.title}"`
       }, {
         type: 'participant_status_update',
-        eventId: event.id,
+        eventId: event._id || event.id,
         userId: userId,
         status,
         slug: eventSlug,

@@ -36,7 +36,7 @@ class DeleteTicketTypeUseCase {
     }
 
     // Get event as Mongoose document to use schema methods
-    const eventDoc = await EventSchema.findById(eventId);
+    const eventDoc = await EventSchema.findById(event._id || event.id);
     if (!eventDoc) {
       throw new EventNotFoundError();
     }
@@ -58,7 +58,7 @@ class DeleteTicketTypeUseCase {
 
     // Remove ticket type
     await eventDoc.removeTicketType(ticketTypeId);
-    const updatedEvent = await this.eventRepository.findById(eventId);
+    const updatedEvent = await this.eventRepository.findById(event._id || event.id);
 
     return updatedEvent;
   }

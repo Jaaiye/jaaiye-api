@@ -36,7 +36,7 @@ class UpdateTicketTypeUseCase {
     }
 
     // Get event as Mongoose document to use schema methods
-    const eventDoc = await EventSchema.findById(eventId);
+    const eventDoc = await EventSchema.findById(event._id || event.id);
     if (!eventDoc) {
       throw new EventNotFoundError();
     }
@@ -96,7 +96,7 @@ class UpdateTicketTypeUseCase {
 
     // Update ticket type
     await eventDoc.updateTicketType(ticketTypeId, updateObj);
-    const updatedEvent = await this.eventRepository.findById(eventId);
+    const updatedEvent = await this.eventRepository.findById(event._id || event.id);
 
     return updatedEvent;
   }

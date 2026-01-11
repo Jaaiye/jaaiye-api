@@ -65,7 +65,7 @@ class GetEventUseCase {
 
       // Set scanner flag for events
       if (event.category === 'event') {
-        eventData.isScanner = isTeamMember || hasAdminRole;
+        eventData.isScanner = isCreator || isTeamMember || hasAdminRole;
       } else {
         eventData.isScanner = false;
       }
@@ -102,6 +102,10 @@ class GetEventUseCase {
         throw new EventAccessDeniedError();
       }
       eventData.isScanner = false;
+    }
+
+    if (isCreator || (teamMember && teamMember.role === 'co_organizer')) {
+      eventData.url = `https://events.jaaiye.com/events/${event.slug}`;
     }
 
     return eventData;

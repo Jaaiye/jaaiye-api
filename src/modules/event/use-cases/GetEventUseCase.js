@@ -31,28 +31,32 @@ class GetEventUseCase {
     // Get event data
     const eventData = event.toJSON();
 
+    // Initialize variables that need to persist outside the userId block
+    let isCreator = false;
+    let isTeamMember = false;
+    let teamMember = null;
+    let hasAdminRole = false;
+
     // Check access if user is provided
     if (userId) {
       // Fetch user to check role (needed for both access check and scanner check)
       const user = await this.userRepository.findById(userId);
-      const hasAdminRole = user && ['scanner', 'admin', 'superadmin'].includes(user.role);
+      hasAdminRole = user && ['scanner', 'admin', 'superadmin'].includes(user.role);
+
+      // Check if user is the creator
+      isCreator = event.creatorId && String(event.creatorId) === String(userId);
 
       // Check if user is a team member (for events only)
-      let isTeamMember = false;
-      let teamMember = null;
       if (event.category === 'event') {
         teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
         isTeamMember = teamMember && teamMember.status === 'accepted';
       }
 
-      // Check if user is the creator
-      const isCreator = event.creatorId && String(event.creatorId) === String(userId);
-
       // Published events are publicly accessible
       const isEventPublished = event.isPublished();
 
-      // Admin/scanner roles, team members, and published events can be accessed
-      if (!hasAdminRole && !isTeamMember && !isEventPublished) {
+      // Admin/scanner roles, team members, creators, and published events can be accessed
+      if (!hasAdminRole && !isTeamMember && !isCreator && !isEventPublished) {
         const calendar = await this.calendarRepository.findById(event.calendar);
         if (!calendar) {
           throw new EventNotFoundError();
@@ -104,6 +108,7 @@ class GetEventUseCase {
       eventData.isScanner = false;
     }
 
+    // Add URL for creators and co-organizers
     if (isCreator || (teamMember && teamMember.role === 'co_organizer')) {
       eventData.url = `https://events.jaaiye.com/events/${event.slug}`;
     }
@@ -113,4 +118,3 @@ class GetEventUseCase {
 }
 
 module.exports = GetEventUseCase;
-

@@ -8,6 +8,7 @@ class EventEntity {
     id,
     calendar,
     title,
+    slug,
     description,
     startTime,
     endTime,
@@ -32,6 +33,7 @@ class EventEntity {
     this.id = id;
     this.calendar = calendar;
     this.title = title;
+    this.slug = slug;
     this.description = description;
     this.startTime = startTime;
     this.endTime = endTime;
@@ -192,6 +194,7 @@ class EventEntity {
       id: this.id,
       calendar: this.calendar,
       title: this.title,
+      slug: this.slug,
       description: this.description,
       startTime: this.startTime,
       endTime: this.endTime,

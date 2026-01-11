@@ -141,8 +141,15 @@ class EventController {
   addTicketType = asyncHandler(async (req, res) => {
     const container = require('./event.module');
     const eventRepository = container.getEventRepository();
-    const EventSchema = require('../entities/Event.schema');
-    const eventDoc = await EventSchema.findById(req.params.id);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    let eventDoc;
+
+    if (isObjectId) {
+      eventDoc = await eventRepository.findById(req.params.id);
+    } else {
+      eventDoc = await eventRepository.findBySlug(req.params.id);
+    }
+
     if (!eventDoc) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }

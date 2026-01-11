@@ -14,7 +14,15 @@ class GetEventAnalyticsUseCase {
   }
 
   async execute(eventId, userId, { startDate, endDate, groupBy = 'day' }) {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }

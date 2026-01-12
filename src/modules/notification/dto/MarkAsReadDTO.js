@@ -26,7 +26,7 @@ class MarkAsReadDTO {
   }
 
   getFilter(userId) {
-    const filter = { user: userId };
+    const filter = { userId };
 
     if (this.all) {
       return filter;

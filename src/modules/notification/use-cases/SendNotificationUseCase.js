@@ -1,7 +1,7 @@
 /**
  * Send Notification Use Case
  * Application layer - use case
- * Creates notification record and sends push notification
+ * Creates notification record and sends push notification with badge count
  */
 
 class SendNotificationUseCase {
@@ -28,16 +28,44 @@ class SendNotificationUseCase {
     });
 
     // Send push notification (non-blocking, fire-and-forget)
-    // Only send if pushNotificationAdapter is available
     if (this.pushNotificationAdapter) {
       setImmediate(async () => {
         try {
-          const result = await this.pushNotificationAdapter.send(userId, notification, data);
+          // Get unread notification count for badge
+          const unreadCount = await this.notificationRepository.count({
+            userId: userIdStr,
+            read: false
+          });
+
+          // Enhance data with badge count
+          const enhancedData = {
+            ...data,
+            badge_count: String(unreadCount)
+          };
+
+          // Enhance notification object with APNS badge
+          const enhancedNotification = {
+            ...notification,
+            apns: {
+              payload: {
+                aps: {
+                  badge: unreadCount
+                }
+              }
+            }
+          };
+
+          const result = await this.pushNotificationAdapter.send(
+            userId,
+            enhancedNotification,
+            enhancedData
+          );
 
           if (result.success) {
             console.log('Push notification sent successfully', {
               userId,
               notificationTitle: notification.title,
+              badgeCount: unreadCount,
               successCount: result.successCount,
               failureCount: result.failureCount
             });
@@ -45,6 +73,7 @@ class SendNotificationUseCase {
             console.warn('Push notification failed', {
               userId,
               notificationTitle: notification.title,
+              badgeCount: unreadCount,
               reason: result.reason || result.error
             });
           }
@@ -66,4 +95,3 @@ class SendNotificationUseCase {
 }
 
 module.exports = SendNotificationUseCase;
-

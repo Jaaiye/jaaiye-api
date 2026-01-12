@@ -80,6 +80,7 @@ class NotificationRepository extends INotificationRepository {
     return result.modifiedCount || result.nModified || 0;
   }
 
+
   async delete(id) {
     const result = await NotificationSchema.deleteOne({ _id: id });
     return result.deletedCount > 0;
@@ -88,6 +89,10 @@ class NotificationRepository extends INotificationRepository {
   async deleteMany(filter) {
     const result = await NotificationSchema.deleteMany(filter);
     return result.deletedCount || 0;
+  }
+
+  async count(filter) {
+    return NotificationSchema.countDocuments(filter);
   }
 }
 

@@ -22,6 +22,7 @@ class EventRepository extends IEventRepository {
       id: docObj._id?.toString() || docObj.id,
       calendar: docObj.calendar,
       title: docObj.title,
+      slug: docObj.slug,
       description: docObj.description,
       startTime: docObj.startTime,
       endTime: docObj.endTime,

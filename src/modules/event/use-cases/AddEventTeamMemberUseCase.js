@@ -15,7 +15,15 @@ class AddEventTeamMemberUseCase {
   }
 
   async execute(eventId, userId, { username, email, role }) {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }
@@ -61,14 +69,14 @@ class AddEventTeamMemberUseCase {
     }
 
     // Check if already a team member
-    const existing = await this.eventTeamRepository.findByEventAndUser(eventId, teamMemberUserId);
+    const existing = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, teamMemberUserId);
     if (existing) {
       throw new ValidationError('User is already a team member');
     }
 
     // Create team member
     const teamMemberEntity = await this.eventTeamRepository.create({
-      event: eventId,
+      event: event._id || event.id,
       user: teamMemberUserId,
       role,
       invitedBy: userId,
@@ -88,11 +96,11 @@ class AddEventTeamMemberUseCase {
             body: `${inviter?.username || inviter?.fullName || 'Someone'} invited you as ${roleLabel} for "${event.title}"`
           }, {
             type: 'team_invitation',
-            eventId: event.id,
+            eventId: event._id || event.id,
             slug: eventSlug,
             role: role,
             teamMemberId: teamMemberEntity.id,
-            path: `teamInvitation/${eventSlug}`
+            path: `notifications`
           });
         } catch (error) {
           console.error('Failed to send team invitation notification:', error);

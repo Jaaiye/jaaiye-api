@@ -6,6 +6,7 @@
 const { GroupRepository } = require('./repositories');
 const { WalletRepository } = require('../wallet/repositories');
 const { FirebaseAdapter } = require('./services');
+const { FriendshipRepository } = require('../friendship/repositories');
 const { UserRepository } = require('../common/repositories');
 const { CalendarRepository } = require('../calendar/repositories');
 const { EventRepository, EventParticipantRepository } = require('../event/repositories');
@@ -80,6 +81,13 @@ class GroupModule {
     return this._instances.calendarRepository;
   }
 
+  getFriendshipRepository() {
+    if (!this._instances.friendshipRepository) {
+      this._instances.friendshipRepository = new FriendshipRepository();
+    }
+    return this._instances.friendshipRepository;
+  }
+
   // ============================================================================
   // ADAPTERS
   // ============================================================================
@@ -150,7 +158,8 @@ class GroupModule {
     if (!this._instances.getUserGroupsUseCase) {
       this._instances.getUserGroupsUseCase = new GetUserGroupsUseCase({
         groupRepository: this.getGroupRepository(),
-        firebaseAdapter: this.getFirebaseAdapter()
+        firebaseAdapter: this.getFirebaseAdapter(),
+        friendshipRepository: this.getFriendshipRepository()
       });
     }
     return this._instances.getUserGroupsUseCase;

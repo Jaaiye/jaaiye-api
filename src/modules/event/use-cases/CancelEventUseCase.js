@@ -25,7 +25,15 @@ class CancelEventUseCase {
   }
 
   async execute(eventId, userId, reason = 'Event cancelled by organizer') {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }
@@ -44,14 +52,14 @@ class CancelEventUseCase {
     }
 
     // Update event status to cancelled
-    const updatedEvent = await this.eventRepository.update(eventId, {
+    const updatedEvent = await this.eventRepository.update(event._id || event.id, {
       status: 'cancelled'
     });
 
     // Deactivate wallet for cancelled event
     if (event.category === 'event') {
       try {
-        const wallet = await this.walletRepository.findByOwner('EVENT', eventId);
+        const wallet = await this.walletRepository.findByOwner('EVENT', event._id || event.id);
         if (wallet) {
           await this.walletRepository.update(wallet.id, { isActive: false });
         }
@@ -65,7 +73,7 @@ class CancelEventUseCase {
     if (event.category === 'event' && event.attendeeCount > 0) {
       try {
         // Get all tickets for this event
-        const tickets = await this.ticketRepository.findByEvent(eventId);
+        const tickets = await this.ticketRepository.findByEvent(event._id || event.id);
 
         // Group tickets by transaction to process refunds efficiently
         const ticketsByTransaction = new Map();
@@ -74,7 +82,7 @@ class CancelEventUseCase {
           if (ticket.status === 'active' && ticket.price > 0) {
             // Find the transaction for this ticket
             // Try to find transaction by eventId and userId
-            const transactions = await this.transactionRepository.findByEvent(eventId);
+            const transactions = await this.transactionRepository.findByEvent(event._id || event.id);
             const transaction = transactions.find(tx =>
               tx.userId && String(tx.userId) === String(ticket.userId) && tx.status === 'successful'
             );
@@ -101,11 +109,11 @@ class CancelEventUseCase {
             // Process refund via wallet refund service
             await this.walletRefundService.processRefund({
               ownerType: 'EVENT',
-              ownerId: eventId,
+              ownerId: event._id || event.id,
               transactionEntity: transaction,
               refundAmount: totalAmount,
               reason: `Event cancelled: ${reason}`,
-              refundReference: `cancel-${eventId}-${Date.now()}`
+              refundReference: `cancel-${event._id || event.id}-${Date.now()}`
             });
 
             // Cancel all tickets for this transaction
@@ -145,7 +153,7 @@ class CancelEventUseCase {
         }
 
       } catch (refundError) {
-        console.error(`Failed to process refunds for cancelled event ${eventId}:`, refundError.message);
+        console.error(`Failed to process refunds for cancelled event ${event._id || event.id}:`, refundError.message);
         // Don't fail cancellation if refund processing fails - log for manual intervention
       }
     }

@@ -12,13 +12,21 @@ class GetEventTeamUseCase {
   }
 
   async execute(eventId) {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }
 
     // Get all team members
-    const teamMembers = await this.eventTeamRepository.findByEvent(eventId);
+    const teamMembers = await this.eventTeamRepository.findByEvent(event._id || event.id);
 
     return {
       team: teamMembers.map(member => ({

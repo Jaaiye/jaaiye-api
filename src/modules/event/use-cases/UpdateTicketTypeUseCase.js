@@ -12,7 +12,15 @@ class UpdateTicketTypeUseCase {
   }
 
   async execute(eventId, ticketTypeId, userId, updateData) {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }
@@ -28,7 +36,7 @@ class UpdateTicketTypeUseCase {
     }
 
     // Get event as Mongoose document to use schema methods
-    const eventDoc = await EventSchema.findById(eventId);
+    const eventDoc = await EventSchema.findById(event._id || event.id);
     if (!eventDoc) {
       throw new EventNotFoundError();
     }
@@ -88,7 +96,7 @@ class UpdateTicketTypeUseCase {
 
     // Update ticket type
     await eventDoc.updateTicketType(ticketTypeId, updateObj);
-    const updatedEvent = await this.eventRepository.findById(eventId);
+    const updatedEvent = await this.eventRepository.findById(event._id || event.id);
 
     return updatedEvent;
   }

@@ -22,7 +22,7 @@ class CreateEventDTO {
     // Parse participants if provided (only for hangouts)
     if (data.participants !== undefined && data.participants !== null && data.participants !== '') {
       if (typeof data.participants === 'string') {
-        this.participants = JSON.parse(data.participants);
+    this.participants = JSON.parse(data.participants);
       } else if (Array.isArray(data.participants)) {
         this.participants = data.participants;
       } else {

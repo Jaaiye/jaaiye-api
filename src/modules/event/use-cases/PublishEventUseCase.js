@@ -13,7 +13,15 @@ class PublishEventUseCase {
   }
 
   async execute(eventId, userId) {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }
@@ -34,7 +42,7 @@ class PublishEventUseCase {
     }
 
     // Update status to published
-    const updatedEvent = await this.eventRepository.update(eventId, {
+    const updatedEvent = await this.eventRepository.update(event._id || event.id, {
       status: 'published',
       publishedAt: new Date()
     });
@@ -42,18 +50,18 @@ class PublishEventUseCase {
     // Ensure wallet exists for published events (category: event)
     if (event.category === 'event') {
       try {
-        let wallet = await this.walletRepository.findByOwner('EVENT', eventId);
+        let wallet = await this.walletRepository.findByOwner('EVENT', event._id || event.id);
         if (!wallet) {
           wallet = await this.walletRepository.create({
             ownerType: 'EVENT',
-            ownerId: eventId,
+            ownerId: event._id || event.id,
             balance: 0.00,
             currency: 'NGN'
           });
         }
       } catch (walletError) {
         // Log but don't fail publish if wallet creation fails
-        console.error(`Failed to create wallet for published event ${eventId}:`, walletError.message);
+        console.error(`Failed to create wallet for published event ${event._id || event.id}:`, walletError.message);
       }
 
       // Send push notification to all users when event is published
@@ -62,7 +70,7 @@ class PublishEventUseCase {
           try {
             // Fetch event slug from schema (slug not in entity)
             const EventSchema = require('../entities/Event.schema');
-            const eventDoc = await EventSchema.findById(eventId).select('slug title').lean();
+            const eventDoc = await EventSchema.findById(event._id || event.id).select('slug title').lean();
             const eventSlug = eventDoc?.slug || eventId;
             const eventTitle = eventDoc?.title || updatedEvent.title;
 
@@ -78,7 +86,7 @@ class PublishEventUseCase {
                   body: `Check out "${eventTitle}" - tickets are now available!`
                 }, {
                   type: 'new_event',
-                  eventId: eventId,
+                  eventId: event._id || event.id,
                   slug: eventSlug,
                   path: `eventScreen/${eventSlug}`
                 }).catch(err => {

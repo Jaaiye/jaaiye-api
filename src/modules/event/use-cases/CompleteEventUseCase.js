@@ -12,7 +12,15 @@ class CompleteEventUseCase {
   }
 
   async execute(eventId, userId) {
-    const event = await this.eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let event;
+
+    if (isObjectId) {
+      event = await this.eventRepository.findById(eventId);
+    } else {
+      event = await this.eventRepository.findBySlug(eventId);
+    }
+
     if (!event) {
       throw new EventNotFoundError();
     }
@@ -31,19 +39,19 @@ class CompleteEventUseCase {
     }
 
     // Update event status to completed
-    const updatedEvent = await this.eventRepository.update(eventId, {
+    const updatedEvent = await this.eventRepository.update(event._id || event.id, {
       status: 'completed'
     });
 
     // Deactivate wallet for completed event
     if (event.category === 'event') {
       try {
-        const wallet = await this.walletRepository.findByOwner('EVENT', eventId);
+        const wallet = await this.walletRepository.findByOwner('EVENT', event._id || event.id);
         if (wallet) {
           await this.walletRepository.update(wallet.id, { isActive: false });
         }
       } catch (walletError) {
-        console.error(`Failed to deactivate wallet for completed event ${eventId}:`, walletError.message);
+        console.error(`Failed to deactivate wallet for completed event ${event._id || event.id}:`, walletError.message);
         // Don't fail completion if wallet deactivation fails
       }
     }

@@ -10,6 +10,7 @@ const notificationSchema = new mongoose.Schema({
   title: { type: String, required: true },
   body: { type: String, required: true },
   type: { type: String, enum: ['info', 'warning', 'error', 'success', 'hangout_invitation', 'group_event_invitation', 'group_event_auto_added', 'event_invitation', 'event_removal', 'participant_status_update', 'group_member_added', 'group_member_removed', 'group_deleted', 'friend_request', 'friend_request_accepted', 'email_update', 'profile_update', 'logout', 'system', 'payment_success', 'payment_failed'], default: 'info' },
+  priority: { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
   read: { type: Boolean, default: false },
   data: { type: mongoose.Schema.Types.Mixed },
   createdAt: { type: Date, default: Date.now }

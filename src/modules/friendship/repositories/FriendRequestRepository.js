@@ -99,18 +99,18 @@ class FriendRequestRepository extends IFriendRequestRepository {
   }
 
   async getPendingRequests(userId, type = 'received') {
-    const query = { status: 'pending', recipient: userId };
+    const query = { status: 'pending' };
 
-    // if (type === 'received') {
-    //   query.recipient = userId;
-    // } else if (type === 'sent') {
-    //   query.requester = userId;
-    // } else {
-    //   query.$or = [
-    //     { requester: userId },
-    //     { recipient: userId }
-    //   ];
-    // }
+    if (type === 'received') {
+      query.recipient = userId;
+    } else if (type === 'sent') {
+      query.requester = userId;
+    } else {
+      query.$or = [
+        { requester: userId },
+        { recipient: userId }
+      ];
+    }
 
     const docs = await FriendRequestSchema.find(query)
       .populate('requester', 'username fullName profilePicture')

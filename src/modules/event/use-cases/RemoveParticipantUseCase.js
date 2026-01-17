@@ -10,12 +10,16 @@ class RemoveParticipantUseCase {
     eventRepository,
     calendarRepository,
     eventParticipantRepository,
-    notificationAdapter
+    notificationAdapter,
+    groupRepository,
+    firebaseAdapter
   }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
     this.eventParticipantRepository = eventParticipantRepository;
     this.notificationAdapter = notificationAdapter;
+    this.groupRepository = groupRepository;
+    this.firebaseAdapter = firebaseAdapter;
   }
 
   async execute(eventId, userId, targetUserId) {
@@ -51,7 +55,6 @@ class RemoveParticipantUseCase {
     // Delete participant
     await this.eventParticipantRepository.deleteByEventAndUser(event._id || event.id, targetUserId);
 
-    // Notify removed participant
     // Fetch event slug from schema (slug not in entity)
     const EventSchema = require('../entities/Event.schema');
     const eventDoc = await EventSchema.findById(event._id || event.id).select('slug').lean();
@@ -66,6 +69,29 @@ class RemoveParticipantUseCase {
       slug: eventSlug,
       path: `hangoutScreen/${eventSlug}`
     });
+
+    // Remove from group if associated
+    if (this.groupRepository) {
+      try {
+        const group = await this.groupRepository.findByEvent(event._id || event.id);
+        if (group) {
+          await this.groupRepository.removeMember(group.id, targetUserId);
+
+          // Update Firebase sync (non-blocking)
+          if (this.firebaseAdapter) {
+            setImmediate(async () => {
+              try {
+                await this.firebaseAdapter.removeMember(group.id, targetUserId);
+              } catch (error) {
+                console.warn('[RemoveParticipant] Failed to remove member from Firebase:', group.id, targetUserId, error.message);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('[RemoveParticipant] Group member removal failed:', error.message);
+      }
+    }
 
     return { success: true };
   }

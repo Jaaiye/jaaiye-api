@@ -265,7 +265,10 @@ class EventModule {
         eventRepository: this.getEventRepository(),
         eventParticipantRepository: this.getEventParticipantRepository(),
         calendarRepository: this.getCalendarRepository(),
-        notificationAdapter: this.getNotificationAdapter()
+        notificationAdapter: this.getNotificationAdapter(),
+        groupRepository: this.getGroupRepository(),
+        userRepository: this.getUserRepository(),
+        firebaseAdapter: this.getFirebaseAdapter()
       });
     }
     return this._instances.updateParticipantStatusUseCase;
@@ -277,7 +280,9 @@ class EventModule {
         eventRepository: this.getEventRepository(),
         calendarRepository: this.getCalendarRepository(),
         eventParticipantRepository: this.getEventParticipantRepository(),
-        notificationAdapter: this.getNotificationAdapter()
+        notificationAdapter: this.getNotificationAdapter(),
+        groupRepository: this.getGroupRepository(),
+        firebaseAdapter: this.getFirebaseAdapter()
       });
     }
     return this._instances.removeParticipantUseCase;

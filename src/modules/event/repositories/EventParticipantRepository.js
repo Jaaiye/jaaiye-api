@@ -3,7 +3,7 @@
  * Implements IEventParticipantRepository interface
  */
 
-const {IEventParticipantRepository} = require('./interfaces');
+const { IEventParticipantRepository } = require('./interfaces');
 const EventParticipantSchema = require('../entities/EventParticipant.schema');
 const EventParticipantEntity = require('../entities/EventParticipant.entity');
 
@@ -17,10 +17,23 @@ class EventParticipantRepository extends IEventParticipantRepository {
 
     const docObj = doc.toObject ? doc.toObject() : doc;
 
+    // Safe ID extraction helper
+    const safeString = (val) => {
+      if (!val) return null;
+      if (typeof val === 'string') return val;
+      if (typeof val === 'object') {
+        if (val.toHexString) return val.toHexString();
+        if (Buffer.isBuffer(val)) return val.toString('hex');
+        if (val._id) return safeString(val._id);
+        if (val.id) return safeString(val.id);
+      }
+      return String(val);
+    };
+
     return new EventParticipantEntity({
-      id: docObj._id?.toString() || docObj.id,
-      event: docObj.event,
-      user: docObj.user,
+      id: safeString(docObj._id || docObj.id),
+      event: docObj.event, // Keep as is (populated or ID)
+      user: docObj.user, // Keep as is (populated or ID)
       role: docObj.role,
       status: docObj.status,
       responseTime: docObj.responseTime,

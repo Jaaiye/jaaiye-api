@@ -62,25 +62,14 @@ class SendNotificationUseCase {
           );
 
           if (result.success) {
-            console.log('Push notification sent successfully', {
-              userId,
-              notificationTitle: notification.title,
-              badgeCount: unreadCount,
-              successCount: result.successCount,
-              failureCount: result.failureCount
-            });
+            console.log('Push notification sent successfully');
           } else {
             console.warn('Push notification failed', {
-              userId,
-              notificationTitle: notification.title,
-              badgeCount: unreadCount,
               reason: result.reason || result.error
             });
           }
         } catch (error) {
           console.error('Failed to send push notification:', {
-            userId,
-            notificationTitle: notification.title,
             error: error.message,
             stack: error.stack
           });

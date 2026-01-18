@@ -34,9 +34,12 @@ class GroupEntity {
    * @returns {boolean}
    */
   isMember(userId) {
-    return this.members.some(member =>
-      member.user?.toString() === userId.toString() || member.user === userId
-    );
+    if (!userId) return false;
+    const userIdStr = userId.toString();
+    return this.members.some(member => {
+      const memberUserId = member.user?._id || member.user?.id || member.user;
+      return memberUserId?.toString() === userIdStr;
+    });
   }
 
   /**
@@ -45,10 +48,13 @@ class GroupEntity {
    * @returns {boolean}
    */
   isAdmin(userId) {
-    const member = this.members.find(member =>
-      member.user?.toString() === userId.toString() || member.user === userId
-    );
-    return member && member.role === 'admin';
+    if (!userId) return false;
+    const userIdStr = userId.toString();
+    const member = this.members.find(member => {
+      const memberUserId = member.user?._id || member.user?.id || member.user;
+      return memberUserId?.toString() === userIdStr;
+    });
+    return !!(member && member.role === 'admin');
   }
 
   /**

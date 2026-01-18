@@ -91,7 +91,6 @@ class AddEventTeamMemberUseCase {
 
       setImmediate(async () => {
         try {
-          console.log(`[AddEventTeamMember] Sending notification to user ${teamMemberUserId} for event ${event._id || event.id}`);
           await this.notificationAdapter.send(teamMemberUserId, {
             title: 'Team Invitation',
             body: `${inviter?.username || inviter?.fullName || 'Someone'} invited you as ${roleLabel} for "${event.title}"`
@@ -103,7 +102,6 @@ class AddEventTeamMemberUseCase {
             teamMemberId: teamMemberEntity.id,
             path: `notifications`
           });
-          console.log(`[AddEventTeamMember] Notification sent successfully to user ${teamMemberUserId}`);
         } catch (error) {
           console.error('[AddEventTeamMember] Failed to send team invitation notification:', error);
         }

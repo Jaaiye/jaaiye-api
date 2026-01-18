@@ -201,6 +201,7 @@ class GroupModule {
     if (!this._instances.removeMemberUseCase) {
       this._instances.removeMemberUseCase = new RemoveMemberUseCase({
         groupRepository: this.getGroupRepository(),
+        userRepository: this.getUserRepository(),
         firebaseAdapter: this.getFirebaseAdapter(),
         notificationAdapter: this.getNotificationAdapter()
       });

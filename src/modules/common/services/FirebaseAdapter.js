@@ -464,7 +464,7 @@ class FirebaseAdapter {
       if (value.constructor?.name === 'FieldValue') return value;
 
       // Handle profile picture objects (emoji + color)
-      if (value.emoji || value.color) {
+      if (value.emoji || value.backgroundColor) {
         return {
           emoji: String(value.emoji || ''),
           color: String(value.backgroundColor || '')

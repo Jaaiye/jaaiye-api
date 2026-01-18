@@ -154,11 +154,11 @@ class CreateEventUseCase {
     if (user && (user.role === 'admin' || user.role === 'superadmin')) {
       createdBy = 'Jaaiye';
       origin = 'jaaiye';
-      creatorId = null;
+      creatorId = userId;
     }
 
     // Create event
-    const event = await this.eventRepository.create({
+    const eventData = {
       calendar: calendar.id,
       title: dto.title,
       description: dto.description,
@@ -173,8 +173,17 @@ class CreateEventUseCase {
       image: imageUrl,
       createdBy,
       origin,
-      creatorId
-    });
+      creatorId,
+    };
+
+    if (category === 'event') {
+      eventData.status = 'published';
+      eventData.publishedAt = new Date();
+    } else {
+      eventData.status = 'scheduled';
+    }
+
+    const event = await this.eventRepository.create(eventData);
 
     // Automatically create wallet for paid events (category === 'event')
     if (category === 'event' && this.walletRepository) {

@@ -42,7 +42,8 @@ const {
   RemoveEventTeamMemberUseCase,
   GetEventTeamUseCase,
   GetEventAnalyticsUseCase,
-  GetTeamEventsUseCase
+  GetTeamEventsUseCase,
+  ListTeamInvitationsUseCase
 } = require('./use-cases');
 const EventController = require('./event.controller');
 const createEventRoutes = require('./event.routes');
@@ -414,6 +415,15 @@ class EventModule {
     return this._instances.getTeamEventsUseCase;
   }
 
+  getListTeamInvitationsUseCase() {
+    if (!this._instances.listTeamInvitationsUseCase) {
+      this._instances.listTeamInvitationsUseCase = new ListTeamInvitationsUseCase({
+        eventTeamRepository: this.getEventTeamRepository()
+      });
+    }
+    return this._instances.listTeamInvitationsUseCase;
+  }
+
   getGetEventAnalyticsUseCase() {
     if (!this._instances.getEventAnalyticsUseCase) {
       const ticketRepository = new TicketRepository();
@@ -454,7 +464,8 @@ class EventModule {
         removeEventTeamMemberUseCase: this.getRemoveEventTeamMemberUseCase(),
         getEventTeamUseCase: this.getGetEventTeamUseCase(),
         getEventAnalyticsUseCase: this.getGetEventAnalyticsUseCase(),
-        getTeamEventsUseCase: this.getGetTeamEventsUseCase()
+        getTeamEventsUseCase: this.getGetTeamEventsUseCase(),
+        listTeamInvitationsUseCase: this.getListTeamInvitationsUseCase()
       });
     }
     return this._instances.eventController;

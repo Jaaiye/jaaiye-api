@@ -59,6 +59,13 @@ function createEventRoutes(eventController) {
   );
 
   router.get(
+    '/team/invitations',
+    apiLimiter,
+    protect,
+    eventController.listTeamInvitations
+  );
+
+  router.get(
     '/:id',
     validateEventId,
     protect,
@@ -225,6 +232,8 @@ function createEventRoutes(eventController) {
     validate,
     eventController.getTeam
   );
+
+
 
   router.put(
     '/:id/team/:userId',

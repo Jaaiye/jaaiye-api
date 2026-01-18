@@ -27,7 +27,8 @@ class EventController {
     removeEventTeamMemberUseCase,
     getEventTeamUseCase,
     getEventAnalyticsUseCase,
-    getTeamEventsUseCase
+    getTeamEventsUseCase,
+    listTeamInvitationsUseCase
   }) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
@@ -49,6 +50,7 @@ class EventController {
     this.getEventTeamUseCase = getEventTeamUseCase;
     this.getEventAnalyticsUseCase = getEventAnalyticsUseCase;
     this.getTeamEventsUseCase = getTeamEventsUseCase;
+    this.listTeamInvitationsUseCase = listTeamInvitationsUseCase;
   }
 
   createEvent = asyncHandler(async (req, res) => {
@@ -263,6 +265,11 @@ class EventController {
       limit: limit || 12
     });
     return successResponse(res, result);
+  });
+
+  listTeamInvitations = asyncHandler(async (req, res) => {
+    const result = await this.listTeamInvitationsUseCase.execute(req.user.id);
+    return successResponse(res, { invitations: result });
   });
 
   updateTeamMember = asyncHandler(async (req, res) => {

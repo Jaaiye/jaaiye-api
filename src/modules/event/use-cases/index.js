@@ -18,6 +18,7 @@ module.exports = {
   RemoveEventTeamMemberUseCase: require('./RemoveEventTeamMemberUseCase'),
   GetEventTeamUseCase: require('./GetEventTeamUseCase'),
   GetEventAnalyticsUseCase: require('./GetEventAnalyticsUseCase'),
-  GetTeamEventsUseCase: require('./GetTeamEventsUseCase')
+  GetTeamEventsUseCase: require('./GetTeamEventsUseCase'),
+  ListTeamInvitationsUseCase: require('./ListTeamInvitationsUseCase')
 };
 

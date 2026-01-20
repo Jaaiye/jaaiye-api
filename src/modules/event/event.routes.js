@@ -77,6 +77,7 @@ function createEventRoutes(eventController) {
     '/:id',
     apiLimiter,
     protect,
+    upload.single('image'),
     validateEventId,
     validateUpdateEvent,
     validate,

@@ -89,7 +89,7 @@ class GoogleOAuthUseCase {
     // Create default Jaaiye calendar for all users if they don't have one (async, non-blocking)
     // This ensures every user who signs in with Google has a calendar
     if (this.calendarAdapter) {
-      this.calendarAdapter.createOnGoogleOAuth(user).catch(err => {
+      this.calendarAdapter.createOnRegistration(user).catch(err => {
         console.error('Failed to create default calendar:', err);
       });
     }

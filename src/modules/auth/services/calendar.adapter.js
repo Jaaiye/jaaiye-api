@@ -56,18 +56,6 @@ class CalendarAdapter {
       `${user.username}'s Calendar`
     );
   }
-
-  /**
-   * Create calendar for user on Google OAuth
-   * @param {Object} user - User entity
-   * @returns {Promise<Object|null>}
-   */
-  async createOnGoogleOAuth(user) {
-    return await this.createDefaultCalendar(
-      user.id,
-      'My Calendar'
-    );
-  }
 }
 
 module.exports = CalendarAdapter;

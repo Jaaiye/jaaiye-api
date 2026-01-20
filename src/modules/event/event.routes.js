@@ -68,7 +68,7 @@ function createEventRoutes(eventController) {
   router.get(
     '/:id',
     validateEventId,
-    protect,
+    optionalAuth,
     validate,
     eventController.getEvent
   );

@@ -52,6 +52,7 @@ class UpdateEventUseCase {
     if (dto.isAllDay !== undefined) updateData.isAllDay = dto.isAllDay;
     if (dto.recurrence !== undefined) updateData.recurrence = dto.recurrence;
     if (dto.status !== undefined) updateData.status = dto.status;
+    if (dto.ticketFee !== undefined) updateData.ticketFee = dto.ticketFee;
 
     // Update event
     const updatedEvent = await this.eventRepository.update(event._id || event.id, updateData);

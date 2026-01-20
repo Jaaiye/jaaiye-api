@@ -68,7 +68,7 @@ function createEventRoutes(eventController) {
   router.get(
     '/:id',
     validateEventId,
-    protect,
+    optionalAuth,
     validate,
     eventController.getEvent
   );
@@ -77,6 +77,7 @@ function createEventRoutes(eventController) {
     '/:id',
     apiLimiter,
     protect,
+    upload.single('image'),
     validateEventId,
     validateUpdateEvent,
     validate,

@@ -43,8 +43,17 @@ class EventTeamRepository {
     // Handle populated event object if it exists
     let event = docObj.event;
     if (event && typeof event === 'object' && event._id) {
-      // Event is populated - extract the ID
-      event = event._id?.toString() || event.id?.toString() || event;
+      // Event is populated - preserve key fields
+      event = {
+        id: event._id?.toString() || event.id,
+        title: event.title,
+        image: event.image,
+        startTime: event.startTime,
+        venue: event.venue,
+        category: event.category,
+        status: event.status,
+        slug: event.slug
+      };
     } else if (event) {
       // Event is just an ID - convert to string
       event = event.toString();
@@ -89,6 +98,14 @@ class EventTeamRepository {
   async findByUser(userId) {
     const docs = await EventTeam.find({ user: userId, status: 'accepted' })
       .populate('event', 'title startTime category status')
+      .sort({ createdAt: -1 });
+    return docs.map(doc => this._toEntity(doc));
+  }
+
+  async findInvitationsByUser(userId) {
+    const docs = await EventTeam.find({ user: userId, status: 'pending' })
+      .populate('event', 'title image startTime venue category status slug')
+      .populate('invitedBy', 'username fullName profilePicture')
       .sort({ createdAt: -1 });
     return docs.map(doc => this._toEntity(doc));
   }

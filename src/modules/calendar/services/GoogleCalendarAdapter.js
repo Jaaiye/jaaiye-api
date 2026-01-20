@@ -10,8 +10,9 @@ const { GoogleAccountNotLinkedError, GoogleTokenExpiredError, GoogleRefreshToken
 const logger = require('../../../utils/logger');
 
 class GoogleCalendarAdapter {
-  constructor({ userRepository }) {
+  constructor({ userRepository, notificationAdapter }) {
     this.userRepository = userRepository;
+    this.notificationAdapter = notificationAdapter;
 
     // Refresh lock: tracks ongoing refresh operations per user
     // Format: { userId: Promise<{ access_token, expiry_date, scope }> }
@@ -691,28 +692,14 @@ class GoogleCalendarAdapter {
       });
 
       // Send notification to user
-      try {
-        const { SendNotificationUseCase } = require('../../notification/use-cases');
-        const { NotificationRepository } = require('../../notification/repositories');
-        const notificationRepository = new NotificationRepository();
-        const sendNotificationUseCase = new SendNotificationUseCase({
-          notificationRepository,
-          pushNotificationAdapter: null // Don't send push, just in-app
-        });
-
-        await sendNotificationUseCase.execute(userId, {
+        await this.notificationAdapter.send(userId, {
           title: 'Google Account Re-link Required',
           body: 'Your Google Calendar connection has expired. Please re-link your Google account to continue syncing events.'
         }, {
           type: 'warning',
-          action: 're_link_google_account'
+          action: 're_link_google_account',
+          path: 'calenderScreen'
         });
-      } catch (notifError) {
-        logger.warn('Failed to send notification for invalid Google account:', {
-          userId,
-          error: notifError.message
-        });
-      }
 
       logger.info('Marked Google account as invalid:', { userId });
     } catch (error) {

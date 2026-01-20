@@ -84,16 +84,29 @@ class AddParticipantsUseCase {
 
     const createdParticipants = await this.eventParticipantRepository.createMany(participantsData);
 
+    // Filter participants for notification (exclude initiator and ensure uniqueness)
+    const initiatorId = userId?.toString ? userId.toString() : String(userId);
+    const uniqueParticipantsToNotify = [];
+    const notifiedUserIds = new Set();
+
+    createdParticipants.forEach(participant => {
+      const participantUserId = participant.user?.toString ? participant.user.toString() : String(participant.user);
+      if (participantUserId !== initiatorId && !notifiedUserIds.has(participantUserId)) {
+        uniqueParticipantsToNotify.push(participant);
+        notifiedUserIds.add(participantUserId);
+      }
+    });
+
     // Send notifications
     await Promise.all(
-      createdParticipants.map(participant =>
+      uniqueParticipantsToNotify.map(participant =>
         this.notificationAdapter.send(participant.user, {
-          title: 'Event Invitation',
-          body: `You have been invited to the event "${event.title}"`
+          title: 'Hangout Invitation',
+          body: `You have been invited to the hangout "${event.title}"`
         }, {
-          type: 'event_invitation',
+          type: 'hangout_invitation',
           eventId: event._id || event.id,
-          path: 'hangoutScreen'
+          path: 'hangoutPreviewScreen'
         })
       )
     );
@@ -103,18 +116,29 @@ class AddParticipantsUseCase {
       try {
         const group = await this.groupRepository.findByEvent(event._id || event.id);
         if (group) {
-          // Get existing group member IDs
+          // Get existing group member IDs (ensure they are strings)
           const existingMemberIds = new Set(
             group.members.map(m => {
-              const memberUserId = typeof m.user === 'object' ? m.user.id || m.user._id : m.user;
-              return memberUserId.toString();
+              const u = m.user;
+              if (!u) return '';
+              // Handle populated vs non-populated
+              const id = typeof u === 'object' ? (u.id || u._id || u) : u;
+              if (typeof id === 'string') return id;
+              if (id.toHexString) return id.toHexString();
+              if (Buffer.isBuffer(id)) return id.toString('hex');
+              return String(id);
             })
           );
 
           // Add only new participants to the group (filter out existing members)
           const participantUserIds = createdParticipants.map(p => {
-            const participantUserId = typeof p.user === 'object' ? p.user.id || p.user._id : p.user;
-            return participantUserId.toString();
+            const u = p.user;
+            if (!u) return '';
+            const id = typeof u === 'object' ? (u.id || u._id || u) : u;
+            if (typeof id === 'string') return id;
+            if (id.toHexString) return id.toHexString();
+            if (Buffer.isBuffer(id)) return id.toString('hex');
+            return String(id);
           });
 
           const newParticipantIds = participantUserIds.filter(id => !existingMemberIds.has(id));
@@ -142,11 +166,12 @@ class AddParticipantsUseCase {
                   for (const member of updatedGroup.members) {
                     if (member.user) {
                       const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+                      const memberUserIdStr = memberUserId?.toString ? memberUserId.toString() : String(memberUserId);
                       const memberUser = await this.userRepository.findById(memberUserId);
                       if (memberUser) {
-                        plainMembers[memberUserId.toString()] = {
+                        plainMembers[memberUserIdStr] = {
                           name: String(memberUser.fullName || memberUser.username || 'Unknown User'),
-                          avatar: String(memberUser.profilePicture || ''),
+                          avatar: memberUser.profilePicture || '',
                           role: String(member.role || 'member')
                         };
                       }

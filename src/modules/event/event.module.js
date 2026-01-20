@@ -42,7 +42,8 @@ const {
   RemoveEventTeamMemberUseCase,
   GetEventTeamUseCase,
   GetEventAnalyticsUseCase,
-  GetTeamEventsUseCase
+  GetTeamEventsUseCase,
+  ListTeamInvitationsUseCase
 } = require('./use-cases');
 const EventController = require('./event.controller');
 const createEventRoutes = require('./event.routes');
@@ -265,7 +266,10 @@ class EventModule {
         eventRepository: this.getEventRepository(),
         eventParticipantRepository: this.getEventParticipantRepository(),
         calendarRepository: this.getCalendarRepository(),
-        notificationAdapter: this.getNotificationAdapter()
+        notificationAdapter: this.getNotificationAdapter(),
+        groupRepository: this.getGroupRepository(),
+        userRepository: this.getUserRepository(),
+        firebaseAdapter: this.getFirebaseAdapter()
       });
     }
     return this._instances.updateParticipantStatusUseCase;
@@ -277,7 +281,9 @@ class EventModule {
         eventRepository: this.getEventRepository(),
         calendarRepository: this.getCalendarRepository(),
         eventParticipantRepository: this.getEventParticipantRepository(),
-        notificationAdapter: this.getNotificationAdapter()
+        notificationAdapter: this.getNotificationAdapter(),
+        groupRepository: this.getGroupRepository(),
+        firebaseAdapter: this.getFirebaseAdapter()
       });
     }
     return this._instances.removeParticipantUseCase;
@@ -409,6 +415,15 @@ class EventModule {
     return this._instances.getTeamEventsUseCase;
   }
 
+  getListTeamInvitationsUseCase() {
+    if (!this._instances.listTeamInvitationsUseCase) {
+      this._instances.listTeamInvitationsUseCase = new ListTeamInvitationsUseCase({
+        eventTeamRepository: this.getEventTeamRepository()
+      });
+    }
+    return this._instances.listTeamInvitationsUseCase;
+  }
+
   getGetEventAnalyticsUseCase() {
     if (!this._instances.getEventAnalyticsUseCase) {
       const ticketRepository = new TicketRepository();
@@ -449,7 +464,8 @@ class EventModule {
         removeEventTeamMemberUseCase: this.getRemoveEventTeamMemberUseCase(),
         getEventTeamUseCase: this.getGetEventTeamUseCase(),
         getEventAnalyticsUseCase: this.getGetEventAnalyticsUseCase(),
-        getTeamEventsUseCase: this.getGetTeamEventsUseCase()
+        getTeamEventsUseCase: this.getGetTeamEventsUseCase(),
+        listTeamInvitationsUseCase: this.getListTeamInvitationsUseCase()
       });
     }
     return this._instances.eventController;

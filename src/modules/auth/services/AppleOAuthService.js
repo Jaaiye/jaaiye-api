@@ -98,37 +98,41 @@ class AppleOAuthService {
       const kid = decoded.header.kid;
       const publicKey = await this.getPublicKey(kid);
 
-      // Get Apple client ID from environment
-      const clientId = process.env.APPLE_CLIENT_ID;
-      if (!clientId) {
+      // Get Apple client IDs from environment
+      const serviceId = process.env.APPLE_CLIENT_ID; // com.jaaiye.apple.signin
+      const bundleId = process.env.APPLE_BUNDLE_ID; // com.jaaiye.app (iOS bundle ID)
+
+      if (!serviceId) {
         throw new Error('APPLE_CLIENT_ID environment variable is not set');
+      }
+
+      // Accept both service ID and bundle ID as valid audiences
+      const validAudiences = [serviceId];
+      if (bundleId) {
+        validAudiences.push(bundleId);
       }
 
       // Verify token
       const payload = jwt.verify(identityToken, publicKey, {
         algorithms: ['RS256'],
         issuer: 'https://appleid.apple.com',
-        audience: clientId
+        audience: validAudiences
       });
 
       // Apple provides name as a JSON string on first sign-in only
       let name = null;
       if (payload.name) {
         try {
-          // If name is a string, parse it; if it's already an object, use it
           name = typeof payload.name === 'string' ? JSON.parse(payload.name) : payload.name;
         } catch (e) {
-          // If parsing fails, name might be null or invalid
           name = null;
         }
       }
 
       return {
-        sub: payload.sub, // Apple user ID
+        sub: payload.sub,
         email: payload.email,
         emailVerified: payload.email_verified || false,
-        // Note: Apple only provides name on first sign-in
-        // It's included in the token only during initial authentication
         name: name
       };
     } catch (error) {

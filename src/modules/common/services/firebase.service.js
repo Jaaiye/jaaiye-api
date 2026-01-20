@@ -130,7 +130,7 @@ class FirebaseService {
         for (const [key, value] of Object.entries(groupData.members)) {
           sanitizedData.members[String(key)] = {
             name: String(value.name || 'Unknown User'),
-            avatar: String(value.avatar || ''),
+            avatar: value.avatar || { emoji: '', color: '' },
             role: String(value.role || 'member')
           };
         }

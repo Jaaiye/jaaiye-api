@@ -441,6 +441,49 @@ class FirebaseAdapter {
   // ============================================================================
 
   /**
+   * Safe conversion of IDs to hex strings to avoid binary buffer mangling
+   * @private
+   */
+  _safeToString(id) {
+    if (!id) return '';
+    if (typeof id === 'string') return id;
+    if (id.toHexString) return id.toHexString();
+    if (Buffer.isBuffer(id)) return id.toString('hex');
+    if (id._id) return this._safeToString(id._id);
+    return String(id);
+  }
+
+  /**
+   * Helper to sanitize values for Firestore
+   * @private
+   */
+  _sanitizeValue(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      // Handle Firebase FieldValues
+      if (value.constructor?.name === 'FieldValue') return value;
+
+      // Handle profile picture objects (emoji + color)
+      if (value.emoji || value.backgroundColor) {
+        return {
+          emoji: String(value.emoji || ''),
+          color: String(value.backgroundColor || '')
+        };
+      }
+
+      // Attempt to get a plain object if it's not one already
+      try {
+        if (value.toObject) return value.toObject();
+        // Fallback for other objects - ensure they are plain
+        return JSON.parse(JSON.stringify(value));
+      } catch (e) {
+        return String(value);
+      }
+    }
+    return value;
+  }
+
+  /**
    * Create a group in Firestore
    * @param {string} groupId - Group ID
    * @param {Object} groupData - Group data
@@ -456,7 +499,7 @@ class FirebaseAdapter {
       const sanitizedData = {
         name: String(groupData.name || ''),
         description: String(groupData.description || ''),
-        creator: String(groupData.creator || ''),
+        creator: this._safeToString(groupData.creator),
         members: {},
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -465,9 +508,9 @@ class FirebaseAdapter {
       // Sanitize members object
       if (groupData.members && typeof groupData.members === 'object') {
         for (const [key, value] of Object.entries(groupData.members)) {
-          sanitizedData.members[String(key)] = {
+          sanitizedData.members[this._safeToString(key)] = {
             name: String(value.name || 'Unknown User'),
-            avatar: String(value.avatar || ''),
+            avatar: this._sanitizeValue(value.avatar),
             role: String(value.role || 'member')
           };
         }
@@ -521,14 +564,18 @@ class FirebaseAdapter {
       for (const [key, value] of Object.entries(updates)) {
         if (key === 'updatedAt') {
           sanitizedUpdates[key] = admin.firestore.FieldValue.serverTimestamp();
-        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-          // Recursively sanitize nested objects
-          sanitizedUpdates[key] = {};
-          for (const [nestedKey, nestedValue] of Object.entries(value)) {
-            sanitizedUpdates[key][nestedKey] = String(nestedValue);
+        } else if (key === 'members' && typeof value === 'object' && value !== null) {
+          // Special handling for members to keep the structure
+          sanitizedUpdates.members = {};
+          for (const [memberId, memberData] of Object.entries(value)) {
+            sanitizedUpdates.members[memberId] = {
+              name: String(memberData.name || 'Unknown User'),
+              avatar: this._sanitizeValue(memberData.avatar),
+              role: String(memberData.role || 'member')
+            };
           }
         } else {
-          sanitizedUpdates[key] = String(value);
+          sanitizedUpdates[key] = this._sanitizeValue(value);
         }
       }
 
@@ -571,9 +618,9 @@ class FirebaseAdapter {
 
     try {
       await admin.firestore().collection('groups').doc(groupId).update({
-        [`members.${memberData.id}`]: {
+        [`members.${this._safeToString(memberData.id)}`]: {
           name: String(memberData.name || 'Unknown User'),
-          avatar: String(memberData.avatar || ''),
+          avatar: this._sanitizeValue(memberData.avatar),
           role: String(memberData.role || 'member')
         },
         updatedAt: admin.firestore.FieldValue.serverTimestamp()

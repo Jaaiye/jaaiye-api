@@ -154,11 +154,11 @@ class CreateEventUseCase {
     if (user && (user.role === 'admin' || user.role === 'superadmin')) {
       createdBy = 'Jaaiye';
       origin = 'jaaiye';
-      creatorId = null;
+      creatorId = userId;
     }
 
     // Create event
-    const event = await this.eventRepository.create({
+    const eventData = {
       calendar: calendar.id,
       title: dto.title,
       description: dto.description,
@@ -173,8 +173,17 @@ class CreateEventUseCase {
       image: imageUrl,
       createdBy,
       origin,
-      creatorId
-    });
+      creatorId,
+    };
+
+    if (category === 'event') {
+      eventData.status = 'published';
+      eventData.publishedAt = new Date();
+    } else {
+      eventData.status = 'scheduled';
+    }
+
+    const event = await this.eventRepository.create(eventData);
 
     // Automatically create wallet for paid events (category === 'event')
     if (category === 'event' && this.walletRepository) {
@@ -290,10 +299,23 @@ class CreateEventUseCase {
           const eventWithSlug = await this.eventRepository.findById(event.id);
           const eventSlug = eventWithSlug?.slug || event.id;
 
+          // Filter participants for notification (exclude initiator and ensure uniqueness)
+          const initiatorId = userId?.toString ? userId.toString() : String(userId);
+          const uniqueParticipantsToNotify = [];
+          const notifiedUserIds = new Set();
+
+          createdParticipants.forEach(participant => {
+            const participantUserId = participant.user?.toString ? participant.user.toString() : String(participant.user);
+            if (participantUserId !== initiatorId && !notifiedUserIds.has(participantUserId)) {
+              uniqueParticipantsToNotify.push(participant);
+              notifiedUserIds.add(participantUserId);
+            }
+          });
+
           await Promise.all(
-            createdParticipants.map(participant => {
-              const userId = participant.user?.toString ? participant.user.toString() : String(participant.user);
-              return this.notificationAdapter.send(userId, {
+            uniqueParticipantsToNotify.map(participant => {
+              const participantUserId = participant.user?.toString ? participant.user.toString() : String(participant.user);
+              return this.notificationAdapter.send(participantUserId, {
                 title: 'Hangout Invitation',
                 body: `You have been invited to the hangout "${event.title}"`
               }, {
@@ -354,13 +376,24 @@ class CreateEventUseCase {
                   throw new ValidationError('Group not found');
                 }
 
-                // Get existing group members
+                // Get existing group members (ensure they are strings)
                 const existingMemberIds = new Set(
-                  group.members.map(m => m.user.toString())
+                  group.members.map(m => {
+                    const memberUserId = typeof m.user === 'object' ? m.user.id || m.user._id : m.user;
+                    return memberUserId?.toString ? memberUserId.toString() : String(memberUserId);
+                  })
                 );
 
                 // Add only new participants to the group
-                const participantUserIds = createdParticipants.map(p => p.user.toString());
+                const participantUserIds = createdParticipants.map(p => {
+                  const u = p.user;
+                  if (!u) return '';
+                  const id = typeof u === 'object' ? (u.id || u._id || u) : u;
+                  if (typeof id === 'string') return id;
+                  if (id.toHexString) return id.toHexString();
+                  if (Buffer.isBuffer(id)) return id.toString('hex');
+                  return String(id);
+                });
                 const newParticipantIds = participantUserIds.filter(id => !existingMemberIds.has(id));
 
                 if (newParticipantIds.length > 0) {
@@ -391,11 +424,12 @@ class CreateEventUseCase {
                       for (const member of updatedGroup.members) {
                         if (member.user) {
                           const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+                          const memberUserIdStr = memberUserId?.toString ? memberUserId.toString() : String(memberUserId);
                           const memberUser = await this.userRepository.findById(memberUserId);
                           if (memberUser) {
-                            plainMembers[memberUserId.toString()] = {
+                            plainMembers[memberUserIdStr] = {
                               name: String(memberUser.fullName || memberUser.username || 'Unknown User'),
-                              avatar: String(memberUser.profilePicture || ''),
+                              avatar: memberUser.profilePicture || '',
                               role: String(member.role || 'member')
                             };
                           }
@@ -423,7 +457,16 @@ class CreateEventUseCase {
                 });
 
                 // Add all participants as members
-                const participantUserIds = createdParticipants.map(p => p.user.toString());
+                const participantUserIds = createdParticipants.map(p => {
+                  const u = p.user;
+                  if (!u) return '';
+                  const id = typeof u === 'object' ? (u.id || u._id || u) : u;
+                  if (typeof id === 'string') return id;
+                  if (id.toHexString) return id.toHexString();
+                  if (Buffer.isBuffer(id)) return id.toString('hex');
+                  return String(id);
+                });
+
                 await Promise.all(
                   participantUserIds.map(async (participantUserId) => {
                     try {
@@ -453,11 +496,12 @@ class CreateEventUseCase {
                       for (const member of populatedGroup.members) {
                         if (member.user) {
                           const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+                          const memberUserIdStr = memberUserId?.toString ? memberUserId.toString() : String(memberUserId);
                           const memberUser = await this.userRepository.findById(memberUserId);
                           if (memberUser) {
-                            plainMembers[memberUserId.toString()] = {
+                            plainMembers[memberUserIdStr] = {
                               name: String(memberUser.fullName || memberUser.username || 'Unknown User'),
-                              avatar: String(memberUser.profilePicture || ''),
+                              avatar: memberUser.profilePicture || '',
                               role: String(member.role || 'member')
                             };
                           }
@@ -467,7 +511,7 @@ class CreateEventUseCase {
                       await this.firebaseAdapter.createGroup(populatedGroup.id, {
                         name: populatedGroup.name,
                         description: populatedGroup.description || '',
-                        creator: userId,
+                        creator: initiatorId,
                         members: plainMembers
                       });
                     } catch (error) {

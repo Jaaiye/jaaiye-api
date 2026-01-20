@@ -100,10 +100,10 @@ class AddEventTeamMemberUseCase {
             slug: eventSlug,
             role: role,
             teamMemberId: teamMemberEntity.id,
-            path: `notifications`
+            path: `teamInvitationsScreen`
           });
         } catch (error) {
-          console.error('Failed to send team invitation notification:', error);
+          console.error('[AddEventTeamMember] Failed to send team invitation notification:', error);
         }
       });
     }

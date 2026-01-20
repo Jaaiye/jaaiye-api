@@ -17,13 +17,30 @@ class GroupRepository extends IGroupRepository {
 
     const docObj = doc.toObject ? doc.toObject() : doc;
 
+    // Safe ID extraction helper
+    const safeString = (val) => {
+      if (!val) return null;
+      if (typeof val === 'string') return val;
+      if (typeof val === 'object') {
+        if (val.toHexString) return val.toHexString();
+        if (Buffer.isBuffer(val)) return val.toString('hex');
+        if (val._id) return safeString(val._id);
+        if (val.id) return safeString(val.id);
+      }
+      return String(val);
+    };
+
     return new GroupEntity({
-      id: docObj._id?.toString() || docObj.id,
+      id: safeString(docObj._id || docObj.id),
       name: docObj.name,
       description: docObj.description,
-      creator: docObj.creator,
-      members: docObj.members || [],
-      events: docObj.events || [],
+      creator: docObj.creator, // Keep as is (populated object or ID)
+      members: (docObj.members || []).map(m => ({
+        ...m,
+        user: m.user, // Keep as is (populated object or ID)
+        addedBy: m.addedBy
+      })),
+      events: docObj.events || [], // Keep as is (populated event objects or IDs)
       settings: docObj.settings || {},
       isActive: docObj.isActive !== undefined ? docObj.isActive : true,
       createdAt: docObj.createdAt,

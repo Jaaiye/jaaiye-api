@@ -54,7 +54,7 @@ const eventSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['scheduled', 'cancelled', 'completed'],
+    enum: ['scheduled', 'cancelled', 'completed', 'draft', 'published'],
     default: 'scheduled'
   },
   // New fields for ticketing system
@@ -167,17 +167,17 @@ const eventSchema = new mongoose.Schema({
 });
 
 // Instance methods
-eventSchema.methods.incrementAttendeeCount = function() {
+eventSchema.methods.incrementAttendeeCount = function () {
   this.attendeeCount += 1;
   return this.save();
 };
 
-eventSchema.methods.addTicketType = function(ticketTypeData) {
+eventSchema.methods.addTicketType = function (ticketTypeData) {
   this.ticketTypes.push(ticketTypeData);
   return this.save();
 };
 
-eventSchema.methods.updateTicketType = function(ticketTypeId, updateData) {
+eventSchema.methods.updateTicketType = function (ticketTypeId, updateData) {
   const ticketType = this.ticketTypes.id(ticketTypeId);
   if (!ticketType) {
     throw new Error('Ticket type not found');
@@ -186,12 +186,12 @@ eventSchema.methods.updateTicketType = function(ticketTypeId, updateData) {
   return this.save();
 };
 
-eventSchema.methods.removeTicketType = function(ticketTypeId) {
+eventSchema.methods.removeTicketType = function (ticketTypeId) {
   this.ticketTypes.pull(ticketTypeId);
   return this.save();
 };
 
-eventSchema.methods.incrementTicketSales = function(ticketTypeId = null, quantity = 1, bypassCapacity = false) {
+eventSchema.methods.incrementTicketSales = function (ticketTypeId = null, quantity = 1, bypassCapacity = false) {
   if (ticketTypeId) {
     const ticketType = this.ticketTypes.id(ticketTypeId);
     if (!ticketType) {
@@ -209,7 +209,7 @@ eventSchema.methods.incrementTicketSales = function(ticketTypeId = null, quantit
   return this.save();
 };
 
-eventSchema.methods.decrementTicketSales = function(ticketTypeId = null, quantity = 1) {
+eventSchema.methods.decrementTicketSales = function (ticketTypeId = null, quantity = 1) {
   if (ticketTypeId) {
     const ticketType = this.ticketTypes.id(ticketTypeId);
     if (!ticketType) {
@@ -222,7 +222,7 @@ eventSchema.methods.decrementTicketSales = function(ticketTypeId = null, quantit
   return this.save();
 };
 
-eventSchema.methods.getAvailableTicketTypes = function() {
+eventSchema.methods.getAvailableTicketTypes = function () {
   const now = new Date();
   return this.ticketTypes.filter(ticketType => {
     if (!ticketType.isActive) return false;
@@ -239,12 +239,12 @@ eventSchema.methods.getAvailableTicketTypes = function() {
 };
 
 // Static methods
-eventSchema.statics.findByCategory = function(category) {
+eventSchema.statics.findByCategory = function (category) {
   return this.find({ category, status: 'scheduled' }).sort({ startTime: 1 });
 };
 
 // Ensure hangouts remain ticketless
-eventSchema.pre('validate', function(next) {
+eventSchema.pre('validate', function (next) {
   if (this.category === 'hangout') {
     this.ticketTypes = [];
     this.ticketFee = null;
@@ -253,7 +253,7 @@ eventSchema.pre('validate', function(next) {
 });
 
 // Generate slug from title before saving
-eventSchema.pre('save', async function(next) {
+eventSchema.pre('save', async function (next) {
   if (this.isModified('title') || !this.slug) {
     // Generate slug from title
     let slug = this.title

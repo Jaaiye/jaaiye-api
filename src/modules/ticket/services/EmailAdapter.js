@@ -53,13 +53,6 @@ class EmailAdapter {
         throw new Error(`${invalidTickets.length} ticket(s) missing valid event data. All tickets must have populated eventId with title property.`);
       }
 
-      console.log('Generating email template', {
-        email,
-        ticketCount,
-        eventTitle,
-        hasQrCodes: tickets.filter(t => t.qrCode).length
-      });
-
       const html = templates.paymentConfirmationEmail({ tickets });
 
       const subject = ticketCount > 1
@@ -95,6 +88,74 @@ class EmailAdapter {
         ticketCount: Array.isArray(ticketOrTickets) ? ticketOrTickets.length : 1,
         hasResendApiKey: !!process.env.RESEND_API_KEY,
         fromEmail: this.fromEmail
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send ticket sale notification email to event creator
+   * @param {Object} creator - Creator user object with email, fullName
+   * @param {Object} saleData - Sale data with eventTitle, ticketCount, amount, buyerName, eventId
+   * @returns {Promise<void>}
+   */
+  async sendTicketSaleNotificationEmail(creator, saleData, accessToken) {
+    try {
+      const email = creator.email;
+
+      if (!email) {
+        throw new Error('Creator email is required');
+      }
+
+      const { eventTitle, ticketCount, amount, buyerName, eventId } = saleData;
+
+      if (!eventTitle || !ticketCount || amount === undefined) {
+        throw new Error('Sale data must include eventTitle, ticketCount, and amount');
+      }
+
+      console.log('Generating ticket sale notification email', {
+        email,
+        eventTitle,
+        ticketCount,
+        amount
+      });
+
+      const html = templates.ticketSaleNotificationEmail({
+        eventTitle,
+        ticketCount,
+        amount,
+        buyerName: buyerName || 'A customer',
+        eventId,
+        accessToken
+      });
+
+      const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
+      const subject = `🎉 New Ticket Sale for ${eventTitle}`;
+
+      console.log('Sending ticket sale notification via Resend', {
+        from: this.fromEmail,
+        to: email,
+        subject
+      });
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject,
+        html
+      });
+
+      console.log('Ticket sale notification sent successfully', {
+        email,
+        resultId: result?.id
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Failed to send ticket sale notification email:', {
+        email: creator.email,
+        error: error.message,
+        stack: error.stack
       });
       throw error;
     }

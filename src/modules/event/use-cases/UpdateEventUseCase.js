@@ -10,15 +10,17 @@ class UpdateEventUseCase {
     eventRepository,
     calendarRepository,
     userRepository,
-    googleCalendarAdapter
+    googleCalendarAdapter,
+    cloudinaryAdapter
   }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
     this.userRepository = userRepository;
     this.googleCalendarAdapter = googleCalendarAdapter;
+    this.cloudinaryAdapter = cloudinaryAdapter;
   }
 
-  async execute(eventId, userId, dto) {
+  async execute(eventId, userId, dto, file = null) {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
     let event;
 
@@ -49,10 +51,23 @@ class UpdateEventUseCase {
     if (dto.startTime !== undefined) updateData.startTime = new Date(dto.startTime);
     if (dto.endTime !== undefined) updateData.endTime = new Date(dto.endTime);
     if (dto.venue !== undefined) updateData.venue = dto.venue;
+    if (dto.latitude !== undefined) updateData.latitude = dto.latitude;
+    if (dto.longitude !== undefined) updateData.longitude = dto.longitude;
     if (dto.isAllDay !== undefined) updateData.isAllDay = dto.isAllDay;
     if (dto.recurrence !== undefined) updateData.recurrence = dto.recurrence;
     if (dto.status !== undefined) updateData.status = dto.status;
     if (dto.ticketFee !== undefined) updateData.ticketFee = dto.ticketFee;
+
+    // Upload image if provided
+    if (file && this.cloudinaryAdapter) {
+      try {
+        const imageUrl = await this.cloudinaryAdapter.uploadImage(file.buffer);
+        updateData.image = imageUrl;
+      } catch (error) {
+        console.error('Failed to upload image during event update:', error);
+        // Continue with update even if image upload fails
+      }
+    }
 
     // Update event
     const updatedEvent = await this.eventRepository.update(event._id || event.id, updateData);

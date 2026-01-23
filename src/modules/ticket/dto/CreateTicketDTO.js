@@ -14,6 +14,7 @@ class CreateTicketDTO {
     this.username = data.username; // Legacy support (optional)
     this.email = data.email; // Legacy support (optional)
     this.bypassCapacity = data.bypassCapacity || false;
+    this.skipEmail = data.skipEmail || false; // Skip individual email notification
   }
 
   validate() {

@@ -49,25 +49,25 @@ class PaymentModule {
     this._paymentService = null;
     this._emailAdapter = null;
 
-  // Use Cases
-  this._initializePaystackPaymentUseCase = null;
-  this._initializeFlutterwavePaymentUseCase = null;
-  this._verifyPaystackPaymentUseCase = null;
-  this._verifyFlutterwavePaymentUseCase = null;
-  this._registerTransactionUseCase = null;
-  this._updateTransactionUseCase = null;
-  this._processPaystackWebhookUseCase = null;
-  this._processFlutterwaveWebhookUseCase = null;
-  this._processFlutterwaveTransferWebhookUseCase = null;
-  this._getMyTransactionsUseCase = null;
-  this._listTransactionsUseCase = null;
+    // Use Cases
+    this._initializePaystackPaymentUseCase = null;
+    this._initializeFlutterwavePaymentUseCase = null;
+    this._verifyPaystackPaymentUseCase = null;
+    this._verifyFlutterwavePaymentUseCase = null;
+    this._registerTransactionUseCase = null;
+    this._updateTransactionUseCase = null;
+    this._processPaystackWebhookUseCase = null;
+    this._processFlutterwaveWebhookUseCase = null;
+    this._processFlutterwaveTransferWebhookUseCase = null;
+    this._getMyTransactionsUseCase = null;
+    this._listTransactionsUseCase = null;
 
     // Controller
     this._paymentController = null;
 
-  // Routes
-  this._paymentRoutes = null;
-  this._transactionRoutes = null;
+    // Routes
+    this._paymentRoutes = null;
+    this._transactionRoutes = null;
   }
 
   // Repositories
@@ -210,8 +210,14 @@ class PaymentModule {
 
   getInitializeFlutterwavePaymentUseCase() {
     if (!this._initializeFlutterwavePaymentUseCase) {
+      // Get EventTeamRepository from Event domain
+      const eventModule = require('../event/event.module');
+      const eventTeamRepository = eventModule.getEventTeamRepository();
+
       this._initializeFlutterwavePaymentUseCase = new InitializeFlutterwavePaymentUseCase({
-        flutterwaveAdapter: this.getFlutterwaveAdapter()
+        flutterwaveAdapter: this.getFlutterwaveAdapter(),
+        eventRepository: this.getEventRepository(),
+        eventTeamRepository
       });
     }
     return this._initializeFlutterwavePaymentUseCase;

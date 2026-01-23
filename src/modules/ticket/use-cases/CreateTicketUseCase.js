@@ -58,7 +58,11 @@ class CreateTicketUseCase {
 
     await eventDoc.incrementTicketSales(ticketTypeIdForSales, dto.quantity, dto.bypassCapacity);
     await this._addParticipantAndSyncCalendar(targetUserId, dto.eventId);
-    await this._sendEmailNotification(targetUserId, finalTicket);
+
+    // Only send email if skipEmail is not set
+    if (!dto.skipEmail) {
+      await this._sendEmailNotification(targetUserId, finalTicket);
+    }
 
     console.log('[CreateTicketUseCase] Ticket creation completed successfully', {
       ticketId: finalTicket.id,
@@ -105,8 +109,10 @@ class CreateTicketUseCase {
       throw new NotFoundError('Event not found');
     }
 
-    if (eventDoc.status !== 'scheduled') {
-      throw new ValidationError('Cannot create ticket for cancelled or completed event');
+    // Allow ticket creation for scheduled and published events
+    const validStatuses = ['scheduled', 'published'];
+    if (!validStatuses.includes(eventDoc.status)) {
+      throw new ValidationError(`Cannot create ticket for ${eventDoc.status} event. Event must be scheduled or published.`);
     }
 
     return eventDoc;

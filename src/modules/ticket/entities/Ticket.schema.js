@@ -25,8 +25,12 @@ const ticketSchema = new mongoose.Schema({
   quantity: {
     type: Number,
     default: 1,
-    min: 1,
-    max: 10
+    min: 1
+  },
+  checkedInCount: {
+    type: Number,
+    default: 0,
+    min: 0
   },
   qrCode: {
     type: String, // Base64 encoded QR code or URL
@@ -65,27 +69,39 @@ const ticketSchema = new mongoose.Schema({
 });
 
 // Instance methods
-ticketSchema.methods.markAsUsed = function() {
+ticketSchema.methods.markAsUsed = function () {
   this.status = 'used';
   this.usedAt = new Date();
+  if (this.checkedInCount < this.quantity) {
+    this.checkedInCount = this.quantity;
+  }
   return this.save();
 };
 
-ticketSchema.methods.cancel = function() {
+ticketSchema.methods.checkIn = function (count = 1) {
+  this.checkedInCount = Math.min(this.quantity, this.checkedInCount + count);
+  if (this.checkedInCount >= this.quantity) {
+    this.status = 'used';
+    this.usedAt = new Date();
+  }
+  return this.save();
+};
+
+ticketSchema.methods.cancel = function () {
   this.status = 'cancelled';
   return this.save();
 };
 
 // Static methods
-ticketSchema.statics.findByUser = function(userId) {
+ticketSchema.statics.findByUser = function (userId) {
   return this.find({ userId }).populate('eventId', 'title startTime endTime venue image').sort({ createdAt: -1 });
 };
 
-ticketSchema.statics.findByEvent = function(eventId) {
+ticketSchema.statics.findByEvent = function (eventId) {
   return this.find({ eventId }).populate('userId', 'fullName email').sort({ createdAt: -1 });
 };
 
-ticketSchema.statics.findActiveByUser = function(userId) {
+ticketSchema.statics.findActiveByUser = function (userId) {
   return this.find({ userId, status: 'active' }).populate('eventId', 'title startTime endTime venue image').sort({ createdAt: -1 });
 };
 

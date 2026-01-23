@@ -214,7 +214,8 @@ class EventModule {
         eventRepository: this.getEventRepository(),
         calendarRepository: this.getCalendarRepository(),
         userRepository: this.getUserRepository(),
-        googleCalendarAdapter: this.getGoogleCalendarAdapter()
+        googleCalendarAdapter: this.getGoogleCalendarAdapter(),
+        cloudinaryAdapter: this.getCloudinaryAdapter()
       });
     }
     return this._instances.updateEventUseCase;

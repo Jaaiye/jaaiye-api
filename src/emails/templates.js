@@ -195,15 +195,12 @@ function generateTicketQRSection(ticket, index, totalTickets) {
 
   return `
     <div style="margin: 24px 0; padding: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px;">
-      ${totalTickets > 1 ? `
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #0F172A;">
-        Ticket${ticketNumber}
+      <h3 style="margin: 0 0 4px 0; font-size: 16px; color: #0F172A;">
+        ${escapeHtml(ticket.ticketTypeName || 'Ticket')}${ticketNumber}
       </h3>
-      ` : `
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #0F172A;">
-        Your Entry Pass
-      </h3>
-      `}
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748B;">
+        Entry Pass
+      </p>
 
       <div style="text-align: center; margin-bottom: 16px;">
         <img
@@ -243,7 +240,7 @@ function paymentConfirmationEmail({ tickets }) {
   const eventTitle = escapeHtml(event.title || 'Upcoming Event');
   const totalTickets = ticketArray.length;
   const totalQuantity = ticketArray.reduce((sum, t) => sum + (t.quantity || 1), 0);
-  const totalPrice = ticketArray.reduce((sum, t) => sum + ((t.price || 0) * (t.quantity || 1)), 0);
+  const totalPrice = ticketArray.reduce((sum, t) => sum + (t.price || 0), 0);
 
   const title = `🎟️ Your ${totalTickets > 1 ? 'Tickets' : 'Ticket'} for ${eventTitle}`;
   const previewText = `Here ${totalTickets > 1 ? 'are' : 'is'} your ${totalTickets} ticket${totalTickets > 1 ? 's' : ''} for ${eventTitle}.`;
@@ -330,14 +327,14 @@ function paymentConfirmationEmail({ tickets }) {
       ` : ''}
 
       ${ticketArray.map((ticket, index) =>
-        ticket.qrCode ? generateTicketQRSection(ticket, index, totalTickets) : ''
-      ).join('')}
+    ticket.qrCode ? generateTicketQRSection(ticket, index, totalTickets) : ''
+  ).join('')}
 
       ${ticketArray.some(t => t.qrCode) ? `
       <p style="font-size: 13px; color: #64748B; text-align: center; margin: 16px 0; line-height: 1.5;">
         ${totalTickets > 1
-          ? 'Show these QR codes at the event entrance for seamless check-in.'
-          : 'Show this QR code at the event entrance for seamless check-in.'}
+        ? 'Show these QR codes at the event entrance for seamless check-in.'
+        : 'Show this QR code at the event entrance for seamless check-in.'}
       </p>
       ` : ''}
 
@@ -346,9 +343,27 @@ function paymentConfirmationEmail({ tickets }) {
         <p style="margin: 0; font-size: 14px; color: #92400E; line-height: 1.6;">
           <strong>Important:</strong> Please arrive 15-30 minutes before the event starts.
           ${totalTickets > 1
-            ? 'Have all QR codes ready on your device or printed for faster entry.'
-            : 'Have this QR code ready on your device or printed for faster entry.'}
+      ? 'Have all QR codes ready on your device or printed for faster entry.'
+      : 'Have this QR code ready on your device or printed for faster entry.'}
         </p>
+      </div>
+
+      <!-- App Download Section -->
+      <div style="margin: 32px 0; padding: 20px; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 12px;">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #0F172A;">
+          📱 Get the Jaaiye App
+        </h3>
+        <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748B;">
+          Access your tickets anytime, discover more events, and get personalized recommendations.
+        </p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <a href="https://apps.apple.com/app/jaaiye" target="_blank" style="display: inline-block; text-decoration: none;">
+            <img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" alt="Download on App Store" style="height: 40px; width: auto;" />
+          </a>
+          <a href="https://play.google.com/store/apps/details?id=com.jaaiye" target="_blank" style="display: inline-block; text-decoration: none;">
+            <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" style="height: 40px; width: auto;" />
+          </a>
+        </div>
       </div>
 
       <p style="font-size: 16px; color: #1E293B; margin-top: 32px;">
@@ -369,8 +384,8 @@ function paymentConfirmationEmail({ tickets }) {
     previewText,
     bodyHtml,
     cta: eventId ? {
-      label: 'View Event Details',
-      url: `${APP_URL}/events/${eventId}`
+      label: 'View in App',
+      url: `https://jaaiye-4439b.web.app/events/${eventId}`
     } : null
   });
 }
@@ -522,6 +537,101 @@ function walletAdjustedManualEmail({ ownerLabel, amount, reason, walletBalanceAf
   return baseLayout({ title, previewText, bodyHtml });
 }
 
+function ticketSaleNotificationEmail({ eventTitle, ticketCount, amount, buyerName, eventId, accessToken }) {
+  const title = '🎉 New Ticket Sale!';
+  const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
+  const previewText = `${ticketCount} ${ticketText} sold for ${eventTitle}. Total: ${formatCurrency(amount)}`;
+
+  const bodyHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <p style="font-size: 16px; color: #1E293B; margin-bottom: 16px;">
+        Great news!
+      </p>
+
+      <p style="font-size: 16px; color: #1E293B; margin-bottom: 24px;">
+        <strong>${escapeHtml(buyerName)}</strong> just purchased <strong>${ticketCount} ${ticketText}</strong> for your event <strong>${escapeHtml(eventTitle)}</strong>.
+      </p>
+
+      <!-- Sale Details Card -->
+      <div style="margin: 24px 0; padding: 20px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F0FDF4;">
+        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0F172A;">
+          Sale Details
+        </h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; width: 120px; vertical-align: top;">
+              Event:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-weight: 500;">
+              ${escapeHtml(eventTitle)}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Buyer:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${escapeHtml(buyerName)}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Tickets Sold:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${ticketCount} ${ticketText}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Total Amount:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-weight: 600;">
+              ${formatCurrency(amount)}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size: 14px; color: #64748B; margin-top: 24px;">
+        View detailed analytics and manage your event in the Jaaiye app.
+      </p>
+
+      <!-- App Download Section -->
+      <div style="margin: 32px 0; padding: 20px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px;">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #0F172A;">
+          📱 Manage on the Go
+        </h3>
+        <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748B;">
+          Download the Jaaiye app to track sales, check-in attendees, and manage your events from anywhere.
+        </p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <a href="https://apps.apple.com/app/jaaiye" target="_blank" style="display: inline-block; text-decoration: none;">
+            <img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" alt="Download on App Store" style="height: 40px; width: auto;" />
+          </a>
+          <a href="https://play.google.com/store/apps/details?id=com.jaaiye" target="_blank" style="display: inline-block; text-decoration: none;">
+            <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" style="height: 40px; width: auto;" />
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return baseLayout({
+    title,
+    previewText,
+    bodyHtml,
+    cta: eventId ? {
+      label: 'View Event Analytics',
+      url: `https://events.jaaiye.com/events/${eventId}/analytics${accessToken ? `?token=${accessToken}` : ''}`
+    } : null
+  });
+}
+
 module.exports = {
   baseLayout,
   verificationEmail,
@@ -530,6 +640,7 @@ module.exports = {
   reportEmail,
   LOGO_CID,
   paymentConfirmationEmail,
+  ticketSaleNotificationEmail,
   walletEventCreditedEmail,
   walletGroupCreditedEmail,
   walletWithdrawalSuccessEmail,

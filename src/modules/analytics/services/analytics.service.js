@@ -45,16 +45,34 @@ class AnalyticsService {
     });
 
     const transactions = result.transactions || [];
-    const totalRevenue = transactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+    // Calculate net revenue (baseAmount - what organizers receive)
+    const totalRevenue = transactions.reduce((sum, t) => {
+      const revenue = Number(t.baseAmount) || Number(t.amount) || 0;
+      return sum + revenue;
+    }, 0);
+
+    // Calculate total platform fees
+    const totalFees = transactions.reduce((sum, t) => {
+      return sum + (Number(t.feeAmount) || 0);
+    }, 0);
+
+    // Calculate gross revenue (total including fees)
+    const totalGross = totalRevenue + totalFees;
+
     const transactionCount = transactions.length;
 
     return {
-      totalRevenue,
+      totalRevenue, // Net revenue to organizers (excluding platform fee)
+      totalFees,    // Platform fees collected
+      totalGross,   // Total revenue including fees
       transactionCount,
       averageTransactionAmount: transactionCount > 0 ? totalRevenue / transactionCount : 0,
       transactions: transactions.map(t => ({
         id: t.id,
         amount: t.amount,
+        baseAmount: t.baseAmount,
+        feeAmount: t.feeAmount,
         currency: t.currency,
         provider: t.provider,
         createdAt: t.createdAt

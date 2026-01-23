@@ -32,14 +32,14 @@ exports.generateToken = (subject) => {
   const isObject = subject && typeof subject === 'object' && subject._id;
   const payload = isObject
     ? {
-        id: subject._id,
-        email: subject.email,
-        username: subject.username,
-        fullName: subject.fullName,
-        role: subject.role,
-        emailVerified: subject.emailVerified,
-        profilePicture: subject.profilePicture
-      }
+      id: subject._id,
+      email: subject.email,
+      username: subject.username,
+      fullName: subject.fullName,
+      role: subject.role,
+      emailVerified: subject.emailVerified,
+      profilePicture: subject.profilePicture
+    }
     : { id: subject };
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '30d'
@@ -74,7 +74,7 @@ exports.generateResetCode = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-const { isExpired } = require('../../utils/dateUtils');
+const { isExpired } = require('../../../utils/dateUtils');
 
 exports.isCodeExpired = (expiresAt) => {
   return isExpired(expiresAt);
@@ -87,7 +87,7 @@ exports.generateRandomPassword = (length = 32) => {
 // Blacklist helpers
 exports.addToBlacklist = async (token, expiresAt) => {
   if (!token) return;
-  const { addDaysToNow, fromISOString } = require('../../utils/dateUtils');
+  const { addDaysToNow, fromISOString } = require('../../../utils/dateUtils');
   const expDate = expiresAt ? fromISOString(expiresAt) : addDaysToNow(90);
   try {
     await TokenBlacklist.create({ token, expiresAt: expDate });

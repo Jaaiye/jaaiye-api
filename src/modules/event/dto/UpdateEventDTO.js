@@ -10,9 +10,12 @@ class UpdateEventDTO {
     this.startTime = data.startTime;
     this.endTime = data.endTime;
     this.venue = data.venue;
+    this.latitude = data.latitude !== undefined ? Number(data.latitude) : undefined;
+    this.longitude = data.longitude !== undefined ? Number(data.longitude) : undefined;
     this.isAllDay = data.isAllDay;
     this.recurrence = data.recurrence;
     this.status = data.status;
+    this.ticketFee = data.ticketFee;
 
     // Remove undefined values
     Object.keys(this).forEach(key => {
@@ -24,4 +27,5 @@ class UpdateEventDTO {
 }
 
 module.exports = UpdateEventDTO;
+
 

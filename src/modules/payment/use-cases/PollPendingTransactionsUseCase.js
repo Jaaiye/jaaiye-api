@@ -72,6 +72,7 @@ class PollPendingTransactionsUseCase {
           if (verified.status === 'successful') {
             logger.info(`Processing pending Flutterwave transaction: ${transaction.reference}`);
             const metadata = verified.meta || (verified.customer && verified.customer.meta) || {
+              ...(transaction.metadata || {}),
               userId: transaction.userId,
               eventId: transaction.eventId,
               quantity: transaction.quantity

@@ -67,7 +67,26 @@ async function addEventToUserCalendar(userId, eventId) {
 }
 
 async function handleSuccessfulPayment({ provider, reference, amount, currency, metadata, raw }) {
-  const { eventId, ticketTypeId, quantity = 1, userId, assignees = [] } = metadata || {};
+  const { eventId, groupId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [] } = metadata || {};
+
+  // Parse metadata safely (Flutterwave sometimes stringifies arrays or objects in meta)
+  let parsedTicketTypes = [];
+  const targetTicketTypes = ticketTypes || [];
+  if (Array.isArray(targetTicketTypes)) {
+    parsedTicketTypes = targetTicketTypes;
+  } else if (typeof targetTicketTypes === 'string') {
+    try {
+      const parsed = JSON.parse(targetTicketTypes);
+      if (Array.isArray(parsed)) {
+        parsedTicketTypes = parsed;
+      }
+    } catch (e) {
+      if (targetTicketTypes.trim()) {
+        parsedTicketTypes = [targetTicketTypes.trim()];
+      }
+    }
+  }
+
   if (!eventId || !userId) {
     return { ok: false, reason: 'missing_metadata' };
   }
@@ -97,22 +116,22 @@ async function handleSuccessfulPayment({ provider, reference, amount, currency, 
   }
 
   // If no ticketTypeId provided, get the first available ticket type
-  // let finalTicketTypeId = ticketTypeId;
-  // if (!finalTicketTypeId) {
-  //   const Event = require('../modules/Event');
-  //   const event = await Event.findById(eventId);
-  //   if (!event) {
-  //     return { ok: false, reason: 'event_not_found' };
-  //   }
+  let finalTicketTypeId = ticketTypeId;
+  if (!finalTicketTypeId) {
+    const Event = require('../modules/Event');
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return { ok: false, reason: 'event_not_found' };
+    }
 
-  //   const availableTicketTypes = event.getAvailableTicketTypes();
-  //   if (availableTicketTypes.length === 0) {
-  //     return { ok: false, reason: 'no_available_ticket_types' };
-  //   }
+    const availableTicketTypes = event.getAvailableTicketTypes();
+    if (availableTicketTypes.length === 0) {
+      return { ok: false, reason: 'no_available_ticket_types' };
+    }
 
-  //   finalTicketTypeId = availableTicketTypes[0]._id;
-  //   console.log('Using first available ticket type:', finalTicketTypeId);
-  // }
+    finalTicketTypeId = availableTicketTypes[0]._id;
+    console.log('Using first available ticket type:', finalTicketTypeId);
+  }
 
   const createdTickets = [];
 
@@ -133,12 +152,30 @@ async function handleSuccessfulPayment({ provider, reference, amount, currency, 
     }
   } else {
     // Single buyer or unassigned multiple tickets
-    for (let i = 0; i < quantity; i++) {
+    const ticketTypesToCreate = parsedTicketTypes.length > 0 ? parsedTicketTypes : Array(quantity).fill(ticketTypeId);
+
+    // Fetch event to get ticket type details (for admission size/names)
+    const event = await Event.findById(eventId);
+
+    for (let i = 0; i < ticketTypesToCreate.length; i++) {
+      const currentTicketTypeId = ticketTypesToCreate[i];
+
+      // Determine admission size based on ticket type
+      let admissionSize = 1;
+      if (event && event.ticketTypes) {
+        const tt = event.ticketTypes.id ? event.ticketTypes.id(currentTicketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(currentTicketTypeId));
+        if (tt) {
+          if (tt.type === 'couples') admissionSize = 2;
+          else if (tt.type === 'group_3') admissionSize = 3;
+          else if (tt.type === 'group_5') admissionSize = 5;
+        }
+      }
+
       const ticket = await createTicketInternal({
         eventId,
-        // ticketTypeId: finalTicketTypeId,
+        ticketTypeId: currentTicketTypeId,
         userId,
-        quantity: 1
+        quantity: admissionSize
       });
       createdTickets.push(ticket);
     }

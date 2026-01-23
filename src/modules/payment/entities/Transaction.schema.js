@@ -4,7 +4,9 @@ const transactionSchema = new mongoose.Schema({
   provider: { type: String, enum: ['paystack', 'flutterwave', 'payaza', 'monnify'], required: true },
   reference: { type: String, required: true }, // jaaiye generated
   transReference: { type: String }, // payment gateway generated
-  amount: { type: Number, required: true },
+  amount: { type: Number, required: true }, // Grand total (base + fee)
+  baseAmount: { type: Number, required: true }, // Ticket price * quantity
+  feeAmount: { type: Number, required: true }, // Platform fee (10%)
   currency: { type: String, default: 'NGN' },
   status: { type: String, enum: ['pending', 'successful', 'failed', 'cancelled', 'completed', 'created'], default: 'created' },
   transId: { type: Number },
@@ -13,6 +15,7 @@ const transactionSchema = new mongoose.Schema({
   eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
   ticketTypeId: { type: mongoose.Schema.Types.ObjectId, required: false },
   quantity: { type: Number, default: 1 },
+  metadata: { type: Object },
   raw: { type: Object },
 }, { timestamps: true });
 

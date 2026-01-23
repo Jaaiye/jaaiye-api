@@ -16,6 +16,7 @@ class TicketEntity {
     ticketData,
     publicId,
     status,
+    checkedInCount,
     usedAt,
     verifiedBy,
     createdAt,
@@ -28,6 +29,7 @@ class TicketEntity {
     this.ticketTypeName = ticketTypeName;
     this.price = price;
     this.quantity = quantity;
+    this.checkedInCount = checkedInCount || 0;
     this.qrCode = qrCode;
     this.ticketData = ticketData;
     this.publicId = publicId;
@@ -99,6 +101,7 @@ class TicketEntity {
       ticketTypeName: this.ticketTypeName,
       price: this.price,
       quantity: this.quantity,
+      checkedInCount: this.checkedInCount,
       qrCode: this.qrCode,
       ticketData: this.getTicketData(),
       publicId: this.publicId,

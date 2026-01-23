@@ -46,7 +46,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 const corsOptions = {
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow non-browser/SSR requests without an origin
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -56,7 +56,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-idempotency-key'],
   exposedHeaders: ['Content-Type']
 };
 
@@ -105,10 +105,10 @@ const limiter = rateLimit({
     // This prevents double counting
     const path = req.path || '';
     return path === '/health' ||
-           path.startsWith('/api/v1/health') ||
-           path.startsWith('/api/v1/analytics') ||
-           path.startsWith('/api/v1/admin') ||
-           path.startsWith('/api/v1/auth') && req.headers.authorization;
+      path.startsWith('/api/v1/health') ||
+      path.startsWith('/api/v1/analytics') ||
+      path.startsWith('/api/v1/admin') ||
+      path.startsWith('/api/v1/auth') && req.headers.authorization;
   }
 });
 app.use(limiter);

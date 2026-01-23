@@ -40,8 +40,10 @@ async function createTicketInternal({ eventId, ticketTypeId = null, quantity = 1
   const event = await Event.findById(eventId);
   if (!event) throw new NotFoundError('Event not found');
 
-  if (event.status !== 'scheduled') {
-    throw new ValidationError('Cannot create ticket for cancelled or completed event');
+  // Allow ticket creation for scheduled and published events
+  const validStatuses = ['scheduled', 'published'];
+  if (!validStatuses.includes(event.status)) {
+    throw new ValidationError(`Cannot create ticket for ${event.status} event. Event must be scheduled or published.`);
   }
 
   // Determine ticket pricing mode (free vs paid with types)
@@ -77,12 +79,12 @@ async function createTicketInternal({ eventId, ticketTypeId = null, quantity = 1
         throw new ValidationError('No available ticket types');
       }
     }
-      resolvedPrice = Number(chosenType.price) || 0;
+    resolvedPrice = Number(chosenType.price) || 0;
 
-      // Check if this is a complimentary ticket type (price should already be 0, but ensure it)
-      if (chosenType.type === 'complimentary') {
-        resolvedPrice = 0;
-      }
+    // Check if this is a complimentary ticket type (price should already be 0, but ensure it)
+    if (chosenType.type === 'complimentary') {
+      resolvedPrice = 0;
+    }
   } else {
     // Paid without configured types: fallback to legacy ticketFee numeric
     if (event.ticketFee === null || event.ticketFee === undefined || event.ticketFee === 'free') {

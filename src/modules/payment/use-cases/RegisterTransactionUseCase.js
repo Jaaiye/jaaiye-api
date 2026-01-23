@@ -32,13 +32,19 @@ class RegisterTransactionUseCase {
       provider: dto.provider,
       reference: dto.reference,
       amount: dto.amount,
+      baseAmount: dto.baseAmount,
+      feeAmount: dto.feeAmount,
       currency: dto.currency,
       userId: dto.userId,
       eventId: dto.eventId,
       quantity: dto.quantity,
       status: dto.status || 'created',
       transId: dto.transId,
-      ticketTypeId: dto.ticketTypeId
+      ticketTypeId: dto.ticketTypeId,
+      metadata: {
+        ...(dto.metadata || {}),
+        ticketTypes: dto.ticketTypes || []
+      }
     });
 
     return {

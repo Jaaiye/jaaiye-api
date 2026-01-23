@@ -34,6 +34,9 @@ class ScanAndVerifyTicketUseCase {
       id: ticket.id,
       publicId: ticket.publicId,
       status: ticket.status,
+      quantity: ticket.quantity,
+      checkedInCount: ticket.checkedInCount,
+      ticketTypeName: ticket.ticketTypeName,
       usedAt: ticket.usedAt || null,
       verifiedBy: ticket.verifiedBy ? {
         fullName: ticket.verifiedBy.fullName,
@@ -49,7 +52,7 @@ class ScanAndVerifyTicketUseCase {
     };
   }
 
-  async execute(identifier, scannerUserId, eventId = null) {
+  async execute(identifier, scannerUserId, eventId = null, checkInCount = 1) {
     let ticket;
 
     // Detect if identifier is publicId or token
@@ -96,7 +99,7 @@ class ScanAndVerifyTicketUseCase {
       }
     }
 
-    // Check if ticket is already used
+    // Check if ticket is already fully used
     if (ticket.isUsed()) {
       // Get ticket with verifiedBy populated
       const usedTicket = await this.ticketRepository.findById(ticket.id, {
@@ -109,19 +112,39 @@ class ScanAndVerifyTicketUseCase {
 
       return {
         success: false,
-        message: 'Ticket already used',
+        message: 'Ticket already fully used',
         status: 'used',
         ticket: this._formatTicketResponse(usedTicket)
       };
     }
 
-    // Mark as used with scanner info
-    ticket.markAsUsed();
+    // Validate check-in count
+    const requestedCount = parseInt(checkInCount) || 1;
+    const remainingAdmissions = ticket.quantity - (ticket.checkedInCount || 0);
+
+    if (requestedCount > remainingAdmissions) {
+      return {
+        success: false,
+        message: `Cannot check in ${requestedCount} people. Only ${remainingAdmissions} admissions remaining.`,
+        status: 'limit_exceeded',
+        ticket: this._formatTicketResponse(ticket)
+      };
+    }
+
+    // Mark as checked in with scanner info
     await this.ticketRepository.update(ticket.id, {
-      status: 'used',
-      usedAt: ticket.usedAt,
+      checkedInCount: (ticket.checkedInCount || 0) + requestedCount,
       verifiedBy: scannerUserId
     });
+
+    // Check if now fully used
+    const newCheckedInCount = (ticket.checkedInCount || 0) + requestedCount;
+    if (newCheckedInCount >= ticket.quantity) {
+      await this.ticketRepository.update(ticket.id, {
+        status: 'used',
+        usedAt: new Date()
+      });
+    }
 
     // Get updated ticket with verifiedBy populated
     const updatedTicket = await this.ticketRepository.findById(ticket.id, {
@@ -132,10 +155,14 @@ class ScanAndVerifyTicketUseCase {
       ]
     });
 
+    const isFullyUsed = updatedTicket.status === 'used';
+
     return {
       success: true,
-      message: 'Ticket verified and marked as used',
-      status: 'verified',
+      message: isFullyUsed
+        ? `Ticket fully verified (${updatedTicket.quantity}/${updatedTicket.quantity})`
+        : `Verified ${requestedCount} people. (${updatedTicket.checkedInCount}/${updatedTicket.quantity} checked in)`,
+      status: isFullyUsed ? 'verified' : 'partial',
       ticket: this._formatTicketResponse(updatedTicket)
     };
   }

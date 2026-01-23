@@ -6,6 +6,7 @@
 
 const logger = require('../../../utils/logger');
 const CreateTicketDTO = require('../../ticket/dto/CreateTicketDTO');
+const authService = require('../../auth/services/auth.service');
 
 class PaymentService {
   constructor({
@@ -36,7 +37,27 @@ class PaymentService {
    * @returns {Promise<Object>}
    */
   async handleSuccessfulPayment({ provider, reference, amount, currency, metadata, raw }) {
-    const { eventId, groupId, hangoutId, ticketTypeId, quantity = 1, userId, assignees = [] } = metadata || {};
+    console.log(metadata)
+    const { eventId, groupId, hangoutId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [] } = metadata || {};
+
+    // Parse metadata safely (Flutterwave sometimes stringifies arrays or objects in meta)
+    let parsedTicketTypes = [];
+    const targetTicketTypes = ticketTypes || [];
+    if (Array.isArray(targetTicketTypes)) {
+      parsedTicketTypes = targetTicketTypes;
+    } else if (typeof targetTicketTypes === 'string') {
+      try {
+        const parsed = JSON.parse(targetTicketTypes);
+        if (Array.isArray(parsed)) {
+          parsedTicketTypes = parsed;
+        }
+      } catch (e) {
+        // Not a JSON array string, maybe a single ID
+        if (targetTicketTypes.trim()) {
+          parsedTicketTypes = [targetTicketTypes.trim()];
+        }
+      }
+    }
 
     // Group funding doesn't require eventId
     if (!groupId && (!eventId || !userId)) {
@@ -113,10 +134,10 @@ class PaymentService {
                 publicId: ticketForEmail.publicId
               });
 
-            await this.emailAdapter.sendPaymentConfirmationEmail(
-              { email, fullName: name },
+              await this.emailAdapter.sendPaymentConfirmationEmail(
+                { email, fullName: name },
                 ticketForEmail
-            );
+              );
 
               logger.info('Ticket email sent to assignee successfully', {
                 email,
@@ -159,7 +180,7 @@ class PaymentService {
                       ticketId: ticket.id.toString(),
                       assignedBy: userId.toString(),
                       priority: 'high',
-                      path: 'ticketsScreen'
+                      path: 'ticketsDetailsScreen',
                     }
                   );
                 }
@@ -174,19 +195,63 @@ class PaymentService {
       }
     } else {
       // Single buyer or unassigned multiple tickets
-      for (let i = 0; i < quantity; i++) {
+      // Support both single ticketTypeId and array of ticketTypes
+      const ticketTypesToCreate = parsedTicketTypes.length > 0 ? parsedTicketTypes : Array(quantity).fill(ticketTypeId);
+
+      // Fetch event to get ticket type details (for admission size/names)
+      const event = eventId ? await this.eventRepository.findById(eventId) : null;
+
+      logger.info('[PaymentService] Creating tickets', {
+        ticketTypesLength: parsedTicketTypes.length,
+        quantity,
+        ticketTypesToCreate,
+        totalToCreate: ticketTypesToCreate.length,
+        hasEvent: !!event
+      });
+
+      for (let i = 0; i < ticketTypesToCreate.length; i++) {
         try {
+          const currentTicketTypeId = ticketTypesToCreate[i];
+
+          // Determine admission size based on ticket type
+          let admissionSize = 1;
+          if (event && event.ticketTypes) {
+            const tt = event.ticketTypes.id ? event.ticketTypes.id(currentTicketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(currentTicketTypeId));
+            if (tt) {
+              if (tt.type === 'couples') admissionSize = 2;
+              else if (tt.type === 'group_3') admissionSize = 3;
+              else if (tt.type === 'group_5') admissionSize = 5;
+              // Add other mappings if needed
+            }
+          }
+
+          logger.info(`[PaymentService] Creating ticket ${i + 1}/${ticketTypesToCreate.length}`, {
+            ticketTypeId: currentTicketTypeId,
+            admissionSize
+          });
+
           const ticketDTO = new CreateTicketDTO({
             eventId,
-            ticketTypeId,
+            ticketTypeId: currentTicketTypeId,
             userId,
-            quantity: 1,
-            bypassCapacity: false
+            quantity: admissionSize,
+            bypassCapacity: false,
+            skipEmail: true // Prevent individual emails, we'll send one consolidated email
           });
           const ticket = await this.createTicketUseCase.execute(ticketDTO);
           createdTickets.push(ticket);
+
+          logger.info(`[PaymentService] Ticket ${i + 1} created successfully`, {
+            ticketId: ticket.id,
+            ticketTypeId: currentTicketTypeId,
+            admissionSize
+          });
         } catch (ticketError) {
-          logger.error('Failed to create ticket', { error: ticketError.message });
+          logger.error('Failed to create ticket', {
+            index: i,
+            ticketTypeId: ticketTypesToCreate[i],
+            error: ticketError.message
+          });
         }
       }
 
@@ -251,8 +316,8 @@ class PaymentService {
               ticketCount: validTickets.length
             });
 
-          await this.emailAdapter.sendPaymentConfirmationEmail(
-            buyer,
+            await this.emailAdapter.sendPaymentConfirmationEmail(
+              buyer,
               validTickets.length === 1 ? validTickets[0] : validTickets
             );
 
@@ -310,7 +375,7 @@ class PaymentService {
                 ticketCount,
                 transactionId: transaction.id.toString(),
                 priority: 'high',
-                path: 'ticketsScreen'
+                path: 'ticketsDetailsScreen',
               }
             );
 
@@ -339,6 +404,83 @@ class PaymentService {
           userId,
           hasTickets: createdTickets.length > 0,
           hasNotificationUseCase: !!this.sendNotificationUseCase
+        });
+      }
+    }
+
+    // Notify event creator about ticket sale
+    const event = eventId ? await this.eventRepository.findById(eventId) : null;
+    if (this.sendNotificationUseCase && event && event.creatorId) {
+      try {
+        const creator = await this.userRepository.findById(event.creatorId);
+
+        // Don't notify if creator bought their own ticket (shouldn't happen with restrictions)
+        if (creator && String(creator.id) !== String(userId)) {
+          const ticketCount = createdTickets.length;
+          const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
+
+          logger.info('Sending ticket sale notification to event creator', {
+            creatorId: event.creatorId,
+            eventId,
+            ticketCount,
+            amount
+          });
+
+          await this.sendNotificationUseCase.execute(
+            event.creatorId,
+            {
+              title: '🎉 New Ticket Sale!',
+              body: `${ticketCount} ${ticketText} purchased for "${event.title}". Total: ₦${amount.toLocaleString()}`
+            },
+            {
+              type: 'ticket_sale',
+              eventId: eventId.toString(),
+              buyerId: userId.toString(),
+              ticketCount,
+              amount,
+              priority: 'medium',
+              path: `https://events.jaaiye.com/events/${event.slug}/analytics`,
+            }
+          );
+
+          // Send email notification to creator
+          if (this.emailAdapter && creator.email) {
+            try {
+              const buyer = await this.userRepository.findById(userId);
+              await this.emailAdapter.sendTicketSaleNotificationEmail(
+                creator,
+                {
+                  eventTitle: event.title,
+                  ticketCount,
+                  amount,
+                  buyerName: buyer?.fullName || 'A customer',
+                  eventId
+                },
+                authService.generateToken(creator)
+              );
+
+              logger.info('Ticket sale email sent to event creator', {
+                creatorId: event.creatorId,
+                creatorEmail: creator.email
+              });
+            } catch (emailError) {
+              logger.error('Failed to send ticket sale email to creator', {
+                creatorId: event.creatorId,
+                error: emailError.message
+              });
+            }
+          }
+
+          logger.info('Ticket sale notification sent to event creator successfully', {
+            creatorId: event.creatorId
+          });
+        }
+      } catch (creatorNotificationError) {
+        logger.error('Failed to notify event creator about ticket sale', {
+          eventId,
+          creatorId: event.creatorId,
+          error: creatorNotificationError.message,
+          stack: creatorNotificationError.stack
         });
       }
     }

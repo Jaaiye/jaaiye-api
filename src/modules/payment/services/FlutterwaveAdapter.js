@@ -22,12 +22,12 @@ class FlutterwaveAdapter {
    * @param {Object} data - { amount, email, metadata, currency, idempotencyKey }
    * @returns {Promise<{ authorizationUrl: string, reference: string, idempotencyKey: string, isCachedResponse: boolean }>}
    */
-  async initializePayment({ amount, email, metadata, currency = 'NGN', idempotencyKey }) {
+  async initializePayment({ amount, reference, email, metadata, currency = 'NGN', idempotencyKey }) {
     // Generate idempotency key if not provided
     const key = idempotencyKey || uuidv4();
 
     const payload = {
-      tx_ref: 'flw_' + Date.now(),
+      tx_ref: reference,
       amount,
       currency,
       redirect_url: this.redirectUrl,
@@ -48,7 +48,7 @@ class FlutterwaveAdapter {
       if (data.status === 'success') {
         return {
           authorizationUrl: data.data.link,
-          reference: data.data.tx_ref,
+          reference: payload.tx_ref,
           idempotencyKey: key,
           isCachedResponse: false
         };
@@ -62,7 +62,7 @@ class FlutterwaveAdapter {
         if (cachedData && cachedData.data) {
           return {
             authorizationUrl: cachedData.data.link,
-            reference: cachedData.data.tx_ref,
+            reference: payload.tx_ref,
             idempotencyKey: key,
             isCachedResponse: true
           };

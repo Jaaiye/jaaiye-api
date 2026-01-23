@@ -81,7 +81,7 @@ class EventController {
   updateEvent = asyncHandler(async (req, res) => {
     const { UpdateEventDTO } = require('./dto');
     const dto = new UpdateEventDTO(req.body);
-    const result = await this.updateEventUseCase.execute(req.params.id, req.user.id, dto);
+    const result = await this.updateEventUseCase.execute(req.params.id, req.user.id, dto, req.file);
 
     return successResponse(res, { event: result }, 200, 'Event updated successfully');
   });
@@ -143,17 +143,23 @@ class EventController {
   addTicketType = asyncHandler(async (req, res) => {
     const container = require('./event.module');
     const eventRepository = container.getEventRepository();
+
+    // Validate event exists
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
-    let eventDoc;
+    let eventId;
 
     if (isObjectId) {
-      eventDoc = await eventRepository.findById(req.params.id);
+      eventId = req.params.id;
+      const event = await eventRepository.findById(eventId);
+      if (!event) {
+        return res.status(404).json({ success: false, error: 'Event not found' });
+      }
     } else {
-      eventDoc = await eventRepository.findBySlug(req.params.id);
-    }
-
-    if (!eventDoc) {
-      return res.status(404).json({ success: false, error: 'Event not found' });
+      const event = await eventRepository.findBySlug(req.params.id);
+      if (!event) {
+        return res.status(404).json({ success: false, error: 'Event not found' });
+      }
+      eventId = event.id;
     }
 
     const ticketTypeData = {
@@ -168,17 +174,8 @@ class EventController {
       salesEndDate: req.body.salesEndDate ? new Date(req.body.salesEndDate) : null
     };
 
-    // Validate predefined type uniqueness
-    const predefinedTypes = ['regular', 'early_bird', 'couples', 'group_3', 'group_5', 'complimentary'];
-    if (predefinedTypes.includes(ticketTypeData.type)) {
-      const existing = eventDoc.ticketTypes.find(tt => tt.type === ticketTypeData.type);
-      if (existing) {
-        return res.status(400).json({ success: false, error: `A ticket type of type '${ticketTypeData.type}' already exists` });
-      }
-    }
-
-    await eventDoc.addTicketType(ticketTypeData);
-    const updatedEvent = await eventRepository.findById(req.params.id);
+    // Use repository method instead of entity method
+    const updatedEvent = await eventRepository.addTicketType(eventId, ticketTypeData);
     return successResponse(res, { event: updatedEvent }, 201, 'Ticket type added successfully');
   });
 
@@ -206,7 +203,8 @@ class EventController {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
 
-    const availableTypes = doc.getAvailableTicketTypes();
+    const availableTypes = doc.getAvailableTicketTypes()
+      .filter(ticket => ticket.type !== 'complimentary');
     return successResponse(res, { ticketTypes: availableTypes });
   });
 

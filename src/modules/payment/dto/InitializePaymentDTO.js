@@ -9,8 +9,10 @@ class InitializePaymentDTO {
   constructor(data) {
     this.eventId = data.eventId;
     this.quantity = data.quantity || 1;
+    this.ticketTypes = data.ticketTypes || [];
     this.email = data.email;
     this.amount = data.amount;
+    this.reference = data.reference;
     this.userId = data.userId; // Optional, can come from req.user
   }
 

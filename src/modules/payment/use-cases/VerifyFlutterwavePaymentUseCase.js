@@ -13,7 +13,7 @@ class VerifyFlutterwavePaymentUseCase {
   async execute(reference) {
     try {
       const result = await this.flutterwaveAdapter.verify(reference);
-      return { result };
+      return result;
     } catch (error) {
       throw new PaymentVerificationError(error.message || 'Failed to verify Flutterwave payment');
     }

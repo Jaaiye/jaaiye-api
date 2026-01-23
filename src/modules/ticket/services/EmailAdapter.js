@@ -53,9 +53,6 @@ class EmailAdapter {
         throw new Error(`${invalidTickets.length} ticket(s) missing valid event data. All tickets must have populated eventId with title property.`);
       }
 
-      const ticketCount = tickets.length;
-      const eventTitle = firstTicket.eventId?.title || 'Event';
-
       const subject = ticketCount > 1
         ? `🎟️ Payment Confirmed! Your ${ticketCount} Tickets for ${eventTitle}`
         : `🎟️ Payment Confirmed! Your Ticket for ${eventTitle}`;

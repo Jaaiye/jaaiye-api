@@ -10,6 +10,7 @@ const createWalletRoutes = require('./wallet.routes');
 const WalletNotificationService = require('./services/WalletNotificationService');
 const WalletEmailAdapter = require('./services/WalletEmailAdapter');
 const WalletWithdrawalService = require('./services/WalletWithdrawalService');
+const WalletAuthorizationService = require('./services/WalletAuthorizationService');
 const { EventRepository } = require('../event/repositories');
 const { GroupRepository } = require('../group/repositories');
 const { UserRepository, BankAccountRepository } = require('../common/repositories');
@@ -121,6 +122,16 @@ class WalletModule {
     return this._instances.walletNotificationService;
   }
 
+  getWalletAuthorizationService() {
+    if (!this._instances.walletAuthorizationService) {
+      this._instances.walletAuthorizationService = new WalletAuthorizationService({
+        eventRepository: new EventRepository(),
+        groupRepository: new GroupRepository()
+      });
+    }
+    return this._instances.walletAuthorizationService;
+  }
+
   // ============================================================================
   // CONTROLLERS
   // ============================================================================
@@ -132,7 +143,8 @@ class WalletModule {
         adjustWalletBalanceUseCase: this.getAdjustWalletBalanceUseCase(),
         requestWithdrawalWithPayoutUseCase: this.getRequestWithdrawalWithPayoutUseCase(),
         getWithdrawalsUseCase: this.getGetWithdrawalsUseCase(),
-        getWithdrawalDetailsUseCase: this.getGetWithdrawalDetailsUseCase()
+        getWithdrawalDetailsUseCase: this.getGetWithdrawalDetailsUseCase(),
+        walletAuthorizationService: this.getWalletAuthorizationService()
       });
     }
     return this._instances.walletController;

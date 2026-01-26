@@ -12,13 +12,15 @@ class WalletController {
     adjustWalletBalanceUseCase,
     requestWithdrawalWithPayoutUseCase,
     getWithdrawalsUseCase,
-    getWithdrawalDetailsUseCase
+    getWithdrawalDetailsUseCase,
+    walletAuthorizationService
   }) {
     this.getWalletDetailsUseCase = getWalletDetailsUseCase;
     this.adjustWalletBalanceUseCase = adjustWalletBalanceUseCase;
     this.requestWithdrawalWithPayoutUseCase = requestWithdrawalWithPayoutUseCase;
     this.getWithdrawalsUseCase = getWithdrawalsUseCase;
     this.getWithdrawalDetailsUseCase = getWithdrawalDetailsUseCase;
+    this.walletAuthorizationService = walletAuthorizationService;
   }
 
   /**
@@ -29,6 +31,8 @@ class WalletController {
     const { ownerType, ownerId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
     const skip = parseInt(req.query.skip) || 0;
+    const userId = req.user.id || req.user._id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
     // Normalize ownerType to uppercase
     const normalizedOwnerType = ownerType.toUpperCase();
@@ -41,6 +45,21 @@ class WalletController {
 
     // For PLATFORM wallet, ownerId should be null/undefined
     const finalOwnerId = normalizedOwnerType === 'PLATFORM' ? null : ownerId;
+
+    // Authorization check
+    const authResult = await this.walletAuthorizationService.canViewWallet({
+      ownerType: normalizedOwnerType,
+      ownerId: finalOwnerId,
+      userId,
+      isAdmin
+    });
+
+    if (!authResult.allowed) {
+      return res.status(403).json({
+        status: 'fail',
+        message: authResult.reason || 'You do not have permission to view this wallet'
+      });
+    }
 
     const result = await this.getWalletDetailsUseCase.execute({
       ownerType: normalizedOwnerType,
@@ -60,6 +79,8 @@ class WalletController {
     const { ownerType, ownerId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
     const skip = parseInt(req.query.skip) || 0;
+    const userId = req.user.id || req.user._id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
     // Normalize ownerType to uppercase
     const normalizedOwnerType = ownerType.toUpperCase();
@@ -72,6 +93,21 @@ class WalletController {
 
     // For PLATFORM wallet, ownerId should be null/undefined
     const finalOwnerId = normalizedOwnerType === 'PLATFORM' ? null : ownerId;
+
+    // Authorization check
+    const authResult = await this.walletAuthorizationService.canViewWallet({
+      ownerType: normalizedOwnerType,
+      ownerId: finalOwnerId,
+      userId,
+      isAdmin
+    });
+
+    if (!authResult.allowed) {
+      return res.status(403).json({
+        status: 'fail',
+        message: authResult.reason || 'You do not have permission to view this wallet'
+      });
+    }
 
     const result = await this.getWalletDetailsUseCase.execute({
       ownerType: normalizedOwnerType,
@@ -160,12 +196,29 @@ class WalletController {
     const { ownerType, ownerId } = req.params;
     const limit = parseInt(req.query.limit) || 50;
     const skip = parseInt(req.query.skip) || 0;
+    const userId = req.user.id || req.user._id;
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
     const normalizedOwnerType = ownerType.toUpperCase();
     if (!['EVENT', 'GROUP'].includes(normalizedOwnerType)) {
       return res.status(400).json({
         status: 'fail',
         message: 'Invalid ownerType. Must be EVENT or GROUP'
+      });
+    }
+
+    // Authorization check
+    const authResult = await this.walletAuthorizationService.canViewWallet({
+      ownerType: normalizedOwnerType,
+      ownerId,
+      userId,
+      isAdmin
+    });
+
+    if (!authResult.allowed) {
+      return res.status(403).json({
+        status: 'fail',
+        message: authResult.reason || 'You do not have permission to view this wallet'
       });
     }
 

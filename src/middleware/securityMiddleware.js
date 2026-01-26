@@ -8,10 +8,23 @@ exports.apiLimiter = rateLimit({
   windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
   max: process.env.RATE_LIMIT_MAX_REQUESTS || 2000, // Increased to 2000 for admin dashboard (makes 5+ parallel requests)
   keyGenerator: (req) => {
-    // Use IP only for authenticated routes to avoid double counting with global limiter
+    // 1. User ID (if already authenticated by middleware)
+    if (req.user && req.user.id) return req.user.id;
+
+    // 2. Authorization Token
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      return authHeader.substring(7); // Return the token part
+    }
+
+    // 3. API Key
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey) return apiKey;
+
+    // 4. Fallback to IP
     return req.ip || req.connection.remoteAddress || 'unknown';
   },
-  message: 'Too many requests from this IP, please try again later',
+  message: 'Too many requests, please try again later',
   skip: (req) => {
     // Skip rate limiting for health checks and other public endpoints
     return req.path === '/health' || req.path.startsWith('/api/v1/health');
@@ -53,7 +66,7 @@ exports.validateApiKey = async (req, res, next) => {
 
     req.apiKey = validKey;
     next();
-  } catch(error) {
+  } catch (error) {
     res.status(500).json({
       success: false,
       error: 'Error validating API key'

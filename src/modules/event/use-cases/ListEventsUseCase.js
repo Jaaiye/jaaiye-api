@@ -14,86 +14,47 @@ class ListEventsUseCase {
     const filters = dto.getFilters();
     const options = dto.getOptions();
 
-    // Handle scope
-    if (dto.scope === 'jaaiye') {
-      filters.createdBy = 'Jaaiye';
-    } else if (!userId) {
-      // Unauthenticated users - can only view events with category 'event'
-      // No hangouts, even if they're in public calendars
-      if (dto.category === 'hangout') {
+    // The user wants fixed logic regardless of input:
+    // 1. Events -> always fetch all
+    // 2. Hangouts -> only mine
+
+    if (dto.category === 'event') {
+      // For 'event', we always fetch all events
+      filters.category = 'event';
+      // No calendar or scope restrictions applied to events
+    } else if (dto.category === 'hangout') {
+      // For 'hangout', we only fetch the user's own hangouts
+      if (!userId) {
         // Unauthenticated users cannot view hangouts
         return { events: [], pagination: { page: dto.page, limit: dto.limit, total: 0, pages: 0 } };
       }
 
-      // Show all events with category 'event' (no calendar restriction)
-      filters.category = 'event';
-    } else {
-      let calendarIds;
+      filters.category = 'hangout';
 
-      if (dto.calendarId) {
-        const calendar = await this.calendarRepository.findById(dto.calendarId);
-        if (!calendar) {
-          return { events: [], pagination: { page: dto.page, limit: dto.limit, total: 0, pages: 0 } };
-        }
+      // Force 'mine' logic: created by user OR participating
+      const participatingEventIds = await this.eventParticipantRepository.findByUser(userId);
+      const eventIds = participatingEventIds.map(p => p.event);
 
-        // Check access
-        if (!calendar.isPublic && !calendar.isOwnedBy(userId) && !calendar.isSharedWith(userId)) {
-          throw new Error('Access denied');
-        }
+      const mongoose = require('mongoose');
+      const objectEventIds = eventIds.length > 0
+        ? eventIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)
+        : [];
 
-        calendarIds = [calendar.id];
+      if (objectEventIds.length > 0) {
+        filters.$or = [
+          { createdBy: userId },
+          { _id: { $in: objectEventIds } }
+        ];
       } else {
-        const calendars = await this.calendarRepository.findAccessibleByUser(userId);
-        calendarIds = calendars.map(c => c.id);
-      }
-
-      // Handle scope-specific filters
-      if (dto.scope === 'creator') {
-        // For 'creator' scope: only events created by user
         filters.createdBy = userId;
-
-        // Optionally filter by calendar if calendars exist
-        if (calendarIds.length > 0) {
-          const mongoose = require('mongoose');
-          const objectCalendarIds = calendarIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
-          filters.calendar = objectCalendarIds.length === 1 ? objectCalendarIds[0] : { $in: objectCalendarIds };
-        }
-      } else if (dto.scope === 'mine') {
-        // For 'mine' scope: events created by user OR events user is participating in
-        const participatingEventIds = await this.eventParticipantRepository.findByUser(userId);
-        const eventIds = participatingEventIds.map(p => p.event);
-
-        const mongoose = require('mongoose');
-        const objectEventIds = eventIds.length > 0
-          ? eventIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)
-          : [];
-
-        if (calendarIds.length > 0) {
-          // User has calendars - filter by calendar AND (created by user OR participating)
-          const objectCalendarIds = calendarIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
-          filters.calendar = objectCalendarIds.length === 1 ? objectCalendarIds[0] : { $in: objectCalendarIds };
-
-          if (objectEventIds.length > 0) {
-            filters.$or = [
-              { createdBy: userId },
-              { _id: { $in: objectEventIds } }
-            ];
-          } else {
-            filters.createdBy = userId;
-          }
-        } else {
-          // No calendars - just filter by created by user OR participating
-          if (objectEventIds.length > 0) {
-            filters.$or = [
-              { createdBy: userId },
-              { _id: { $in: objectEventIds } }
-            ];
-          } else {
-            filters.createdBy = userId;
-          }
-        }
+      }
+    } else {
+      // category === 'all' (default or explicitly passed)
+      if (!userId) {
+        // Unauthenticated users only see public events
+        filters.category = 'event';
       } else {
-        // For 'all' scope: events in accessible calendars OR events user is participating in
+        // Authenticated users see ALL categories: All Events + My Hangouts
         const participatingEventIds = await this.eventParticipantRepository.findByUser(userId);
         const eventIds = participatingEventIds.map(p => p.event);
 
@@ -102,28 +63,23 @@ class ListEventsUseCase {
           ? eventIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)
           : [];
 
-        if (calendarIds.length > 0) {
-          // User has calendars - filter by calendar OR participating events
-          const objectCalendarIds = calendarIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
+        filters.$or = [
+          { category: 'event' }, // All events
+          {
+            category: 'hangout',
+            $or: [
+              { createdBy: userId },
+              { _id: { $in: objectEventIds.length > 0 ? objectEventIds : [] } }
+            ].filter(cond => {
+              if (cond._id && cond._id.$in.length === 0) return false;
+              return true;
+            })
+          }
+        ];
 
-          if (objectEventIds.length > 0) {
-            // Include events in accessible calendars OR events user is participating in
-            filters.$or = [
-              { calendar: objectCalendarIds.length === 1 ? objectCalendarIds[0] : { $in: objectCalendarIds } },
-              { _id: { $in: objectEventIds } }
-            ];
-          } else {
-            // Only filter by calendar
-            filters.calendar = objectCalendarIds.length === 1 ? objectCalendarIds[0] : { $in: objectCalendarIds };
-          }
-        } else {
-          // No calendars - only show events user is participating in
-          if (objectEventIds.length > 0) {
-            filters._id = { $in: objectEventIds };
-          } else {
-            // No calendars and no participating events - return empty
-            return { events: [], pagination: { page: dto.page, limit: dto.limit, total: 0, pages: 0 } };
-          }
+        // If no participating events, simplify the hangout part
+        if (objectEventIds.length === 0) {
+          filters.$or[1] = { category: 'hangout', createdBy: userId };
         }
       }
     }
@@ -143,4 +99,3 @@ class ListEventsUseCase {
 }
 
 module.exports = ListEventsUseCase;
-

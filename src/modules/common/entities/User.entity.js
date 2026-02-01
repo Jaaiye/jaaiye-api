@@ -75,9 +75,9 @@ class UserEntity {
    * Business Rule: Is user a scanner?
    * @returns {boolean}
   **/
- isScanner() {
-  return ['scanner', 'admin', 'superadmin'].includes(this.role);
- }
+  isScanner() {
+    return ['scanner', 'admin', 'superadmin'].includes(this.role);
+  }
 
   /**
    * Business Rule: Is user an admin?
@@ -134,7 +134,6 @@ class UserEntity {
       return false;
     }
 
-    console.log(this.verification)
 
     if (!this.verification.expires) {
       if (process.env.NODE_ENV === 'development') {
@@ -150,11 +149,12 @@ class UserEntity {
     const isValid = isBefore(now(), expiresDate);
 
     if (process.env.NODE_ENV === 'development') {
+      const currentTime = now();
       console.log('hasValidVerificationCode check:', {
-        now: now.toISOString(),
+        now: currentTime.toISOString(),
         expires: expiresDate.toISOString(),
         isValid,
-        timeRemaining: isValid ? Math.floor((expiresDate - now) / 1000 / 60) : 0
+        timeRemaining: isValid ? Math.floor((expiresDate - currentTime) / 1000 / 60) : 0
       });
     }
 

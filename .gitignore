@@ -16,7 +16,7 @@ data
 docs
 
 # Logs
-logs
+logs/
 
 # Firebase config files (security)
 src/config/*.json
@@ -28,5 +28,3 @@ scripts/
 
 emails/resend/
 postman
-scripts
-logs/

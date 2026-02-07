@@ -1,9 +1,5 @@
 const winston = require('winston');
-const path = require('path');
 const { sanitizeLogData } = require('./logSanitizer');
-
-const combinedLogPath = path.join(__dirname, '../..', 'logs', 'combined.log');
-const errorLogPath = path.join(__dirname, '../..', 'logs', 'error.log');
 
 const LOG_INCLUDE_STACK = process.env.LOG_INCLUDE_STACK === 'true';
 
@@ -28,7 +24,7 @@ function parseAllowedLevels() {
 
 let ALLOWED_LEVELS = parseAllowedLevels();
 
-// Set logger threshold to the most permissive; gating handled in wrappers
+// Set logger threshold
 const logger = winston.createLogger({
   level: 'silly',
   format: winston.format.combine(
@@ -45,19 +41,6 @@ const logger = winston.createLogger({
         winston.format.colorize(),
         winston.format.simple()
       )
-    }),
-    new winston.transports.File({
-      filename: combinedLogPath,
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
-      tailable: true
-    }),
-    new winston.transports.File({
-      filename: errorLogPath,
-      level: 'error',
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
-      tailable: true
     })
   ]
 });

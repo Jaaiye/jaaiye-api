@@ -27,12 +27,6 @@ app.use(traceMiddleware);
 // Create HTTP server
 const server = require('http').createServer(app);
 
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir);
-}
-
 // Middleware
 app.use(helmet()); // Security headers
 app.use(compression()); // Compress responses

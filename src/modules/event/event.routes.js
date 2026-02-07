@@ -275,6 +275,15 @@ function createEventRoutes(eventController) {
     eventController.issueTicket
   );
 
+  router.post(
+    '/:id/tickets/resend-emails',
+    apiLimiter,
+    protect,
+    validateEventId,
+    validate,
+    eventController.resendEventTickets
+  );
+
   return router;
 }
 

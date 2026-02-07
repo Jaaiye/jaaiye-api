@@ -98,6 +98,11 @@ const eventSchema = new mongoose.Schema({
     salesEndDate: {
       type: Date,
       default: null
+    },
+    admissionSize: {
+      type: Number,
+      default: 1,
+      min: 1
     }
   }],
   // Legacy field for backward compatibility

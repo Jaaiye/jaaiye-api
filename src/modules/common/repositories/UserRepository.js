@@ -7,6 +7,7 @@
 const IUserRepository = require('./interfaces/IUserRepository');
 const UserSchema = require('../entities/User.schema');
 const UserEntity = require('../entities/User.entity');
+const TokenBlacklist = require('../../common/entities/TokenBlacklist.schema');
 
 class UserRepository extends IUserRepository {
   /**
@@ -146,6 +147,29 @@ class UserRepository extends IUserRepository {
    */
   async delete(id) {
     await UserSchema.findByIdAndDelete(id);
+  }
+
+  /**
+   * Revoke all sessions for a user
+   * @param {string} userId - User ID
+   * @returns {Promise<void>}
+   */
+  async revokeAllSessions(userId) {
+    // Select the refresh token fields specifically
+    const userDoc = await UserSchema.findById(userId).select('+refresh.token +refresh.expiresAt');
+
+    if (userDoc?.refresh?.token) {
+      // Blacklist the existing token
+      await TokenBlacklist.create({
+        token: userDoc.refresh.token,
+        expiresAt: userDoc.refresh.expiresAt || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+      });
+
+      // Wipe the token from the user record
+      userDoc.refresh.token = undefined;
+      userDoc.refresh.expiresAt = undefined;
+      await userDoc.save();
+    }
   }
 
   /**

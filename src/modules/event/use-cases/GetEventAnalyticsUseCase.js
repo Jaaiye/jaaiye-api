@@ -174,22 +174,23 @@ class GetEventAnalyticsUseCase {
     // Initialize with event ticket types
     if (event.ticketTypes && event.ticketTypes.length > 0) {
       event.ticketTypes.forEach(tt => {
-        breakdown[tt._id?.toString() || tt.id] = {
-          ticketTypeId: tt._id?.toString() || tt.id,
+        const id = tt._id?.toString() || tt.id;
+        breakdown[id] = {
+          ticketTypeId: id,
           name: tt.name,
           type: tt.type,
           price: Number(tt.price || 0),
+          admissionSize: tt.admissionSize || 1,
           soldCount: 0,
           revenue: 0
         };
       });
     }
 
-    // Count tickets by type (soldCount from tickets)
+    // 1. Calculate soldCount from tickets (Source of truth for ticket volume)
     tickets.forEach(ticket => {
       const typeId = ticket.ticketTypeId?.toString() || 'unknown';
       if (!breakdown[typeId]) {
-        // If ticket type not found in event, create entry with price from ticket
         breakdown[typeId] = {
           ticketTypeId: typeId,
           name: ticket.ticketTypeName || 'Unknown',
@@ -199,24 +200,57 @@ class GetEventAnalyticsUseCase {
           revenue: 0
         };
       }
-      breakdown[typeId].soldCount += ticket.quantity || 1;
+
+      const quantity = Number(ticket.quantity || 1);
+      breakdown[typeId].soldCount += quantity;
     });
 
-    // Calculate revenue by type (revenue from transactions)
-    transactions.forEach(transaction => {
-      const typeId = transaction.ticketTypeId?.toString() || 'unknown';
-      if (!breakdown[typeId]) {
-        // If transaction type not found, create entry
-        breakdown[typeId] = {
-          ticketTypeId: typeId,
-          name: 'Unknown',
-          type: 'custom',
-          price: Number(transaction.amount || 0) / (transaction.quantity || 1),
-          soldCount: 0,
-          revenue: 0
-        };
+    // 2. Calculate revenue from transactions (Source of truth for money)
+    // Map transaction ID to its ticket type(s)
+    const transactionTypeMap = {};
+    tickets.forEach(ticket => {
+      if (ticket.transactionId) {
+        const txId = ticket.transactionId.toString();
+        const typeId = ticket.ticketTypeId?.toString() || 'unknown';
+        if (!transactionTypeMap[txId]) {
+          transactionTypeMap[txId] = new Set();
+        }
+        transactionTypeMap[txId].add(typeId);
       }
-      breakdown[typeId].revenue += Number(transaction.amount || 0);
+    });
+
+    transactions.forEach(transaction => {
+      const txId = transaction._id?.toString() || transaction.id;
+      let targetTypeIds = [];
+
+      // Priority 1: Use the ticketTypeId stored directly on the transaction
+      if (transaction.ticketTypeId) {
+        targetTypeIds = [transaction.ticketTypeId.toString()];
+      }
+      // Priority 2: Use the types of the tickets created by this transaction
+      else if (transactionTypeMap[txId]) {
+        targetTypeIds = Array.from(transactionTypeMap[txId]);
+      }
+      // Priority 3: Fallback to unknown
+      else {
+        targetTypeIds = ['unknown'];
+      }
+
+      // Distribute transaction amount among found types
+      const amountPerType = Number(transaction.amount || 0) / targetTypeIds.length;
+      targetTypeIds.forEach(typeId => {
+        if (!breakdown[typeId]) {
+          breakdown[typeId] = {
+            ticketTypeId: typeId,
+            name: 'Unknown',
+            type: 'custom',
+            price: amountPerType,
+            soldCount: 0,
+            revenue: 0
+          };
+        }
+        breakdown[typeId].revenue += amountPerType;
+      });
     });
 
     return Object.values(breakdown);

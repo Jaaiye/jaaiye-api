@@ -64,6 +64,8 @@ class EmailAdapter {
         hasApiKey: !!process.env.RESEND_API_KEY
       });
 
+      const html = templates.paymentConfirmationEmail({ tickets });
+
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: email,
@@ -158,6 +160,38 @@ class EmailAdapter {
         stack: error.stack
       });
       throw error;
+    }
+  }
+
+  /**
+   * Send system alert email to admin
+   * @param {string} subject - Alert subject
+   * @param {string} message - Alert message
+   * @returns {Promise<void>}
+   */
+  async sendSystemAlert(subject, message) {
+    try {
+      const adminEmail = 'Fashinaololade96@gmail.com'; // User's email from recorded CCs
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: adminEmail,
+        subject: `🚨 SYSTEM ALERT: ${subject}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ff4444; border-radius: 8px;">
+            <h2 style="color: #ff4444;">System Alert</h2>
+            <p><strong>Message:</strong> ${message}</p>
+            <p><strong>Time (WAT):</strong> ${new Date().toLocaleString('en-GB', { timeZone: 'Africa/Lagos' })}</p>
+            <p><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</p>
+            <hr />
+            <p style="font-size: 12px; color: #666;">This is an automated message from the Jaaiye monitoring system.</p>
+          </div>
+        `
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Failed to send system alert email:', error.message);
     }
   }
 }

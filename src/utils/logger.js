@@ -62,6 +62,15 @@ const logger = winston.createLogger({
   ]
 });
 
+// Add MongoDB transport for persistent, searchable logs
+try {
+  const MongoTransport = require('./MongoTransport');
+  // We log 'info' and above to the database (info, warn, error)
+  logger.add(new MongoTransport({ level: 'info' }));
+} catch (error) {
+  console.error('Failed to add MongoDB transport to logger:', error.message);
+}
+
 // Enhanced logging methods with error handling, redaction, and controlled stacks
 const wrapLoggerMethod = (level) => {
   const original = logger[level].bind(logger);
@@ -69,6 +78,14 @@ const wrapLoggerMethod = (level) => {
     if (!ALLOWED_LEVELS.has(level)) return; // Gate by configured level set
 
     const base = { message };
+
+    // Auto-inject traceId from AsyncLocalStorage if available
+    const als = require('./als');
+    const store = als.getStore();
+    if (store) {
+      if (store.traceId) base.traceId = store.traceId;
+      if (store.userId) base.userId = store.userId;
+    }
 
     if (errorOrInfo instanceof Error) {
       base.error = errorOrInfo.message;

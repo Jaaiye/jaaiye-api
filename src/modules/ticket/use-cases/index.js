@@ -6,6 +6,7 @@ const GetTicketByIdUseCase = require('./GetTicketByIdUseCase');
 const GetTicketByPublicIdUseCase = require('./GetTicketByPublicIdUseCase');
 const ScanAndVerifyTicketUseCase = require('./ScanAndVerifyTicketUseCase');
 const CancelTicketUseCase = require('./CancelTicketUseCase');
+const ResendEventTicketsUseCase = require('./ResendEventTicketsUseCase');
 
 module.exports = {
   CreateTicketUseCase,
@@ -15,6 +16,7 @@ module.exports = {
   GetTicketByIdUseCase,
   GetTicketByPublicIdUseCase,
   ScanAndVerifyTicketUseCase,
-  CancelTicketUseCase
+  CancelTicketUseCase,
+  ResendEventTicketsUseCase
 };
 

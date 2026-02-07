@@ -32,6 +32,7 @@ class TransactionRepository extends ITransactionRepository {
       ticketTypeId: data.ticketTypeId,
       quantity: data.quantity,
       raw: data.raw,
+      gatewayFee: data.gatewayFee,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt
     });

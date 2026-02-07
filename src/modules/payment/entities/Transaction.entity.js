@@ -19,6 +19,7 @@ class TransactionEntity {
     ticketTypeId,
     quantity,
     raw,
+    gatewayFee,
     createdAt,
     updatedAt
   }) {
@@ -36,6 +37,7 @@ class TransactionEntity {
     this.ticketTypeId = ticketTypeId;
     this.quantity = quantity || 1;
     this.raw = raw;
+    this.gatewayFee = gatewayFee || 0;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -96,6 +98,7 @@ class TransactionEntity {
       ticketTypeId: this.ticketTypeId,
       quantity: this.quantity,
       raw: this.raw,
+      gatewayFee: this.gatewayFee,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     };

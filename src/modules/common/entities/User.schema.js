@@ -92,7 +92,8 @@ const userSchema = new mongoose.Schema(
     friendSettings: {
       allowFriendRequests: { type: Boolean, default: true },
       allowEventInvites: { type: Boolean, default: true },
-      visibility: { type: String, enum: ['public', 'friends', 'private'], default: 'friends' }
+      visibility: { type: String, enum: ['public', 'friends', 'private'], default: 'friends' },
+      showInSearch: { type: Boolean, default: true }
     },
     ics: {
       token: { type: String, select: false }

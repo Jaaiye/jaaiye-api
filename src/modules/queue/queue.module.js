@@ -6,6 +6,7 @@
 const EmailQueue = require('./email.queue');
 const NotificationQueue = require('./notification.queue');
 const PaymentPollingQueue = require('./payment-polling.queue');
+const UptimeMonitor = require('./uptime.monitor');
 
 class QueueModule {
   constructor() {
@@ -31,6 +32,13 @@ class QueueModule {
       this._instances.paymentPollingQueue = PaymentPollingQueue;
     }
     return this._instances.paymentPollingQueue;
+  }
+
+  getUptimeMonitor() {
+    if (!this._instances.uptimeMonitor) {
+      this._instances.uptimeMonitor = UptimeMonitor;
+    }
+    return this._instances.uptimeMonitor;
   }
 }
 

@@ -100,9 +100,14 @@ class WalletWithdrawalService {
 
     const currentBalance = Number(wallet.balance || 0);
 
-    // Placeholder: fee rules to be implemented later
-    const feeAmount = 0;
-    const totalDebit = amount + feeAmount;
+    // Default fee logic: EVENT owners pay 5% service fee
+    let feeAmount = 0;
+    if (ownerType === 'EVENT') {
+      feeAmount = amount * 0.05;
+    }
+
+    const totalDebit = amount; // The requested amount is the total debit from wallet
+    const payoutAmount = amount - feeAmount; // Remaining is remitted
 
     if (currentBalance < totalDebit) {
       throw new Error('Insufficient wallet balance for withdrawal');
@@ -124,11 +129,11 @@ class WalletWithdrawalService {
       ownerId,
       metadata: {
         requestedBy,
-        feeMode
+        feeMode,
+        feeAmount,
+        payoutAmount
       }
     });
-
-    // Fee-specific ledger entries can be added here once rules are finalised.
 
     return {
       ownerType,
@@ -137,6 +142,7 @@ class WalletWithdrawalService {
       requestedAmount: amount,
       feeAmount,
       totalDebit,
+      payoutAmount,
       walletBalanceAfter: Number(updatedWallet.balance || walletBalanceAfter)
     };
   }

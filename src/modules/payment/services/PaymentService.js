@@ -71,6 +71,16 @@ class PaymentService {
       return { ok: true, alreadyProcessed: true, transaction: transaction.toJSON() };
     }
 
+    // Extract gateway fee from raw provider data if available
+    let gatewayFee = 0;
+    if (raw) {
+      if (provider === 'flutterwave') {
+        gatewayFee = Number(raw.app_fee || raw.fee || 0);
+      } else if (provider === 'paystack') {
+        gatewayFee = Number(raw.fees || 0) / 100; // Paystack returns fees in kobo
+      }
+    }
+
     // Create or update transaction
     if (!transaction) {
       transaction = await this.transactionRepository.create({
@@ -83,6 +93,7 @@ class PaymentService {
         ticketTypeId: ticketTypeId || null,
         quantity,
         raw,
+        gatewayFee,
         status: 'pending'
       });
     }
@@ -218,10 +229,7 @@ class PaymentService {
           if (event && event.ticketTypes) {
             const tt = event.ticketTypes.id ? event.ticketTypes.id(currentTicketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(currentTicketTypeId));
             if (tt) {
-              if (tt.type === 'couples') admissionSize = 2;
-              else if (tt.type === 'group_3') admissionSize = 3;
-              else if (tt.type === 'group_5') admissionSize = 5;
-              // Add other mappings if needed
+              admissionSize = tt.admissionSize || 1;
             }
           }
 
@@ -236,7 +244,8 @@ class PaymentService {
             userId,
             quantity: admissionSize,
             bypassCapacity: false,
-            skipEmail: true // Prevent individual emails, we'll send one consolidated email
+            skipEmail: true, // Prevent individual emails, we'll send one consolidated email
+            transactionId: transaction.id || transaction._id
           });
           const ticket = await this.createTicketUseCase.execute(ticketDTO);
           createdTickets.push(ticket);
@@ -418,26 +427,27 @@ class PaymentService {
         if (creator && String(creator.id) !== String(userId)) {
           const ticketCount = createdTickets.length;
           const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
+          const ticketTotalAmount = createdTickets.reduce((sum, t) => sum + Number(t.price || 0), 0);
 
           logger.info('Sending ticket sale notification to event creator', {
             creatorId: event.creatorId,
             eventId,
             ticketCount,
-            amount
+            amount: ticketTotalAmount
           });
 
           await this.sendNotificationUseCase.execute(
             event.creatorId,
             {
               title: '🎉 New Ticket Sale!',
-              body: `${ticketCount} ${ticketText} purchased for "${event.title}". Total: ₦${amount.toLocaleString()}`
+              body: `${ticketCount} ${ticketText} purchased for "${event.title}". Total: ₦${ticketTotalAmount.toLocaleString()}`
             },
             {
               type: 'ticket_sale',
               eventId: eventId.toString(),
               buyerId: userId.toString(),
               ticketCount,
-              amount,
+              amount: ticketTotalAmount,
               priority: 'medium',
               path: `https://events.jaaiye.com/events/${event.slug}/analytics`,
             }
@@ -452,7 +462,7 @@ class PaymentService {
                 {
                   eventTitle: event.title,
                   ticketCount,
-                  amount,
+                  amount: ticketTotalAmount,
                   buyerName: buyer?.fullName || 'A customer',
                   eventId
                 },
@@ -488,7 +498,8 @@ class PaymentService {
     // Mark transaction as successful
     transaction.markAsSuccessful();
     await this.transactionRepository.update(transaction.id, {
-      status: 'successful'
+      status: 'successful',
+      gatewayFee: gatewayFee || transaction.gatewayFee
     });
 
     // Fund wallets with 10% exclusive fee

@@ -20,14 +20,12 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
+// Trace ID Middleware (Generate unique ID for every request)
+const { traceMiddleware } = require('./middleware/traceMiddleware');
+app.use(traceMiddleware);
+
 // Create HTTP server
 const server = require('http').createServer(app);
-
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir);
-}
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -202,6 +200,7 @@ app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRo
 app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
 app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
 app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
+app.use('/api/v1/logging', require('./modules/logging/logging.module').getLoggingRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
 
 // 404 handler
@@ -240,7 +239,14 @@ connectDB();
 
 // Start background services
 const queueModule = require('./modules/queue/queue.module');
+const ticketModule = require('./modules/ticket/ticket.module');
+
 queueModule.getPaymentPollingQueue().start();
+
+// Initialize and start uptime monitor
+const uptimeMonitor = queueModule.getUptimeMonitor();
+uptimeMonitor.init({ emailAdapter: ticketModule.getEmailAdapter() });
+uptimeMonitor.start();
 
 // Start server
 const PORT = process.env.PORT || 3000;

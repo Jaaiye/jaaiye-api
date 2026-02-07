@@ -117,10 +117,11 @@ class RequestWithdrawalWithPayoutUseCase {
     // Step 2: Create Flutterwave transfer
     let transferResult;
     const payoutReference = `wd_${Date.now()}_${ownerType.toLowerCase()}_${ownerId}`;
+    const payoutAmount = withdrawalResult.payoutAmount;
 
     try {
       transferResult = await this.flutterwaveAdapter.createTransfer({
-        amount: withdrawalAmount,
+        amount: payoutAmount,
         bankCode: bankAccount.bankCode,
         accountNumber: bankAccount.accountNumber,
         accountName: bankAccount.accountName,

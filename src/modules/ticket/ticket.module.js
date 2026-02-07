@@ -13,14 +13,14 @@ const {
   GetTicketByIdUseCase,
   GetTicketByPublicIdUseCase,
   ScanAndVerifyTicketUseCase,
-  CancelTicketUseCase
+  CancelTicketUseCase,
+  ResendEventTicketsUseCase
 } = require('./use-cases');
 const TicketController = require('./ticket.controller');
 const TicketRoutes = require('./ticket.routes');
 
 // Import shared dependencies
-const { EventRepository } = require('../event/repositories');
-const { EventParticipantRepository } = require('../event/repositories');
+const { EventRepository, EventParticipantRepository, EventTeamRepository } = require('../event/repositories');
 const { UserRepository } = require('../common/repositories');
 const CalendarSyncService = require('../event/services/CalendarSyncService');
 const { GoogleCalendarAdapter } = require('../event/services');
@@ -46,6 +46,7 @@ class TicketModule {
     this._getTicketByPublicIdUseCase = null;
     this._scanAndVerifyTicketUseCase = null;
     this._cancelTicketUseCase = null;
+    this._resendEventTicketsUseCase = null;
 
     // Controller
     this._ticketController = null;
@@ -97,6 +98,13 @@ class TicketModule {
       this._eventParticipantRepository = new EventParticipantRepository();
     }
     return this._eventParticipantRepository;
+  }
+
+  getEventTeamRepository() {
+    if (!this._eventTeamRepository) {
+      this._eventTeamRepository = new EventTeamRepository();
+    }
+    return this._eventTeamRepository;
   }
 
   getCalendarRepository() {
@@ -205,6 +213,19 @@ class TicketModule {
       });
     }
     return this._cancelTicketUseCase;
+  }
+
+  getResendEventTicketsUseCase() {
+    if (!this._resendEventTicketsUseCase) {
+      this._resendEventTicketsUseCase = new ResendEventTicketsUseCase({
+        ticketRepository: this.getTicketRepository(),
+        eventRepository: this.getEventRepository(),
+        userRepository: this.getUserRepository(),
+        emailAdapter: this.getEmailAdapter(),
+        eventTeamRepository: this.getEventTeamRepository()
+      });
+    }
+    return this._resendEventTicketsUseCase;
   }
 
   // Controller

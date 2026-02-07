@@ -52,27 +52,70 @@ class AnalyticsService {
       return sum + revenue;
     }, 0);
 
-    // Calculate total platform fees
+    // Calculate total platform fees collected (10%)
     const totalFees = transactions.reduce((sum, t) => {
       return sum + (Number(t.feeAmount) || 0);
     }, 0);
+
+    // Calculate total gateway fees (what Flutterwave/Paystack charged us)
+    const totalGatewayFees = transactions.reduce((sum, t) => {
+      return sum + (Number(t.gatewayFee) || 0);
+    }, 0);
+
+    // Calculate platform profit (What we charged - What we were charged)
+    const platformProfit = totalFees - totalGatewayFees;
 
     // Calculate gross revenue (total including fees)
     const totalGross = totalRevenue + totalFees;
 
     const transactionCount = transactions.length;
 
+    // Calculate monthly breakdown for the earnings page
+    const monthlyBreakdown = transactions.reduce((acc, t) => {
+      const date = new Date(t.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!acc[monthKey]) {
+        acc[monthKey] = {
+          month: monthKey,
+          revenue: 0,
+          fees: 0,
+          gatewayFees: 0,
+          profit: 0,
+          count: 0
+        };
+      }
+
+      const transRevenue = Number(t.baseAmount) || Number(t.amount) || 0;
+      const transFees = Number(t.feeAmount) || 0;
+      const transGatewayFees = Number(t.gatewayFee) || 0;
+
+      acc[monthKey].revenue += transRevenue;
+      acc[monthKey].fees += transFees;
+      acc[monthKey].gatewayFees += transGatewayFees;
+      acc[monthKey].profit += (transFees - transGatewayFees);
+      acc[monthKey].count += 1;
+
+      return acc;
+    }, {});
+
+    const breakdownArray = Object.values(monthlyBreakdown).sort((a, b) => a.month.localeCompare(b.month));
+
     return {
       totalRevenue, // Net revenue to organizers (excluding platform fee)
-      totalFees,    // Platform fees collected
+      totalFees,    // Total platform fees collected (10%)
+      totalGatewayFees, // Total gateway fees paid (e.g. Flutterwave)
+      platformProfit,   // Actual platform profit (Fees - Gateway Fees)
       totalGross,   // Total revenue including fees
       transactionCount,
       averageTransactionAmount: transactionCount > 0 ? totalRevenue / transactionCount : 0,
+      monthlyBreakdown: breakdownArray,
       transactions: transactions.map(t => ({
         id: t.id,
         amount: t.amount,
         baseAmount: t.baseAmount,
         feeAmount: t.feeAmount,
+        gatewayFee: t.gatewayFee,
         currency: t.currency,
         provider: t.provider,
         createdAt: t.createdAt

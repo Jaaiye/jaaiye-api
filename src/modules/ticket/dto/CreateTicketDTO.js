@@ -15,6 +15,8 @@ class CreateTicketDTO {
     this.email = data.email; // Legacy support (optional)
     this.bypassCapacity = data.bypassCapacity || false;
     this.skipEmail = data.skipEmail || false; // Skip individual email notification
+    this.transactionId = data.transactionId || null;
+    this.price = data.price || null;
   }
 
   validate() {

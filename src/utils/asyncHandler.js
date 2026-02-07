@@ -19,6 +19,7 @@ const requestLogger = (req, res, next) => {
       statusCode: res.statusCode,
       durationMs: duration,
       userId: req.user?.id,
+      traceId: req.traceId
     });
     logger.info('Request', info);
   });

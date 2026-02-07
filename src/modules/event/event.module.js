@@ -45,6 +45,7 @@ const {
   GetTeamEventsUseCase,
   ListTeamInvitationsUseCase
 } = require('./use-cases');
+const { ResendEventTicketsUseCase } = require('../ticket/use-cases');
 const EventController = require('./event.controller');
 const createEventRoutes = require('./event.routes');
 
@@ -443,6 +444,14 @@ class EventModule {
   // CONTROLLER
   // ============================================================================
 
+  getResendEventTicketsUseCase() {
+    if (!this._instances.resendEventTicketsUseCase) {
+      const ticketModule = require('../ticket/ticket.module');
+      this._instances.resendEventTicketsUseCase = ticketModule.getResendEventTicketsUseCase();
+    }
+    return this._instances.resendEventTicketsUseCase;
+  }
+
   getEventController() {
     if (!this._instances.eventController) {
       this._instances.eventController = new EventController({
@@ -466,7 +475,8 @@ class EventModule {
         getEventTeamUseCase: this.getGetEventTeamUseCase(),
         getEventAnalyticsUseCase: this.getGetEventAnalyticsUseCase(),
         getTeamEventsUseCase: this.getGetTeamEventsUseCase(),
-        listTeamInvitationsUseCase: this.getListTeamInvitationsUseCase()
+        listTeamInvitationsUseCase: this.getListTeamInvitationsUseCase(),
+        resendEventTicketsUseCase: this.getResendEventTicketsUseCase()
       });
     }
     return this._instances.eventController;

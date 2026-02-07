@@ -50,7 +50,8 @@ class CreateTicketUseCase {
       ticketTypeIdForTracking,
       ticketTypeNameForTracking,
       resolvedPrice,
-      quantity: dto.quantity
+      quantity: dto.quantity,
+      transactionId: dto.transactionId
     });
 
     const updatedTicket = await this._generateAndSavePublicId(ticket);
@@ -122,7 +123,9 @@ class CreateTicketUseCase {
     let chosenType = null;
     let resolvedPrice = 0;
 
-    if (eventDoc.ticketFee === 'free') {
+    if (dto.price !== null && dto.price !== undefined) {
+      resolvedPrice = Number(dto.price);
+    } else if (eventDoc.ticketFee === 'free') {
       resolvedPrice = 0;
     } else if (Array.isArray(eventDoc.ticketTypes) && eventDoc.ticketTypes.length > 0) {
       chosenType = await this._selectTicketType(eventDoc, dto);
@@ -185,7 +188,7 @@ class CreateTicketUseCase {
     return chosenType;
   }
 
-  async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, quantity }) {
+  async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, quantity, transactionId }) {
     console.log('[CreateTicketUseCase] Creating ticket', {
       userId: targetUserId,
       eventId,
@@ -200,6 +203,7 @@ class CreateTicketUseCase {
       eventId,
       ticketTypeId: ticketTypeIdForTracking,
       ticketTypeName: ticketTypeNameForTracking,
+      transactionId,
       price: resolvedPrice,
       quantity
     });

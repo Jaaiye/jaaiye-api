@@ -28,7 +28,8 @@ class EventController {
     getEventTeamUseCase,
     getEventAnalyticsUseCase,
     getTeamEventsUseCase,
-    listTeamInvitationsUseCase
+    listTeamInvitationsUseCase,
+    resendEventTicketsUseCase
   }) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
@@ -51,6 +52,7 @@ class EventController {
     this.getEventAnalyticsUseCase = getEventAnalyticsUseCase;
     this.getTeamEventsUseCase = getTeamEventsUseCase;
     this.listTeamInvitationsUseCase = listTeamInvitationsUseCase;
+    this.resendEventTicketsUseCase = resendEventTicketsUseCase;
   }
 
   createEvent = asyncHandler(async (req, res) => {
@@ -442,6 +444,11 @@ class EventController {
         createdAt: ticket.createdAt
       }
     }, 201, 'Ticket issued successfully');
+  });
+
+  resendEventTickets = asyncHandler(async (req, res) => {
+    const result = await this.resendEventTicketsUseCase.execute(req.params.id, req.user.id);
+    return successResponse(res, result, 200, result.message);
   });
 }
 

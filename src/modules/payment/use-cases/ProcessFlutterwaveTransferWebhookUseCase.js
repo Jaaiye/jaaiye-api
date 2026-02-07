@@ -160,7 +160,7 @@ class ProcessFlutterwaveTransferWebhookUseCase {
         await this.walletNotificationService.sendWithdrawalSuccessEmail({
           user,
           ownerLabel,
-          payoutAmountNet: withdrawal.amount,
+          payoutAmountNet: withdrawal.amount - (withdrawal.feeAmount || 0),
           feeAmount: withdrawal.feeAmount || 0,
           walletBalanceAfter: Number(updatedWallet.balance || 0),
           destinationMasked
@@ -172,7 +172,7 @@ class ProcessFlutterwaveTransferWebhookUseCase {
         await this.walletNotificationService.sendWithdrawalFailedEmail({
           user,
           ownerLabel,
-          payoutAmountNet: withdrawal.amount,
+          payoutAmountNet: withdrawal.amount - (withdrawal.feeAmount || 0),
           failureReason: failureReason || 'Transfer failed. Please contact support if this persists.'
         });
 

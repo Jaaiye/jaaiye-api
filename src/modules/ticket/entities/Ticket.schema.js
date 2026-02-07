@@ -14,6 +14,11 @@ const ticketSchema = new mongoose.Schema({
   ticketTypeId: {
     type: mongoose.Schema.Types.ObjectId,
   },
+  transactionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Transaction',
+    default: null
+  },
   ticketTypeName: {
     type: String,
   },
@@ -110,6 +115,7 @@ ticketSchema.index({ userId: 1, createdAt: -1 });
 ticketSchema.index({ eventId: 1, createdAt: -1 });
 ticketSchema.index({ status: 1 });
 ticketSchema.index({ ticketTypeId: 1 });
+ticketSchema.index({ transactionId: 1 });
 ticketSchema.index({ userId: 1, eventId: 1, ticketTypeId: 1 }); // Prevent duplicate tickets of same type
 ticketSchema.index({ publicId: 1 });
 

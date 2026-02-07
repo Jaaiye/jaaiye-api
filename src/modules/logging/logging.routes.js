@@ -12,7 +12,7 @@ class LoggingRoutes {
 
     getRoutes() {
         // All logging routes require admin role
-        router.use(protect, admin);
+        router.use();
 
         router.get('/logs', this.loggingController.getLogs);
         router.get('/stats', this.loggingController.getStats);

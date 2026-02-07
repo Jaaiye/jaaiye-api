@@ -11,9 +11,7 @@ class LoggingRoutes {
     }
 
     getRoutes() {
-        // All logging routes require admin role
-        router.use();
-
+        // All logging routes require adm
         router.get('/logs', this.loggingController.getLogs);
         router.get('/stats', this.loggingController.getStats);
         router.get('/trace/:traceId', this.loggingController.getTrace);

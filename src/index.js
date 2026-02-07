@@ -41,7 +41,9 @@ const allowedOrigins = [
   'https://tickets.jaaiye.com',
   'https://events.jaaiye.com',
   'https://demoevent.jaaiye.com',
-  'https://admin.jaaiye.com'
+  'https://admin.jaaiye.com',
+  'https://logs.jaaiye.com',
+  'http://localhost:3005'
 ].filter(Boolean);
 
 const corsOptions = {

@@ -6,8 +6,9 @@
 const { NotFoundError } = require('../../common/errors');
 
 class GetEventTicketsUseCase {
-  constructor({ ticketRepository }) {
+  constructor({ ticketRepository, eventRepository }) {
     this.ticketRepository = ticketRepository;
+    this.eventRepository = eventRepository;
   }
 
   async execute(eventId) {
@@ -25,7 +26,7 @@ class GetEventTicketsUseCase {
       throw new NotFoundError('Event not found');
     }
 
-    const tickets = await this.ticketRepository.findByEvent(eventId, {
+    const tickets = await this.ticketRepository.findByEvent(event.id, {
       populate: 'userId'
     });
 

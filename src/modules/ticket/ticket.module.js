@@ -172,7 +172,8 @@ class TicketModule {
   getGetEventTicketsUseCase() {
     if (!this._getEventTicketsUseCase) {
       this._getEventTicketsUseCase = new GetEventTicketsUseCase({
-        ticketRepository: this.getTicketRepository()
+        ticketRepository: this.getTicketRepository(),
+        eventRepository: this.getEventRepository()
       });
     }
     return this._getEventTicketsUseCase;

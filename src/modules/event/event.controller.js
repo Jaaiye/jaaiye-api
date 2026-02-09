@@ -312,17 +312,27 @@ class EventController {
     const createTicketUseCase = ticketModule.getCreateTicketUseCase();
     const { CreateTicketDTO } = require('../ticket/dto');
 
-    const eventId = req.params.id;
+    const eventIdParam = req.params.id;
     const userId = req.user.id;
 
-    console.log('[EventController] Checking permissions', { eventId, userId });
+    console.log('[EventController] Checking permissions', { eventId: eventIdParam, userId });
 
     // Check if user is creator or co-organizer
-    const event = await eventRepository.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventIdParam);
+    let event;
+
+    if (isObjectId) {
+      event = await eventRepository.findById(eventIdParam);
+    } else {
+      event = await eventRepository.findBySlug(eventIdParam);
+    }
+
     if (!event) {
-      console.error('[EventController] Event not found', { eventId });
+      console.error('[EventController] Event not found', { eventId: eventIdParam });
       return res.status(404).json({ success: false, error: 'Event not found' });
     }
+
+    const eventId = event.id;
 
     console.log('[EventController] Event found', {
       eventId: event.id,

@@ -27,7 +27,7 @@ class ResendEventTicketsUseCase {
         }
 
         if (!event) {
-            throw new EventNotFoundError();
+            throw new NotFoundError();
         }
 
         // 2. Check permissions (creator or co-organizer)
@@ -35,7 +35,7 @@ class ResendEventTicketsUseCase {
 
         let isCoOrganizer = false;
         if (!isCreator && this.eventTeamRepository) {
-            const teamMember = await this.eventTeamRepository.findByEventAndUser(eventId, userId);
+            const teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
             if (teamMember && teamMember.status === 'accepted' && (teamMember.role === 'co_organizer' || teamMember.role === 'creator')) {
                 isCoOrganizer = true;
             }
@@ -46,7 +46,7 @@ class ResendEventTicketsUseCase {
         }
 
         // 3. Find all tickets for this event
-        const allTickets = await this.ticketRepository.findByEvent(eventId);
+        const allTickets = await this.ticketRepository.findByEvent(event.id);
         const validTickets = allTickets.filter(t => t.status !== 'cancelled');
 
         if (validTickets.length === 0) {

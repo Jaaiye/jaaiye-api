@@ -23,10 +23,10 @@ class GetProfileUseCase {
       throw new UserNotFoundError();
     }
 
-    // Check if Google Calendar is linked
-    const UserSchema = require('../../common/entities/User.schema');
-    const userDoc = await UserSchema.findById(userId).select('+googleCalendar.refreshToken');
-    const isGoogleCalendarLinked = !!(userDoc?.googleCalendar?.refreshToken);
+    // Check connection statuses
+    const isGoogle = !!(user.googleCalendar && user.googleCalendar.googleId);
+    const isApple = !!user.appleId;
+    const isGoogleCalendarLinked = !!(user.googleCalendar && user.googleCalendar.refreshToken);
 
     // Return user data matching legacy format (formatUserResponse will handle formatting)
     return {
@@ -43,6 +43,8 @@ class GetProfileUseCase {
         isActive: user.isActive,
         isBlocked: user.isBlocked,
         createdAt: user.createdAt,
+        isGoogle,
+        isApple,
         isGoogleCalendarLinked
       }
     };

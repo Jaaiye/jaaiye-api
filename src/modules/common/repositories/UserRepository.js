@@ -19,7 +19,7 @@ class UserRepository extends IUserRepository {
     // Explicitly select password and ensure refresh object is included
     // Using lean() to get plain object and avoid transform issues, then convert back
     const userDoc = await UserSchema.findById(id)
-      .select('+password +googleCalendar.refreshToken')
+      .select('+password +googleCalendar.googleId +googleCalendar.refreshToken')
       .lean(false); // Keep as Mongoose document to preserve all fields
 
     if (!userDoc) return null;
@@ -33,7 +33,7 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<UserEntity|null>}
    */
   async findByEmail(email) {
-    const user = await UserSchema.findOne({ email: email.toLowerCase() }).select('+password +googleCalendar.googleId');
+    const user = await UserSchema.findOne({ email: email.toLowerCase() }).select('+password +googleCalendar.googleId +googleCalendar.refreshToken');
     return user ? this._toEntity(user) : null;
   }
 
@@ -43,7 +43,7 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<UserEntity|null>}
    */
   async findByUsername(username) {
-    const user = await UserSchema.findOne({ username }).select('+password +googleCalendar.googleId');
+    const user = await UserSchema.findOne({ username }).select('+password +googleCalendar.googleId +googleCalendar.refreshToken');
     return user ? this._toEntity(user) : null;
   }
 
@@ -53,7 +53,7 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<UserEntity|null>}
    */
   async findByGoogleId(googleId) {
-    const user = await UserSchema.findOne({ 'googleCalendar.googleId': googleId }).select('+password +googleCalendar.googleId');
+    const user = await UserSchema.findOne({ 'googleCalendar.googleId': googleId }).select('+password +googleCalendar.googleId +googleCalendar.refreshToken');
     return user ? this._toEntity(user) : null;
   }
 
@@ -63,7 +63,7 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<UserEntity|null>}
    */
   async findByAppleId(appleId) {
-    const user = await UserSchema.findOne({ appleId }).select('+password +googleCalendar.googleId');
+    const user = await UserSchema.findOne({ appleId }).select('+password +googleCalendar.googleId +googleCalendar.refreshToken');
     return user ? this._toEntity(user) : null;
   }
 
@@ -75,7 +75,7 @@ class UserRepository extends IUserRepository {
   async create(userData) {
     const user = await UserSchema.create(userData);
     // Select verification fields if they exist in userData
-    const selectFields = '+password +googleCalendar.googleId';
+    const selectFields = '+password +googleCalendar.googleId +googleCalendar.refreshToken';
     const verificationSelect = (userData.verification && (userData.verification.code || userData.verification.expires))
       ? ' +verification.code +verification.expires'
       : '';
@@ -97,7 +97,7 @@ class UserRepository extends IUserRepository {
       id,
       { $set: updates },
       { new: true, runValidators: true }
-    ).select('+password +googleCalendar.googleId');
+    ).select('+password +googleCalendar.googleId +googleCalendar.refreshToken');
 
     return this._toEntity(user);
   }
@@ -198,7 +198,7 @@ class UserRepository extends IUserRepository {
    * @returns {Promise<UserEntity[]>}
    */
   async findByRole(role) {
-    const users = await UserSchema.find({ role }).select('+password +googleCalendar.googleId');
+    const users = await UserSchema.find({ role }).select('+password +googleCalendar.googleId +googleCalendar.refreshToken');
     return users.map(user => this._toEntity(user));
   }
 
@@ -310,7 +310,7 @@ class UserRepository extends IUserRepository {
    */
   async findByIdWithVerification(id) {
     const userDoc = await UserSchema.findById(id)
-      .select('+password +verification +googleCalendar.googleId')
+      .select('+password +verification +googleCalendar.googleId +googleCalendar.refreshToken')
       .lean(false);
 
     if (!userDoc) return null;
@@ -326,7 +326,7 @@ class UserRepository extends IUserRepository {
   async findByVerificationCode(code) {
     // Explicitly select verification subfields since they have select: false
     const user = await UserSchema.findOne({ 'verification.code': code })
-      .select('+password +verification.code +verification.expires +googleCalendar.googleId')
+      .select('+password +verification.code +verification.expires +googleCalendar.googleId +googleCalendar.refreshToken')
       .lean(false); // Keep as Mongoose document to preserve all fields
 
     if (!user) return null;
@@ -364,7 +364,7 @@ class UserRepository extends IUserRepository {
 
     // Now fetch the full user with explicit selection of nested fields
     const user = await UserSchema.findById(userWithCode._id)
-      .select('+password +resetPassword.code +resetPassword.expires +googleCalendar.googleId')
+      .select('+password +resetPassword.code +resetPassword.expires +googleCalendar.googleId +googleCalendar.refreshToken')
       .lean(false); // Keep as Mongoose document to preserve Date objects
 
     if (!user) return null;
@@ -427,11 +427,11 @@ class UserRepository extends IUserRepository {
     // Include all fields, especially those with select: false
     const obj = doc.toObject
       ? doc.toObject({
-          virtuals: true,
-          getters: false,
-          transform: false,
-          flattenMaps: false // Preserve nested objects
-        })
+        virtuals: true,
+        getters: false,
+        transform: false,
+        flattenMaps: false // Preserve nested objects
+      })
       : doc;
 
     // Debug: Log verification data if present (development only)

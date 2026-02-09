@@ -114,6 +114,8 @@ class UserController {
     // Format user response to match legacy format
     const formattedUser = formatUserResponse(result.user);
     formattedUser.isGoogleCalendarLinked = result.user.isGoogleCalendarLinked;
+    formattedUser.isGoogle = result.user.isGoogle;
+    formattedUser.isApple = result.user.isApple;
     return successResponse(res, { user: formattedUser });
   });
 
@@ -126,6 +128,9 @@ class UserController {
     const result = await this.updateProfileUseCase.execute(req.user.id, dto);
     // Format user response to match legacy format
     const formattedUser = formatUserResponse(result.user);
+    formattedUser.isGoogleCalendarLinked = result.user.isGoogleCalendarLinked;
+    formattedUser.isGoogle = result.user.isGoogle;
+    formattedUser.isApple = result.user.isApple;
     return successResponse(res, { user: formattedUser });
   });
 

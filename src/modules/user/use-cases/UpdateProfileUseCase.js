@@ -82,7 +82,10 @@ class UpdateProfileUseCase {
         preferences: updatedUser.preferences,
         isActive: updatedUser.isActive,
         isBlocked: updatedUser.isBlocked,
-        createdAt: updatedUser.createdAt
+        createdAt: updatedUser.createdAt,
+        isGoogle: !!(updatedUser.googleCalendar && updatedUser.googleCalendar.googleId),
+        isApple: !!updatedUser.appleId,
+        isGoogleCalendarLinked: !!(updatedUser.googleCalendar && updatedUser.googleCalendar.refreshToken)
       }
     };
   }

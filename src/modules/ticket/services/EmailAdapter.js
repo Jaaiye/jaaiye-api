@@ -69,7 +69,6 @@ class EmailAdapter {
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: email,
-        cc: 'Fashinaololade96@gmail.com',
         subject,
         html
       });

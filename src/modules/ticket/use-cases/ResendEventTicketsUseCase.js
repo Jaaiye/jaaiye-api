@@ -56,6 +56,9 @@ class ResendEventTicketsUseCase {
         // 4. Group tickets by user to send one email per user (consolidated)
         const ticketsByUser = {};
         validTickets.forEach(ticket => {
+            // Populate eventId for the email adapter
+            ticket.eventId = event;
+
             const ticketUserId = ticket.userId?._id?.toString() || ticket.userId?.toString();
             if (!ticketUserId) return;
 

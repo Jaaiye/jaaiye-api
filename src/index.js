@@ -20,6 +20,9 @@ dotenv.config();
 // Initialize Express app
 const app = express();
 
+// Trust proxy - needed for express-rate-limit when behind a reverse proxy (e.g. Vercel, Nginx, Heroku)
+app.set('trust proxy', 1);
+
 // Trace ID Middleware (Generate unique ID for every request)
 const { traceMiddleware } = require('./middleware/traceMiddleware');
 app.use(traceMiddleware);

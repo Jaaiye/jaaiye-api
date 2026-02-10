@@ -30,7 +30,7 @@ function createUserRoutes({ userController }) {
   router.put('/profile', userController.updateProfile);
   router.put('/password', validatePassword, validate, userController.changePassword);
   router.put('/email', validateUpdateEmail, validate, userController.updateEmail);
-  router.delete('/', validateDeactivateAccount, validate, userController.deleteUser);
+  router.delete('/', validate, userController.deleteUser);
   router.post('/logout', userController.logout);
 
   // Bank account routes

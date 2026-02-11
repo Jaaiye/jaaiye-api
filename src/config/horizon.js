@@ -1,4 +1,5 @@
-const { HorizonClient, HorizonWinstonTransport } = require('@kisameholmes/horizon_node');
+const { HorizonClient } = require('@kisameholmes/horizon_node');
+const { HorizonWinstonTransport } = require('@kisameholmes/horizon_node/winston');
 const dotenv = require('dotenv');
 
 // Ensure environment variables are loaded

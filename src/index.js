@@ -27,6 +27,12 @@ app.set('trust proxy', 1);
 const { traceMiddleware } = require('./middleware/traceMiddleware');
 app.use(traceMiddleware);
 
+// Horizon Observability
+const { horizon } = require('./config/horizon');
+const { expressHorizonMiddleware } = require('@kisameholmes/horizon_node');
+horizon.autoCaptureErrors();
+app.use(expressHorizonMiddleware(horizon));
+
 // Create HTTP server
 const server = require('http').createServer(app);
 
@@ -205,7 +211,6 @@ app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRo
 app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
 app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
 app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
-app.use('/api/v1/logging', require('./modules/logging/logging.module').getLoggingRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
 
 // 404 handler

@@ -45,13 +45,12 @@ const logger = winston.createLogger({
   ]
 });
 
-// Add MongoDB transport for persistent, searchable logs
+// Add Horizon transport
 try {
-  const MongoTransport = require('./MongoTransport');
-  // We log 'info' and above to the database (info, warn, error)
-  logger.add(new MongoTransport({ level: 'info' }));
+  const { horizonTransport } = require('../config/horizon');
+  logger.add(horizonTransport);
 } catch (error) {
-  console.error('Failed to add MongoDB transport to logger:', error.message);
+  console.error('Failed to add Horizon transport to logger:', error.message);
 }
 
 // Enhanced logging methods with error handling, redaction, and controlled stacks

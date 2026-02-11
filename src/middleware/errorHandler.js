@@ -175,12 +175,17 @@ const errorHandler = (error, req, res, next) => {
     errorMessage: error.message
   });
 
-  // Log client errors as warnings, server errors as errors
+  // Filter out high-volume, low-value errors to save log quota
+  const isHighVolumeError = error.statusCode === 404 || error.name === 'ValidationError' || error.name === 'NotFoundError';
+  const isSecurityError = error.statusCode === 401 || error.statusCode === 403;
+
+  // Log server errors (5xx) and security events (401/403). Skip the rest.
   if (error.statusCode >= 500) {
-    logger.error('Request Error', context);
-  } else {
-    logger.warn('Request Error', context);
+    logger.error('Server Error', context);
+  } else if (isSecurityError) {
+    logger.warn('Security Event', context);
   }
+  // 404s and Validation errors are now completely silent in logs
 
   // Handle specific error types
   if (error.name === 'ValidationError') {

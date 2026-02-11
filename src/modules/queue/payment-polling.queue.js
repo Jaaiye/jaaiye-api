@@ -74,7 +74,27 @@ class PaymentPollingQueue {
   // Poll for pending transactions
   async pollPendingTransactions() {
     const useCase = this._getPollUseCase();
-    await useCase.execute();
+    const summary = await useCase.execute();
+
+    if (summary.totalFound > 0) {
+      logger.info('Payment polling job completed', {
+        found: summary.totalFound,
+        processed: summary.totalProcessed,
+        failed: summary.totalFailed,
+        audit: {
+          processed: summary.audit.processed,
+          failed: summary.audit.failed
+        },
+        breakdown: {
+          flutterwave: summary.flutterwave.found,
+          paystack: summary.paystack.found,
+          payaza: summary.payaza.found,
+          monnify: summary.monnify.found
+        }
+      });
+    } else {
+      logger.info('Payment polling job completed: no pending transactions');
+    }
   }
 
   // Get queue status

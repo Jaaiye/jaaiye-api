@@ -5,6 +5,7 @@
 
 const { Resend } = require('resend');
 const templates = require('../../../emails/templates');
+const logger = require('../../../utils/logger');
 
 class EmailAdapter {
   constructor() {
@@ -57,7 +58,7 @@ class EmailAdapter {
         ? `🎟️ Payment Confirmed! Your ${ticketCount} Tickets for ${eventTitle}`
         : `🎟️ Payment Confirmed! Your Ticket for ${eventTitle}`;
 
-      console.log('Sending email via Resend', {
+      logger.debug('Sending email via Resend', {
         from: this.fromEmail,
         to: email,
         subject,
@@ -73,7 +74,7 @@ class EmailAdapter {
         html
       });
 
-      console.log('Email sent successfully via Resend', {
+      logger.debug('Email sent successfully via Resend', {
         email,
         resultId: result?.id,
         ticketCount
@@ -81,7 +82,7 @@ class EmailAdapter {
 
       return result;
     } catch (error) {
-      console.error('Failed to send payment confirmation email:', {
+      logger.error('Failed to send payment confirmation email:', {
         email: typeof user === 'object' ? user.email : user,
         error: error.message,
         stack: error.stack,
@@ -113,7 +114,7 @@ class EmailAdapter {
         throw new Error('Sale data must include eventTitle, ticketCount, and amount');
       }
 
-      console.log('Generating ticket sale notification email', {
+      logger.debug('Generating ticket sale notification email', {
         email,
         eventTitle,
         ticketCount,
@@ -132,7 +133,7 @@ class EmailAdapter {
       const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
       const subject = `🎉 New Ticket Sale for ${eventTitle}`;
 
-      console.log('Sending ticket sale notification via Resend', {
+      logger.debug('Sending ticket sale notification via Resend', {
         from: this.fromEmail,
         to: email,
         subject
@@ -146,14 +147,14 @@ class EmailAdapter {
         html
       });
 
-      console.log('Ticket sale notification sent successfully', {
+      logger.debug('Ticket sale notification sent successfully', {
         email,
         resultId: result?.id
       });
 
       return result;
     } catch (error) {
-      console.error('Failed to send ticket sale notification email:', {
+      logger.error('Failed to send ticket sale notification email:', {
         email: creator.email,
         error: error.message,
         stack: error.stack
@@ -190,7 +191,7 @@ class EmailAdapter {
 
       return result;
     } catch (error) {
-      console.error('Failed to send system alert email:', error.message);
+      logger.error('Failed to send system alert email:', error.message);
     }
   }
 }

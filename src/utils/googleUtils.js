@@ -96,7 +96,7 @@ exports.validateGoogleTokens = (tokens) => {
       throw new Error('Tokens do not have required Google Calendar scopes');
     }
 
-    logger.info('Google tokens validated successfully');
+    logger.debug('Google tokens validated successfully');
     return true;
   } catch (error) {
     logger.error('Google token validation failed', { error: error.message });
@@ -126,7 +126,7 @@ exports.validateCalendarScopes = (tokens) => {
       throw new Error('Insufficient authentication scopes. Required: calendar and calendar.events');
     }
 
-    logger.info('Calendar scopes validated successfully');
+    logger.debug('Calendar scopes validated successfully');
     return true;
   } catch (error) {
     logger.error('Calendar scope validation failed', { error: error.message });
@@ -189,8 +189,8 @@ exports.getGoogleCalendarName = (calendarId, googleCalendars = {}) => {
 exports.isGoogleCalendarAccessible = (user) => {
   try {
     return !!(user?.googleCalendar?.refreshToken &&
-              user?.googleCalendar?.accessToken &&
-              user?.googleCalendar?.scope);
+      user?.googleCalendar?.accessToken &&
+      user?.googleCalendar?.scope);
   } catch (error) {
     logger.error('Failed to check Google Calendar accessibility', { error: error.message });
     return false;
@@ -268,14 +268,14 @@ exports.isTokenExpired = (expiryDate, bufferMinutes = 5) => {
  */
 exports.logGoogleOperation = (operation, details = {}) => {
   try {
-    logger.info(`Google API operation: ${operation}`, {
+    logger.debug(`Google API operation: ${operation}`, {
       operation,
       timestamp: new Date().toISOString(),
       ...details
     });
   } catch (error) {
     // Don't let logging errors break the main flow
-    console.error('Failed to log Google operation:', error);
+    logger.error('Failed to log Google operation:', error);
   }
 };
 

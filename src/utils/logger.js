@@ -76,7 +76,7 @@ const wrapLoggerMethod = (level) => {
 
     if (errorOrInfo instanceof Error) {
       base.error = errorOrInfo.message;
-      if (LOG_INCLUDE_STACK && errorOrInfo.stack) {
+      if ((level === 'error' || LOG_INCLUDE_STACK) && errorOrInfo.stack) {
         base.stack = errorOrInfo.stack;
       }
       if (errorOrInfo.code) base.code = errorOrInfo.code;

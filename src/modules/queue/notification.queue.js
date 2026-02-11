@@ -34,7 +34,7 @@ class NotificationQueue {
       this.processQueue();
     }, this.batchTimeout);
 
-    logger.info('Notification added to queue', {
+    logger.debug('Notification added to queue', {
       type: notificationTask.type,
       userId: notificationTask.userId,
       queueLength: this.queue.length
@@ -48,15 +48,31 @@ class NotificationQueue {
     }
 
     this.processing = true;
+    let stats = { total: 0, success: 0, failed: 0, retrying: 0 };
 
     try {
       // Process in batches
       while (this.queue.length > 0) {
         const batch = this.queue.splice(0, this.batchSize);
+        stats.total += batch.length;
 
         // Process batch concurrently
         const promises = batch.map(task => this.executeNotificationTask(task));
-        await Promise.allSettled(promises);
+        const results = await Promise.allSettled(promises);
+
+        // Update stats from results
+        results.forEach((res, idx) => {
+          if (res.status === 'fulfilled') {
+            if (res.value?.retrying) stats.retrying++;
+            else stats.success++;
+          } else {
+            stats.failed++;
+          }
+        });
+      }
+
+      if (stats.total > 0) {
+        logger.info('Notification batch processing completed', stats);
       }
     } catch (error) {
       logger.error('Error processing notification queue:', error);
@@ -75,12 +91,11 @@ class NotificationQueue {
     try {
       const { type, userId, notification, data, retries } = task;
 
-      logger.info('Processing notification task', {
+      logger.debug('Processing notification task', {
         type,
         userId,
         notificationTitle: notification.title,
-        retries,
-        queueLength: this.queue.length
+        retries
       });
 
       switch (type) {
@@ -98,23 +113,11 @@ class NotificationQueue {
           break;
         default:
           logger.warn(`Unknown notification type: ${type}`);
-          return;
+          return { success: false };
       }
 
-      logger.info('Notification sent successfully', {
-        type,
-        userId,
-        notificationTitle: notification.title,
-        retries
-      });
+      return { success: true };
     } catch (error) {
-      logger.error('Notification task failed', {
-        type: task.type,
-        userId: task.userId,
-        error: error.message,
-        retries: task.retries
-      });
-
       // Retry logic
       if (task.retries < this.maxRetries) {
         task.retries++;
@@ -123,18 +126,20 @@ class NotificationQueue {
         // Add back to queue for retry
         this.queue.push(task);
 
-        logger.info('Notification task queued for retry', {
+        logger.debug('Notification task queued for retry', {
           type: task.type,
           userId: task.userId,
-          retries: task.retries,
-          retryAt: task.retryAt
+          retries: task.retries
         });
+        return { success: false, retrying: true };
       } else {
         logger.error('Notification task failed permanently', {
           type: task.type,
           userId: task.userId,
-          maxRetries: this.maxRetries
+          maxRetries: this.maxRetries,
+          error: error.message
         });
+        return { success: false, retrying: false };
       }
     }
   }

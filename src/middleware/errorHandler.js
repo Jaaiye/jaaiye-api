@@ -181,7 +181,7 @@ const errorHandler = (error, req, res, next) => {
 
   // Log server errors (5xx) and security events (401/403). Skip the rest.
   if (error.statusCode >= 500) {
-    logger.error('Server Error', context);
+    logger.error('Server Error', { ...context, stack: error.stack });
   } else if (isSecurityError) {
     logger.warn('Security Event', context);
   }

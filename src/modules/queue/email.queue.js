@@ -57,7 +57,7 @@ class EmailQueue {
       this.processQueue();
     }, this.batchTimeout);
 
-    logger.info('Email added to queue', {
+    logger.debug('Email added to queue', {
       type: emailTask.type,
       to: emailTask.to,
       queueLength: this.queue.length
@@ -71,15 +71,31 @@ class EmailQueue {
     }
 
     this.processing = true;
+    let stats = { total: 0, success: 0, failed: 0, retrying: 0 };
 
     try {
       // Process in batches
       while (this.queue.length > 0) {
         const batch = this.queue.splice(0, this.batchSize);
+        stats.total += batch.length;
 
         // Process batch concurrently
         const promises = batch.map(task => this.executeEmailTask(task));
-        await Promise.allSettled(promises);
+        const results = await Promise.allSettled(promises);
+
+        // Update stats from results
+        results.forEach((res) => {
+          if (res.status === 'fulfilled') {
+            if (res.value?.retrying) stats.retrying++;
+            else stats.success++;
+          } else {
+            stats.failed++;
+          }
+        });
+      }
+
+      if (stats.total > 0) {
+        logger.info('Email batch processing completed', stats);
       }
     } catch (error) {
       logger.error('Error processing email queue:', error);
@@ -98,11 +114,10 @@ class EmailQueue {
     try {
       const { type, to, data, retries } = task;
 
-      logger.info('Processing email task', {
+      logger.debug('Processing email task', {
         type,
         to,
-        retries,
-        queueLength: this.queue.length
+        retries
       });
 
       const authAdapter = getAuthEmailAdapter();
@@ -130,18 +145,12 @@ class EmailQueue {
           });
           break;
         case 'accountDeactivation':
-          // Note: This method doesn't exist in new EmailAdapter yet
-          // For now, we'll log a warning and skip
           logger.warn('Account deactivation email not yet implemented in new EmailAdapter');
           break;
         case 'accountReactivation':
-          // Note: This method doesn't exist in new EmailAdapter yet
-          // For now, we'll log a warning and skip
           logger.warn('Account reactivation email not yet implemented in new EmailAdapter');
           break;
         case 'report':
-          // Note: This method doesn't exist in new EmailAdapter yet
-          // For now, we'll log a warning and skip
           logger.warn('Report email not yet implemented in new EmailAdapter');
           break;
         case 'ticket':
@@ -153,22 +162,11 @@ class EmailQueue {
           break;
         default:
           logger.warn(`Unknown email type: ${type}`);
-          return;
+          return { success: false };
       }
 
-      logger.info('Email sent successfully', {
-        type,
-        to,
-        retries
-      });
+      return { success: true };
     } catch (error) {
-      logger.error('Email task failed', {
-        type: task.type,
-        to: task.to,
-        error: error.message,
-        retries: task.retries
-      });
-
       // Retry logic
       if (task.retries < this.maxRetries) {
         task.retries++;
@@ -177,18 +175,20 @@ class EmailQueue {
         // Add back to queue for retry
         this.queue.push(task);
 
-        logger.info('Email task queued for retry', {
+        logger.debug('Email task queued for retry', {
           type: task.type,
           to: task.to,
-          retries: task.retries,
-          retryAt: task.retryAt
+          retries: task.retries
         });
+        return { success: false, retrying: true };
       } else {
         logger.error('Email task failed permanently', {
           type: task.type,
           to: task.to,
-          maxRetries: this.maxRetries
+          maxRetries: this.maxRetries,
+          error: error.message
         });
+        return { success: false, retrying: false };
       }
     }
   }

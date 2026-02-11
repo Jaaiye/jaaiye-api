@@ -197,11 +197,11 @@ app.use('/api/v1/calendars', require('./modules/calendar/calendar.module').getCa
 try {
   const eventRoutes = require('./modules/event/event.module').getEventRoutes();
   if (!eventRoutes) {
-    console.error('Event routes are null or undefined');
+    logger.error('Event routes are null or undefined');
   }
   app.use('/api/v1/events', eventRoutes);
 } catch (error) {
-  console.error('Failed to register event routes:', error);
+  logger.error('Failed to register event routes:', error);
   throw error;
 }
 app.use('/api/v1/notifications', require('./modules/notification/notification.module').getNotificationRoutes());

@@ -36,32 +36,18 @@ class FirebaseAdapter {
 
       const missingVars = requiredVars.filter(varName => !process.env[varName]);
       if (missingVars.length > 0) {
-        console.warn(`Firebase Admin not initialized: Missing environment variables: ${missingVars.join(', ')}`);
+        logger.warn(`Firebase Admin not initialized: Missing environment variables: ${missingVars.join(', ')}`);
         return;
       }
 
       // Normalize private key - handle various formats from environment variables
       let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
-
-      // Log initial state (sanitized for security)
-      console.log('[Firebase Init] Private key initial state:', {
-        length: privateKey.length,
-        hasBeginHeader: privateKey.includes('BEGIN'),
-        hasEndHeader: privateKey.includes('END'),
-        hasNewlines: privateKey.includes('\n'),
-        hasEscapedNewlines: privateKey.includes('\\n'),
-        hasDoubleEscapedNewlines: privateKey.includes('\\\\n'),
-        firstChars: privateKey.substring(0, 50).replace(/\n/g, '\\n').replace(/\\/g, '\\\\'),
-        lastChars: privateKey.substring(Math.max(0, privateKey.length - 50)).replace(/\n/g, '\\n').replace(/\\/g, '\\\\')
-      });
-
       // Handle multiple levels of escaping - order matters!
       // First, handle double-escaped (\\\\n -> \n) - this matches \\n in the actual string
       const beforeDoubleReplace = privateKey;
       privateKey = privateKey.replace(/\\\\n/g, '\n');
       if (beforeDoubleReplace !== privateKey) {
         const count = (beforeDoubleReplace.match(/\\\\n/g) || []).length;
-        console.log(`[Firebase Init] Replaced double-escaped newlines (\\\\n -> \\n), count: ${count}`);
       }
 
       // Then handle single-escaped (\n -> \n) - this matches \n in the actual string
@@ -69,7 +55,6 @@ class FirebaseAdapter {
       privateKey = privateKey.replace(/\\n/g, '\n');
       if (beforeReplace !== privateKey) {
         const count = (beforeReplace.match(/\\n/g) || []).length;
-        console.log(`[Firebase Init] Replaced escaped newlines (\\n -> \\n), count: ${count}`);
       }
 
       // Clean up any trailing/leading backslashes that might remain (common issue with env vars)
@@ -78,14 +63,6 @@ class FirebaseAdapter {
       privateKey = privateKey.replace(/\\+$/gm, ''); // Remove trailing backslashes from each line
       privateKey = privateKey.replace(/^\\+/gm, ''); // Remove leading backslashes from each line
       if (beforeBackslashCleanup !== privateKey) {
-        console.log('[Firebase Init] Cleaned up trailing/leading backslashes');
-        const firstLine = privateKey.split('\n')[0];
-        const lastLine = privateKey.split('\n').pop();
-        console.log('[Firebase Init] After cleanup - first line:', firstLine?.substring(0, 60));
-        console.log('[Firebase Init] After cleanup - last line:', lastLine?.substring(Math.max(0, lastLine.length - 60)));
-      }
-      if (beforeBackslashCleanup !== privateKey) {
-        console.log('[Firebase Init] Cleaned up trailing/leading backslashes');
       }
 
       // Ensure proper PEM format - add headers if missing
@@ -93,36 +70,21 @@ class FirebaseAdapter {
       const hasEndHeader = privateKey.includes('END PRIVATE KEY') || privateKey.includes('END RSA PRIVATE KEY');
 
       if (privateKey && !hasBeginHeader) {
-        console.log('[Firebase Init] Missing BEGIN header, attempting to add...');
         const keyContent = privateKey.trim();
         if (keyContent.length > 0) {
           // Check if it's RSA or PKCS8 format based on content
           if (keyContent.includes('MII')) {
             // Likely PKCS8 format
             privateKey = `-----BEGIN PRIVATE KEY-----\n${keyContent}\n-----END PRIVATE KEY-----\n`;
-            console.log('[Firebase Init] Added PKCS8 headers');
           } else {
             // Try RSA format
             privateKey = `-----BEGIN RSA PRIVATE KEY-----\n${keyContent}\n-----END RSA PRIVATE KEY-----\n`;
-            console.log('[Firebase Init] Added RSA headers');
           }
         }
       }
 
       // Clean up any extra whitespace
       privateKey = privateKey.trim();
-
-      // Log final state
-      console.log('[Firebase Init] Private key after normalization:', {
-        length: privateKey.length,
-        hasBeginHeader: privateKey.includes('BEGIN'),
-        hasEndHeader: privateKey.includes('END'),
-        hasNewlines: privateKey.includes('\n'),
-        newlineCount: (privateKey.match(/\n/g) || []).length,
-        firstLine: privateKey.split('\n')[0],
-        lastLine: privateKey.split('\n').pop(),
-        lineCount: privateKey.split('\n').length
-      });
 
       const serviceAccount = {
         type: "service_account",
@@ -140,24 +102,24 @@ class FirebaseAdapter {
 
       // Validate service account data
       if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-        console.warn('Firebase Admin not initialized: Invalid service account configuration');
+        logger.warn('Firebase Admin not initialized: Invalid service account configuration');
         if (!serviceAccount.private_key) {
-          console.warn('FIREBASE_PRIVATE_KEY is missing or empty');
+          logger.warn('FIREBASE_PRIVATE_KEY is missing or empty');
         }
         return;
       }
 
       // Validate private key format
       if (!serviceAccount.private_key.includes('BEGIN') || !serviceAccount.private_key.includes('END')) {
-        console.error('Firebase Admin not initialized: Private key appears to be malformed');
-        console.error('Private key should include -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY----- headers');
+        logger.error('Firebase Admin not initialized: Private key appears to be malformed');
+        logger.error('Private key should include -----BEGIN PRIVATE KEY----- and -----END PRIVATE KEY----- headers');
         return;
       }
 
       // Initialize Firebase Admin with better error handling
       try {
-        console.log('[Firebase Init] Attempting to initialize Firebase Admin...');
-        console.log('[Firebase Init] Service account config:', {
+        logger.debug('[Firebase Init] Attempting to initialize Firebase Admin...');
+        logger.debug('[Firebase Init] Service account config:', {
           project_id: serviceAccount.project_id,
           client_email: serviceAccount.client_email,
           private_key_id: serviceAccount.private_key_id ? 'present' : 'missing',
@@ -170,10 +132,10 @@ class FirebaseAdapter {
           projectId: serviceAccount.project_id
         });
 
-        console.log('[Firebase Init] Firebase Admin initialized successfully');
+        logger.info('[Firebase Init] Firebase Admin initialized successfully');
       } catch (initError) {
         // Log detailed error information
-        console.error('[Firebase Init] Initialization failed with error:', {
+        logger.error('[Firebase Init] Initialization failed with error:', {
           name: initError.name,
           message: initError.message,
           code: initError.code,
@@ -182,9 +144,9 @@ class FirebaseAdapter {
 
         // Provide more helpful error messages
         if (initError.message && (initError.message.includes('PEM') || initError.message.includes('private key'))) {
-          console.error('[Firebase Init] PEM Format Error Details:');
-          console.error('Error:', initError.message);
-          console.error('Private key state:', {
+          logger.error('[Firebase Init] PEM Format Error Details:');
+          logger.error('Error:', initError.message);
+          logger.error('Private key state:', {
             length: serviceAccount.private_key?.length || 0,
             isEmpty: !serviceAccount.private_key || serviceAccount.private_key.length === 0,
             hasBeginHeader: serviceAccount.private_key?.includes('BEGIN') || false,
@@ -194,18 +156,18 @@ class FirebaseAdapter {
             lastLine: serviceAccount.private_key?.split('\n').pop() || 'N/A',
             lineCount: serviceAccount.private_key?.split('\n').length || 0
           });
-          console.error('Common issues:');
-          console.error('1. Private key may have incorrect newline formatting');
-          console.error('2. Private key may be missing BEGIN/END headers');
-          console.error('3. Environment variable may have encoding issues');
-          console.error('4. Private key may be corrupted or truncated');
-          console.error('Tip: Ensure FIREBASE_PRIVATE_KEY includes the full key with headers');
-          console.error('Expected format:');
-          console.error('-----BEGIN PRIVATE KEY-----');
-          console.error('(base64 encoded key content)');
-          console.error('-----END PRIVATE KEY-----');
+          logger.error('Common issues:');
+          logger.error('1. Private key may have incorrect newline formatting');
+          logger.error('2. Private key may be missing BEGIN/END headers');
+          logger.error('3. Environment variable may have encoding issues');
+          logger.error('4. Private key may be corrupted or truncated');
+          logger.error('Tip: Ensure FIREBASE_PRIVATE_KEY includes the full key with headers');
+          logger.error('Expected format:');
+          logger.error('-----BEGIN PRIVATE KEY-----');
+          logger.error('(base64 encoded key content)');
+          logger.error('-----END PRIVATE KEY-----');
         } else {
-          console.error('[Firebase Init] Non-PEM error, re-throwing...');
+          logger.error('[Firebase Init] Non-PEM error, re-throwing...');
           throw initError; // Re-throw if it's not a PEM error
         }
         this.initialized = false;
@@ -216,18 +178,18 @@ class FirebaseAdapter {
       try {
         const messaging = admin.messaging();
         if (!messaging) {
-          console.warn('Firebase Messaging not available - ensure Firebase Cloud Messaging API (V1) is enabled in Google Cloud Console');
+          logger.warn('Firebase Messaging not available - ensure Firebase Cloud Messaging API (V1) is enabled in Google Cloud Console');
         } else {
-          console.log('Firebase Admin initialized successfully with FCM V1 support');
+          logger.info('Firebase Admin initialized successfully with FCM V1 support');
         }
       } catch (error) {
-        console.warn('Firebase Messaging check failed:', error.message);
-        console.warn('Ensure Firebase Cloud Messaging API (V1) is enabled in Google Cloud Console');
+        logger.warn('Firebase Messaging check failed:', error.message);
+        logger.warn('Ensure Firebase Cloud Messaging API (V1) is enabled in Google Cloud Console');
       }
 
       this.initialized = true;
     } catch (error) {
-      console.error('Failed to initialize Firebase Admin:', error.message);
+      logger.error('Failed to initialize Firebase Admin:', error.message);
       // Don't throw - allow app to run without Firebase
       this.initialized = false;
     }
@@ -240,7 +202,7 @@ class FirebaseAdapter {
    */
   async generateToken(userId) {
     if (!this.initialized) {
-      console.warn('Firebase not initialized, returning null token');
+      logger.warn('Firebase not initialized, returning null token');
       return null;
     }
 
@@ -248,7 +210,7 @@ class FirebaseAdapter {
       const customToken = await admin.auth().createCustomToken(userId);
       return customToken;
     } catch (error) {
-      console.error('Failed to generate Firebase token:', error.message);
+      logger.error('Failed to generate Firebase token:', error.message);
       // Return null instead of throwing - graceful degradation
       return null;
     }
@@ -281,7 +243,7 @@ class FirebaseAdapter {
    */
   async sendMulticastMessage(tokens, notification, data = {}) {
     if (!this.initialized) {
-      console.warn('Firebase not initialized, skipping multicast message');
+      logger.warn('Firebase not initialized, skipping multicast message');
       return { successCount: 0, failureCount: tokens?.length || 0, responses: [] };
     }
 
@@ -292,9 +254,9 @@ class FirebaseAdapter {
 
       // Validate that messaging is available (FCM V1 API)
       if (!admin.messaging) {
-        console.error('Firebase messaging not available - Firebase Cloud Messaging API (V1) may not be enabled for this project');
-        console.error('Please enable Firebase Cloud Messaging API (V1) in Google Cloud Console:');
-        console.error(`https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`);
+        logger.error('Firebase messaging not available - Firebase Cloud Messaging API (V1) may not be enabled for this project');
+        logger.error('Please enable Firebase Cloud Messaging API (V1) in Google Cloud Console:');
+        logger.error(`https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`);
         return { successCount: 0, failureCount: tokens.length, responses: [] };
       }
 
@@ -308,14 +270,14 @@ class FirebaseAdapter {
       };
 
       // Log request details before sending
-      console.log('[Firebase] Sending multicast message', {
+      logger.debug('[Firebase] Sending multicast message', {
         tokenCount: tokens.length,
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL
       });
 
       const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(`Firebase message sent: ${response.successCount} success, ${response.failureCount} failed`);
+      logger.info(`Firebase message sent: ${response.successCount} success, ${response.failureCount} failed`);
 
       return response;
     } catch (error) {
@@ -340,7 +302,7 @@ class FirebaseAdapter {
 
       // Check if this is the 404 /batch error
       if (error.message?.includes('/batch') || error.message?.includes('404') || error.httpResponse?.statusCode === 404) {
-        console.error('Firebase sendMulticastMessage - 404 /batch error detected:', {
+        logger.error('Firebase sendMulticastMessage - 404 /batch error detected:', {
           ...errorDetails,
           troubleshooting: [
             '1. Verify FCM API is enabled: https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=' + process.env.FIREBASE_PROJECT_ID,
@@ -353,7 +315,7 @@ class FirebaseAdapter {
           iamUrl: `https://console.cloud.google.com/iam-admin/iam?project=${process.env.FIREBASE_PROJECT_ID}`
         });
       } else {
-        console.error('Firebase sendMulticastMessage error:', errorDetails);
+        logger.error('Firebase sendMulticastMessage error:', errorDetails);
       }
 
       // Handle specific Firebase errors gracefully
@@ -386,16 +348,16 @@ class FirebaseAdapter {
    */
   async sendSingleMessage(token, notification, data = {}) {
     if (!this.initialized) {
-      console.warn('Firebase not initialized, skipping single message');
+      logger.warn('Firebase not initialized, skipping single message');
       return null;
     }
 
     try {
       // Validate that messaging is available (FCM V1 API)
       if (!admin.messaging) {
-        console.error('Firebase messaging not available - Firebase Cloud Messaging API (V1) may not be enabled for this project');
-        console.error('Please enable Firebase Cloud Messaging API (V1) in Google Cloud Console:');
-        console.error(`https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`);
+        logger.error('Firebase messaging not available - Firebase Cloud Messaging API (V1) may not be enabled for this project');
+        logger.error('Please enable Firebase Cloud Messaging API (V1) in Google Cloud Console:');
+        logger.error(`https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=${process.env.FIREBASE_PROJECT_ID}`);
         return null;
       }
 
@@ -409,16 +371,16 @@ class FirebaseAdapter {
       };
 
       const response = await admin.messaging().send(message);
-      console.log('Firebase single message sent successfully');
+      logger.info('Firebase single message sent successfully');
 
       return response;
     } catch (error) {
       // Handle specific Firebase errors gracefully
       if (error.code === 'messaging/unknown-error' || error.code === 'messaging/invalid-argument') {
-        console.error('Firebase sendSingleMessage error:', error.message);
+        logger.error('Firebase sendSingleMessage error:', error.message);
         return null;
       }
-      console.error('Firebase sendSingleMessage error:', error);
+      logger.error('Firebase sendSingleMessage error:', error);
       return null;
     }
   }
@@ -521,10 +483,10 @@ class FirebaseAdapter {
         .doc(String(groupId))
         .set(sanitizedData);
 
-      console.log(`Group created in Firebase: ${groupId}`);
+      logger.info(`Group created in Firebase: ${groupId}`);
       return { success: true, id: groupId };
     } catch (error) {
-      console.error('Firebase createGroup error:', error);
+      logger.error('Firebase createGroup error:', error);
       throw new Error('Failed to create group in Firebase');
     }
   }
@@ -543,7 +505,7 @@ class FirebaseAdapter {
       const doc = await admin.firestore().collection('groups').doc(groupId.toString()).get();
       return doc.exists ? doc.data() : null;
     } catch (error) {
-      console.error('Firebase getGroupSnapshot error:', error);
+      logger.error('Firebase getGroupSnapshot error:', error);
       return null;
     }
   }
@@ -581,7 +543,7 @@ class FirebaseAdapter {
 
       await admin.firestore().collection('groups').doc(groupId.toString()).update(sanitizedUpdates);
     } catch (error) {
-      console.error('Firebase updateGroup error:', error);
+      logger.error('Firebase updateGroup error:', error);
       throw new Error('Failed to update group in Firebase');
     }
   }
@@ -598,9 +560,9 @@ class FirebaseAdapter {
 
     try {
       await admin.firestore().collection('groups').doc(groupId.toString()).delete();
-      console.log(`Group deleted from Firebase: ${groupId}`);
+      logger.info(`Group deleted from Firebase: ${groupId}`);
     } catch (error) {
-      console.error('Firebase deleteGroup error:', error);
+      logger.error('Firebase deleteGroup error:', error);
       throw new Error('Failed to delete group from Firebase');
     }
   }
@@ -626,7 +588,7 @@ class FirebaseAdapter {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } catch (error) {
-      console.error('Firebase addMember error:', error);
+      logger.error('Firebase addMember error:', error);
       throw error;
     }
   }
@@ -648,7 +610,7 @@ class FirebaseAdapter {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } catch (error) {
-      console.error('Firebase removeMember error:', error);
+      logger.error('Firebase removeMember error:', error);
       throw error;
     }
   }

@@ -27,6 +27,7 @@ class PollPendingTransactionsUseCase {
    * Poll Flutterwave pending transactions
    */
   async pollFlutterwave() {
+    const stats = { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] };
     try {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       const result = await this.transactionRepository.find({
@@ -37,40 +38,22 @@ class PollPendingTransactionsUseCase {
         limit: 50
       });
 
-      logger.info(`Polling ${result.transactions.length} pending Flutterwave transactions`, {
-        queryTime: twoHoursAgo.toISOString(),
-        foundCount: result.transactions.length
-      });
+      stats.found = result.transactions.length;
+      if (stats.found === 0) return stats;
 
       for (const transaction of result.transactions) {
         try {
           if (!transaction.transId) {
-            logger.warn(`Skipping Flutterwave transaction without transId: ${transaction.reference}`);
             continue; // Skip if no transaction ID
           }
-
-          logger.debug(`Verifying Flutterwave transaction`, {
-            reference: transaction.reference,
-            transId: transaction.transId,
-            createdAt: transaction.createdAt
-          });
 
           const verified = await this.flutterwaveAdapter.verify(transaction.transId);
 
           if (!verified) {
-            logger.debug(`Flutterwave transaction verification returned null for transId: ${transaction.transId}`);
             continue;
           }
 
-          logger.debug(`Flutterwave transaction verification result`, {
-            reference: transaction.reference,
-            transId: transaction.transId,
-            status: verified.status,
-            amount: verified.amount
-          });
-
           if (verified.status === 'successful') {
-            logger.info(`Processing pending Flutterwave transaction: ${transaction.reference}`);
             const metadata = verified.meta || (verified.customer && verified.customer.meta) || {
               ...(transaction.metadata || {}),
               userId: transaction.userId,
@@ -86,29 +69,24 @@ class PollPendingTransactionsUseCase {
               metadata,
               raw: verified
             });
+            stats.processed++;
+            stats.processedIds.push(transaction.reference);
           } else if (verified.status === 'failed') {
             await this.transactionRepository.update(transaction.id, { status: 'failed' });
-            logger.info(`Transaction failed: ${transaction.reference}`);
-          } else {
-            logger.debug(`Flutterwave transaction still pending or in other state`, {
-              reference: transaction.reference,
-              status: verified.status
-            });
+            stats.failed++;
+            stats.failedIds.push(transaction.reference);
           }
         } catch (error) {
           logger.error(`Error polling Flutterwave transaction ${transaction.reference}:`, {
             error: error.message,
-            stack: error.stack,
             transId: transaction.transId
           });
         }
       }
     } catch (error) {
-      logger.error('Error in Flutterwave polling job:', {
-        error: error.message,
-        stack: error.stack
-      });
+      logger.error('Error in Flutterwave polling job:', error.message);
     }
+    return stats;
   }
 
   /**
@@ -137,6 +115,7 @@ class PollPendingTransactionsUseCase {
    * Poll Paystack pending transactions
    */
   async pollPaystack() {
+    const stats = { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] };
     try {
       const result = await this.transactionRepository.find({
         provider: 'paystack',
@@ -146,7 +125,8 @@ class PollPendingTransactionsUseCase {
         limit: 50
       });
 
-      logger.info(`Polling ${result.transactions.length} pending Paystack transactions`);
+      stats.found = result.transactions.length;
+      if (stats.found === 0) return stats;
 
       for (const transaction of result.transactions) {
         try {
@@ -156,7 +136,6 @@ class PollPendingTransactionsUseCase {
 
           const verified = await this.paystackAdapter.verify(transaction.reference);
           if (verified && verified.status === 'success') {
-            logger.info(`Processing pending Paystack transaction: ${transaction.reference}`);
             const metadata = verified.metadata || {
               userId: transaction.userId,
               eventId: transaction.eventId,
@@ -171,38 +150,78 @@ class PollPendingTransactionsUseCase {
               metadata,
               raw: verified
             });
+            stats.processed++;
+            stats.processedIds.push(transaction.reference);
           } else if (verified && verified.status === 'failed') {
             await this.transactionRepository.update(transaction.id, { status: 'failed' });
-            logger.info(`Transaction failed: ${transaction.reference}`);
+            stats.failed++;
+            stats.failedIds.push(transaction.reference);
           }
         } catch (error) {
           logger.error(`Error polling Paystack transaction ${transaction.reference}:`, error.message);
         }
       }
     } catch (error) {
-      logger.error('Error in Paystack polling job:', error);
+      logger.error('Error in Paystack polling job:', error.message);
     }
+    return stats;
   }
 
   /**
    * Poll all pending transactions
    */
   async execute() {
-    try {
-      logger.info('Starting payment polling job');
+    const summary = {
+      flutterwave: { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] },
+      payaza: { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] },
+      monnify: { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] },
+      paystack: { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] },
+      totalFound: 0,
+      totalProcessed: 0,
+      totalFailed: 0,
+      audit: {
+        processed: [],
+        failed: []
+      }
+    };
 
+    try {
       // Poll all providers in parallel
-      await Promise.all([
+      const [flutterwave, payaza, monnify, paystack] = await Promise.all([
         this.pollFlutterwave(),
         this.pollPayaza(),
         this.pollMonnify(),
         this.pollPaystack()
       ]);
 
-      logger.info('Payment polling job completed successfully');
+      summary.flutterwave = flutterwave || summary.flutterwave;
+      summary.payaza = payaza || summary.payaza;
+      summary.monnify = monnify || summary.monnify;
+      summary.paystack = paystack || summary.paystack;
+
+      summary.totalFound = summary.flutterwave.found + summary.payaza.found + summary.monnify.found + summary.paystack.found;
+      summary.totalProcessed = summary.flutterwave.processed + summary.payaza.processed + summary.monnify.processed + summary.paystack.processed;
+      summary.totalFailed = summary.flutterwave.failed + summary.payaza.failed + summary.monnify.failed + summary.paystack.failed;
+
+      summary.audit.processed = [
+        ...summary.flutterwave.processedIds,
+        ...summary.paystack.processedIds,
+        ...summary.payaza.processedIds,
+        ...summary.monnify.processedIds
+      ];
+
+      summary.audit.failed = [
+        ...summary.flutterwave.failedIds,
+        ...summary.paystack.failedIds,
+        ...summary.payaza.failedIds,
+        ...summary.monnify.failedIds
+      ];
+
     } catch (error) {
-      logger.error('Error in payment polling job:', error);
+      logger.error('Error in payment polling job execution:', error.message);
     }
+
+    return summary;
   }
 }
 

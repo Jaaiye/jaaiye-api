@@ -37,7 +37,7 @@ class PaymentService {
    * @returns {Promise<Object>}
    */
   async handleSuccessfulPayment({ provider, reference, amount, currency, metadata, raw }) {
-    console.log(metadata)
+    logger.debug('Payment metadata', metadata);
     const { eventId, groupId, hangoutId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [] } = metadata || {};
 
     // Parse metadata safely (Flutterwave sometimes stringifies arrays or objects in meta)

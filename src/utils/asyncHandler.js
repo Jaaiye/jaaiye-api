@@ -25,14 +25,22 @@ const requestLogger = (req, res, next) => {
 
     if (isError || isMutation) {
       const duration = Date.now() - start;
-      const info = sanitizeLogData({
+      const metadata = {
         method: req.method,
         path: req.path,
         statusCode: res.statusCode,
         durationMs: duration,
         userId: req.user?.id,
         traceId: req.traceId
-      });
+      };
+
+      // Extract audit IDs from body or query for mutations
+      if (isMutation) {
+        const auditId = req.body?.transactionId || req.body?.requestId || req.body?.reference || req.query?.reference;
+        if (auditId) metadata.auditId = auditId;
+      }
+
+      const info = sanitizeLogData(metadata);
       logger.info('Request', info);
     }
   });

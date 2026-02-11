@@ -3,7 +3,7 @@
  * Application layer - business logic
  */
 
-const logger = require('../../utils/logger');
+const logger = require('../../../utils/logger');
 const { InvalidTicketTypeError } = require('../errors');
 const { ValidationError, NotFoundError } = require('../../common/errors');
 const EventSchema = require('../../event/entities/Event.schema');

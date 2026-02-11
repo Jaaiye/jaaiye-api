@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,15 +8,13 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const WebSocket = require('ws');
-const dotenv = require('dotenv');
+
 const connectDB = require('./config/database');
 const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./utils/asyncHandler');
 const logger = require('./utils/logger');
 
-// Load environment variables
-dotenv.config();
 
 // Initialize Express app
 const app = express();

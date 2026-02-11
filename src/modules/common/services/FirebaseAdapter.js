@@ -6,6 +6,7 @@
 
 const admin = require('firebase-admin');
 const path = require('path');
+const logger = require('../../../utils/logger');
 
 class FirebaseAdapter {
   constructor() {

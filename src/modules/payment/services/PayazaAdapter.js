@@ -34,9 +34,10 @@ class PayazaAdapter {
 
   /**
    * Poll pending Payaza transactions
-   * @returns {Promise<void>}
+   * @returns {Promise<Object>} Polling stats
    */
   async pollPendingTransactions() {
+    const stats = { found: 0, processed: 0, failed: 0, processedIds: [], failedIds: [] };
     try {
       const result = await this.transactionRepository.find({
         provider: 'payaza',
@@ -46,13 +47,13 @@ class PayazaAdapter {
         limit: 50
       });
 
-      logger.info(`Polling ${result.transactions.length} pending Payaza transactions`);
+      stats.found = result.transactions.length;
+      if (stats.found === 0) return stats;
 
       for (const transaction of result.transactions) {
         try {
           const verified = await this.verify(transaction.reference);
           if (verified && verified.status === 'successful') {
-            logger.info(`Processing pending Payaza transaction: ${transaction.reference}`);
             const metadata = verified.meta || (verified.customer && verified.customer.meta) || {
               userId: transaction.userId,
               eventId: transaction.eventId,
@@ -67,9 +68,12 @@ class PayazaAdapter {
               metadata,
               raw: verified
             });
+            stats.processed++;
+            stats.processedIds.push(transaction.reference);
           } else if (verified && verified.status === 'failed') {
             await this.transactionRepository.update(transaction.id, { status: 'failed' });
-            logger.info(`Transaction failed: ${transaction.reference}`);
+            stats.failed++;
+            stats.failedIds.push(transaction.reference);
           }
         } catch (error) {
           logger.error(`Error polling Payaza transaction ${transaction.reference}:`, error.message);
@@ -78,6 +82,7 @@ class PayazaAdapter {
     } catch (error) {
       logger.error('Error in Payaza polling job:', error);
     }
+    return stats;
   }
 }
 

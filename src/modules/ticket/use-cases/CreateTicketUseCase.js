@@ -3,6 +3,7 @@
  * Application layer - business logic
  */
 
+const logger = require('../../../utils/logger');
 const { InvalidTicketTypeError } = require('../errors');
 const { ValidationError, NotFoundError } = require('../../common/errors');
 const EventSchema = require('../../event/entities/Event.schema');
@@ -27,7 +28,7 @@ class CreateTicketUseCase {
   }
 
   async execute(dto) {
-    console.log('[CreateTicketUseCase] Starting ticket creation', {
+    logger.debug('[CreateTicketUseCase] Starting ticket creation', {
       eventId: dto.eventId,
       ticketTypeId: dto.ticketTypeId,
       quantity: dto.quantity,
@@ -65,7 +66,7 @@ class CreateTicketUseCase {
       await this._sendEmailNotification(targetUserId, finalTicket);
     }
 
-    console.log('[CreateTicketUseCase] Ticket creation completed successfully', {
+    logger.debug('[CreateTicketUseCase] Ticket creation completed successfully', {
       ticketId: finalTicket.id,
       publicId: finalTicket.publicId,
       hasQrCode: !!finalTicket.qrCode,
@@ -79,7 +80,7 @@ class CreateTicketUseCase {
     let targetUserId = dto.userId;
 
     if (!targetUserId && dto.username) {
-      console.log('[CreateTicketUseCase] Looking up user by username', { username: dto.username });
+      logger.debug('[CreateTicketUseCase] Looking up user by username', { username: dto.username });
       const user = await this.userRepository.findByUsername(dto.username);
       if (!user) {
         throw new NotFoundError('User not found');
@@ -88,7 +89,7 @@ class CreateTicketUseCase {
     }
 
     if (!targetUserId && dto.email) {
-      console.log('[CreateTicketUseCase] Looking up user by email', { email: dto.email });
+      logger.debug('[CreateTicketUseCase] Looking up user by email', { email: dto.email });
       const user = await this.userRepository.findByEmail(dto.email);
       if (!user) {
         throw new NotFoundError('User not found');
@@ -100,7 +101,7 @@ class CreateTicketUseCase {
       throw new ValidationError('Target user is required');
     }
 
-    console.log('[CreateTicketUseCase] Target user resolved', { targetUserId });
+    logger.debug('[CreateTicketUseCase] Target user resolved', { targetUserId });
     return targetUserId;
   }
 
@@ -189,7 +190,7 @@ class CreateTicketUseCase {
   }
 
   async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, quantity, transactionId }) {
-    console.log('[CreateTicketUseCase] Creating ticket', {
+    logger.debug('[CreateTicketUseCase] Creating ticket', {
       userId: targetUserId,
       eventId,
       ticketTypeId: ticketTypeIdForTracking,
@@ -208,7 +209,7 @@ class CreateTicketUseCase {
       quantity
     });
 
-    console.log('[CreateTicketUseCase] Ticket created', {
+    logger.debug('[CreateTicketUseCase] Ticket created', {
       ticketId: ticket.id,
       publicId: ticket.publicId
     });
@@ -218,14 +219,14 @@ class CreateTicketUseCase {
 
   async _generateAndSavePublicId(ticket) {
     if (ticket.publicId) {
-      console.log('[CreateTicketUseCase] Ticket already has publicId', { publicId: ticket.publicId });
+      logger.debug('[CreateTicketUseCase] Ticket already has publicId', { publicId: ticket.publicId });
       return ticket;
     }
 
-    console.log('[CreateTicketUseCase] Generating publicId');
+    logger.debug('[CreateTicketUseCase] Generating publicId');
     const publicId = await this._generateUniquePublicId();
 
-    console.log('[CreateTicketUseCase] Updating ticket with publicId', {
+    logger.debug('[CreateTicketUseCase] Updating ticket with publicId', {
       ticketId: ticket.id,
       publicId
     });
@@ -236,7 +237,7 @@ class CreateTicketUseCase {
       throw new Error('Failed to save publicId to database');
     }
 
-    console.log('[CreateTicketUseCase] publicId successfully saved', {
+    logger.debug('[CreateTicketUseCase] publicId successfully saved', {
       ticketId: updatedTicket.id,
       publicId: updatedTicket.publicId
     });
@@ -251,7 +252,7 @@ class CreateTicketUseCase {
       const randomNum = Math.floor(100000 + Math.random() * 900000);
       const publicId = `jaaiye-${randomNum}`;
 
-      console.log('[CreateTicketUseCase] Checking publicId uniqueness', {
+      logger.debug('[CreateTicketUseCase] Checking publicId uniqueness', {
         publicId,
         attempt: attempt + 1
       });
@@ -260,7 +261,7 @@ class CreateTicketUseCase {
       const existing = await this.ticketRepository.findByPublicId(publicId);
 
       if (!existing) {
-        console.log('[CreateTicketUseCase] Found unique publicId', { publicId });
+        logger.debug('[CreateTicketUseCase] Found unique publicId', { publicId });
         return publicId;
       }
     }
@@ -269,7 +270,7 @@ class CreateTicketUseCase {
   }
 
   async _generateAndSaveQRCode(ticket) {
-    console.log('[CreateTicketUseCase] Generating QR codes', {
+    logger.debug('[CreateTicketUseCase] Generating QR codes', {
       ticketId: ticket.id,
       publicId: ticket.publicId
     });
@@ -279,7 +280,7 @@ class CreateTicketUseCase {
     const { qrCode } = await this.qrCodeAdapter.generateTicketQRCodeWithPublicId(ticketForQR);
     const { token, verifyUrl } = await this.qrCodeAdapter.generateTicketQRCode(ticketForQR);
 
-    console.log('[CreateTicketUseCase] QR codes generated', {
+    logger.debug('[CreateTicketUseCase] QR codes generated', {
       hasQrCode: !!qrCode,
       hasToken: !!token
     });
@@ -293,7 +294,7 @@ class CreateTicketUseCase {
       throw new Error('Failed to save QR code to database');
     }
 
-    console.log('[CreateTicketUseCase] Ticket updated with QR code', {
+    logger.debug('[CreateTicketUseCase] Ticket updated with QR code', {
       ticketId: finalTicket.id,
       hasQrCode: !!finalTicket.qrCode
     });
@@ -354,18 +355,18 @@ class CreateTicketUseCase {
           }
         }
       } catch (error) {
-        console.warn('[CreateTicket] Failed to add participant or sync calendar:', error);
+        logger.warn('[CreateTicket] Failed to add participant or sync calendar:', error);
       }
     });
   }
 
   async _sendEmailNotification(targetUserId, ticket) {
     try {
-      console.log('[CreateTicketUseCase] Preparing email notification', { targetUserId, ticketId: ticket.id });
+      logger.debug('[CreateTicketUseCase] Preparing email notification', { targetUserId, ticketId: ticket.id });
 
       const targetUser = await this.userRepository.findById(targetUserId);
       if (!targetUser || !targetUser.email) {
-        console.warn('[CreateTicketUseCase] Cannot send email - no target user or email');
+        logger.warn('[CreateTicketUseCase] Cannot send email - no target user or email');
         return;
       }
 
@@ -379,9 +380,9 @@ class CreateTicketUseCase {
       const ticketForEmail = await this._prepareTicketForEmail(populatedDoc, ticket, targetUser);
 
       await this.emailAdapter.sendPaymentConfirmationEmail(targetUser, ticketForEmail);
-      console.log('[CreateTicketUseCase] Email sent successfully');
+      logger.debug('[CreateTicketUseCase] Email sent successfully');
     } catch (error) {
-      console.error('[CreateTicketUseCase] Failed to send email notification:', {
+      logger.error('[CreateTicketUseCase] Failed to send email notification:', {
         error: error.message,
         targetUserId,
         ticketId: ticket.id

@@ -48,6 +48,11 @@ const logger = winston.createLogger({
 // Add Horizon transport
 try {
   const { horizonTransport } = require('../config/horizon');
+  // Strict filtering for Horizon: Only send warnings and errors in production
+  // This helps stay within the 10,000 logs/month limit
+  const horizonLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
+  horizonTransport.level = horizonLevel;
+
   logger.add(horizonTransport);
 } catch (error) {
   console.error('Failed to add Horizon transport to logger:', error.message);
@@ -71,7 +76,7 @@ const wrapLoggerMethod = (level) => {
 
     if (errorOrInfo instanceof Error) {
       base.error = errorOrInfo.message;
-      if (LOG_INCLUDE_STACK && errorOrInfo.stack) {
+      if ((level === 'error' || LOG_INCLUDE_STACK) && errorOrInfo.stack) {
         base.stack = errorOrInfo.stack;
       }
       if (errorOrInfo.code) base.code = errorOrInfo.code;

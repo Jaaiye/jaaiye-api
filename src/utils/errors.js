@@ -71,13 +71,15 @@ class DatabaseError extends AppError {
   }
 }
 
+const logger = require('./logger');
+
 const errorHandler = (error, req, res, next) => {
   error.statusCode = error.statusCode || 500;
   error.status = error.status || 'error';
 
   // Log error in development
   if (process.env.NODE_ENV === 'development') {
-    console.error('Error:', {
+    logger.error('Error:', {
       message: error.message,
       stack: error.stack,
       statusCode: error.statusCode,

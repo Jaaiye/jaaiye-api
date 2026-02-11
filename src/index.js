@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,15 +8,13 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const WebSocket = require('ws');
-const dotenv = require('dotenv');
+
 const connectDB = require('./config/database');
 const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./utils/asyncHandler');
 const logger = require('./utils/logger');
 
-// Load environment variables
-dotenv.config();
 
 // Initialize Express app
 const app = express();
@@ -197,11 +196,11 @@ app.use('/api/v1/calendars', require('./modules/calendar/calendar.module').getCa
 try {
   const eventRoutes = require('./modules/event/event.module').getEventRoutes();
   if (!eventRoutes) {
-    console.error('Event routes are null or undefined');
+    logger.error('Event routes are null or undefined');
   }
   app.use('/api/v1/events', eventRoutes);
 } catch (error) {
-  console.error('Failed to register event routes:', error);
+  logger.error('Failed to register event routes:', error);
   throw error;
 }
 app.use('/api/v1/notifications', require('./modules/notification/notification.module').getNotificationRoutes());

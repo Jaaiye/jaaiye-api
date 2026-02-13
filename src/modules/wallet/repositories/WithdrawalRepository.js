@@ -62,6 +62,30 @@ class WithdrawalRepository {
   async countByQuery(query) {
     return await Withdrawal.countDocuments(query);
   }
+
+  /**
+   * Find pending withdrawals for polling
+   * @param {Object} options
+   * @param {Date} options.createdBefore - Only get withdrawals created before this date
+   * @param {number} options.limit - Maximum number of withdrawals to return
+   * @returns {Promise<Array>}
+   */
+  async findPendingWithdrawals({ createdBefore, limit = 50 }) {
+    const query = {
+      status: 'pending'
+    };
+
+    if (createdBefore) {
+      query.createdAt = { $lt: createdBefore };
+    }
+
+    const docs = await Withdrawal.find(query)
+      .sort({ createdAt: 1 }) // Oldest first
+      .limit(limit)
+      .lean();
+
+    return docs;
+  }
 }
 
 module.exports = WithdrawalRepository;

@@ -12,14 +12,7 @@ class UpdateTicketTypeUseCase {
   }
 
   async execute(eventId, ticketTypeId, userId, updateData) {
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
-    let event;
-
-    if (isObjectId) {
-      event = await this.eventRepository.findById(eventId);
-    } else {
-      event = await this.eventRepository.findBySlug(eventId);
-    }
+    const event = await this.eventRepository.findByIdOrSlug(eventId);
 
     if (!event) {
       throw new EventNotFoundError();
@@ -93,6 +86,7 @@ class UpdateTicketTypeUseCase {
     if (updateData.salesEndDate !== undefined) updateObj.salesEndDate = updateData.salesEndDate ? new Date(updateData.salesEndDate) : null;
     if (updateData.type !== undefined) updateObj.type = updateData.type;
     if (updateData.quantityLimit !== undefined) updateObj.quantityLimit = updateData.quantityLimit === null || updateData.quantityLimit === '' ? null : Number(updateData.quantityLimit);
+    if (updateData.admissionSize !== undefined) updateObj.admissionSize = Number(updateData.admissionSize);
 
     // Update ticket type
     await eventDoc.updateTicketType(ticketTypeId, updateObj);

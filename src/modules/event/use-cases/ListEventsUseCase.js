@@ -4,10 +4,11 @@
  */
 
 class ListEventsUseCase {
-  constructor({ eventRepository, calendarRepository, eventParticipantRepository }) {
+  constructor({ eventRepository, calendarRepository, eventParticipantRepository, userRepository }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
     this.eventParticipantRepository = eventParticipantRepository;
+    this.userRepository = userRepository;
   }
 
   async execute(userId, dto) {
@@ -18,73 +19,64 @@ class ListEventsUseCase {
     const user = userId ? await this.userRepository.findById(userId) : null;
     const isGuest = user && user.isGuest;
 
-    // The user wants fixed logic regardless of input:
-    // 1. Events -> always fetch all
-    // 2. Hangouts -> only mine (or empty if guest)
+    const isMineScope = dto.scope === 'mine' || dto.scope === 'creator';
+
+    // Helper to get participating events
+    const getParticipatingFilter = async (uid) => {
+      const participations = await this.eventParticipantRepository.findByUser(uid);
+      const eventIds = participations.map(p => p.event);
+
+      const mongoose = require('mongoose');
+      return eventIds.length > 0
+        ? eventIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)
+        : [];
+    };
 
     if (dto.category === 'event') {
-      // For 'event', we always fetch all events
       filters.category = 'event';
-      // No calendar or scope restrictions applied to events
+
+      if (isMineScope && userId && !isGuest) {
+        const objectEventIds = await getParticipatingFilter(userId);
+        filters.$or = [
+          { creatorId: userId },
+          { _id: { $in: objectEventIds } }
+        ];
+      }
     } else if (dto.category === 'hangout') {
-      // For 'hangout', we only fetch the user's own hangouts
       if (!userId || isGuest) {
-        // Unauthenticated users or Guest users cannot view hangouts
         return { events: [], pagination: { page: dto.page, limit: dto.limit, total: 0, pages: 0 } };
       }
 
       filters.category = 'hangout';
+      const objectEventIds = await getParticipatingFilter(userId);
 
-      // Force 'mine' logic: created by user OR participating
-      const participatingEventIds = await this.eventParticipantRepository.findByUser(userId);
-      const eventIds = participatingEventIds.map(p => p.event);
-
-      const mongoose = require('mongoose');
-      const objectEventIds = eventIds.length > 0
-        ? eventIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)
-        : [];
-
-      if (objectEventIds.length > 0) {
+      filters.$or = [
+        { creatorId: userId },
+        { _id: { $in: objectEventIds } }
+      ];
+    } else {
+      // category === 'all'
+      if (!userId || isGuest) {
+        filters.category = 'event';
+      } else if (isMineScope) {
+        const objectEventIds = await getParticipatingFilter(userId);
         filters.$or = [
-          { createdBy: userId },
+          { creatorId: userId },
           { _id: { $in: objectEventIds } }
         ];
       } else {
-        filters.createdBy = userId;
-      }
-    } else {
-      // category === 'all' (default or explicitly passed)
-      if (!userId || isGuest) {
-        // Unauthenticated users or Guest users only see public events
-        filters.category = 'event';
-      } else {
-        // Authenticated users see ALL categories: All Events + My Hangouts
-        const participatingEventIds = await this.eventParticipantRepository.findByUser(userId);
-        const eventIds = participatingEventIds.map(p => p.event);
-
-        const mongoose = require('mongoose');
-        const objectEventIds = eventIds.length > 0
-          ? eventIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id)
-          : [];
+        const objectEventIds = await getParticipatingFilter(userId);
 
         filters.$or = [
-          { category: 'event' }, // All events
+          { category: 'event' }, // All public events
           {
             category: 'hangout',
             $or: [
-              { createdBy: userId },
-              { _id: { $in: objectEventIds.length > 0 ? objectEventIds : [] } }
-            ].filter(cond => {
-              if (cond._id && cond._id.$in.length === 0) return false;
-              return true;
-            })
+              { creatorId: userId },
+              { _id: { $in: objectEventIds } }
+            ]
           }
         ];
-
-        // If no participating events, simplify the hangout part
-        if (objectEventIds.length === 0) {
-          filters.$or[1] = { category: 'hangout', createdBy: userId };
-        }
       }
     }
 

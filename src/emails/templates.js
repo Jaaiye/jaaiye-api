@@ -632,6 +632,177 @@ function ticketSaleNotificationEmail({ eventTitle, ticketCount, amount, buyerNam
   });
 }
 
+function withdrawalReceiptEmail({ eventTitle, eventId, userName, userEmail, amount, feeAmount, payoutAmount, bankName, accountNumber, accountName, reference, requestedAt }) {
+  const title = '💸 Withdrawal Receipt';
+  const previewText = `Withdrawal request for ${eventTitle} - ₦${amount.toLocaleString()}`;
+
+  const bodyHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <p style="font-size: 16px; color: #1E293B; margin-bottom: 16px;">
+        <strong>Withdrawal Request Receipt</strong>
+      </p>
+
+      <p style="font-size: 14px; color: #64748B; margin-bottom: 24px;">
+        A withdrawal has been requested and processed. Details below:
+      </p>
+
+      <!-- Event Details Card -->
+      <div style="margin: 24px 0; padding: 20px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F8FAFC;">
+        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0F172A;">
+          Event Information
+        </h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; width: 140px; vertical-align: top;">
+              Event:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-weight: 500;">
+              ${escapeHtml(eventTitle)}
+            </td>
+          </tr>
+
+          ${eventId ? `
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Event ID:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-family: 'Courier New', monospace;">
+              ${escapeHtml(eventId)}
+            </td>
+          </tr>
+          ` : ''}
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Requested By:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${escapeHtml(userName || 'N/A')}
+            </td>
+          </tr>
+
+          ${userEmail ? `
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Email:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${escapeHtml(userEmail)}
+            </td>
+          </tr>
+          ` : ''}
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Request Time:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${new Date(requestedAt || Date.now()).toLocaleString(DEFAULT_LOCALE, {
+    dateStyle: 'full',
+    timeStyle: 'short'
+  })}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Financial Details Card -->
+      <div style="margin: 24px 0; padding: 20px; border: 1px solid #E2E8F0; border-radius: 12px; background: #FEF3C7;">
+        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0F172A;">
+          Financial Details
+        </h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; width: 140px; vertical-align: top;">
+              Withdrawal Amount:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-weight: 600;">
+              ${formatCurrency(amount)}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Service Fee (5%):
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${formatCurrency(feeAmount)}
+            </td>
+          </tr>
+
+          <tr style="border-top: 2px solid #E2E8F0;">
+            <td style="padding: 12px 0 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              <strong>Payout Amount:</strong>
+            </td>
+            <td style="padding: 12px 0 8px 0; color: #0F172A; font-size: 16px; font-weight: 700;">
+              ${formatCurrency(payoutAmount)}
+            </td>
+          </tr>
+
+          ${reference ? `
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Reference:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 13px; font-family: 'Courier New', monospace;">
+              ${escapeHtml(reference)}
+            </td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+
+      <!-- Bank Details Card -->
+      <div style="margin: 24px 0; padding: 20px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F0FDF4;">
+        <h2 style="margin: 0 0 16px 0; font-size: 18px; color: #0F172A;">
+          Bank Account Details
+        </h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; width: 140px; vertical-align: top;">
+              Bank Name:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-weight: 500;">
+              ${escapeHtml(bankName || 'N/A')}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Account Number:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px; font-family: 'Courier New', monospace;">
+              ${escapeHtml(accountNumber || 'N/A')}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 8px 0; color: #64748B; font-size: 14px; vertical-align: top;">
+              Account Name:
+            </td>
+            <td style="padding: 8px 0; color: #1E293B; font-size: 14px;">
+              ${escapeHtml(accountName || 'N/A')}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size: 13px; color: #64748B; margin-top: 24px; padding: 12px; background: #F1F5F9; border-radius: 8px;">
+        <strong>Note:</strong> This is an automated receipt for record-keeping purposes. The withdrawal has been processed via Flutterwave.
+      </p>
+    </div>
+  `;
+
+  return baseLayout({
+    title,
+    previewText,
+    bodyHtml
+  });
+}
+
 module.exports = {
   baseLayout,
   verificationEmail,
@@ -646,5 +817,6 @@ module.exports = {
   walletWithdrawalSuccessEmail,
   walletWithdrawalFailedEmail,
   walletAdjustedRefundEmail,
-  walletAdjustedManualEmail
+  walletAdjustedManualEmail,
+  withdrawalReceiptEmail
 };

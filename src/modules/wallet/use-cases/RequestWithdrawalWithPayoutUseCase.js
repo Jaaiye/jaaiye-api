@@ -20,7 +20,9 @@ class RequestWithdrawalWithPayoutUseCase {
     walletLedgerEntryRepository,
     bankAccountRepository,
     withdrawalRepository,
-    flutterwaveAdapter
+    flutterwaveAdapter,
+    walletEmailAdapter,
+    eventRepository
   }) {
     this.walletWithdrawalService = walletWithdrawalService;
     this.walletRepository = walletRepository;
@@ -28,6 +30,8 @@ class RequestWithdrawalWithPayoutUseCase {
     this.bankAccountRepository = bankAccountRepository;
     this.withdrawalRepository = withdrawalRepository;
     this.flutterwaveAdapter = flutterwaveAdapter;
+    this.walletEmailAdapter = walletEmailAdapter;
+    this.eventRepository = eventRepository;
   }
 
   /**
@@ -101,7 +105,7 @@ class RequestWithdrawalWithPayoutUseCase {
         ownerId,
         requestedBy,
         requestedAmount: withdrawalAmount,
-        feeMode: 'NONE' // Fee is 0% for now
+        feeMode: 'EXCLUSIVE' // 5% service fee for EVENT withdrawals
       });
     } catch (error) {
       logger.error('Wallet withdrawal failed', {
@@ -197,6 +201,38 @@ class RequestWithdrawalWithPayoutUseCase {
         createdAt: new Date()
       }
     });
+
+    // Step 5: Send withdrawal receipt email to admin
+    if (this.walletEmailAdapter && ownerType === 'EVENT') {
+      try {
+        // Fetch event and user details for the email
+        const event = await this.eventRepository.findByIdOrSlug(ownerId);
+        const UserRepository = require('../../common/repositories/UserRepository');
+        const userRepo = new UserRepository();
+        const user = await userRepo.findById(requestedBy);
+
+        await this.walletEmailAdapter.sendWithdrawalReceiptToAdmin({
+          eventTitle: event?.title || 'Unknown Event',
+          eventId: event?._id || event?.id || ownerId,
+          userName: user?.username || user?.fullName || 'Unknown User',
+          userEmail: user?.email,
+          amount: withdrawalAmount,
+          feeAmount: withdrawalResult.feeAmount || 0,
+          payoutAmount: withdrawalResult.payoutAmount,
+          bankName: bankAccount.bankName,
+          accountNumber: bankAccount.accountNumber,
+          accountName: bankAccount.accountName,
+          reference: transferResult.reference || payoutReference,
+          requestedAt: new Date()
+        });
+      } catch (emailError) {
+        // Log but don't fail the withdrawal if email fails
+        logger.error('Failed to send withdrawal receipt email', {
+          error: emailError.message,
+          withdrawalId: withdrawal._id || withdrawal.id
+        });
+      }
+    }
 
     return {
       withdrawal: {

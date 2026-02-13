@@ -45,13 +45,17 @@ class WalletService {
       throw new Error('transactionEntity with id is required');
     }
 
-    const amount = Number(transactionEntity.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const baseAmount = Number(transactionEntity.baseAmount || transactionEntity.amount || 0);
+    if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
       throw new Error('Invalid transaction amount for wallet funding');
     }
 
-    const fee = amount * 0.10;
-    const netAmount = amount;
+    // Use stored feeAmount if available, otherwise calculate 10%
+    const fee = Number(transactionEntity.feeAmount) !== undefined && transactionEntity.feeAmount !== null
+      ? Number(transactionEntity.feeAmount)
+      : baseAmount * 0.10;
+
+    const netAmountForUser = baseAmount; // The full ticket price before platform fee
 
     // Get or create owner wallet
     let wallet = await this.walletRepository.findByOwner(ownerType, ownerId);
@@ -71,7 +75,7 @@ class WalletService {
     const walletBalanceBefore = Number(wallet.balance || 0);
     const platformBalanceBefore = Number(platformWallet.balance || 0);
 
-    const walletBalanceAfterFunding = walletBalanceBefore + netAmount;
+    const walletBalanceAfterFunding = walletBalanceBefore + netAmountForUser;
     const walletBalanceAfterFee = walletBalanceAfterFunding - fee;
     const platformBalanceAfterFee = platformBalanceBefore + fee;
 
@@ -90,7 +94,7 @@ class WalletService {
       walletId: wallet.id,
       type: 'FUNDING',
       direction: 'CREDIT',
-      amount: netAmount,
+      amount: netAmountForUser,
       balanceAfter: walletBalanceAfterFunding,
       ownerType,
       ownerId,

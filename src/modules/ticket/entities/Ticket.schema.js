@@ -32,6 +32,11 @@ const ticketSchema = new mongoose.Schema({
     default: 1,
     min: 1
   },
+  admissionSize: {
+    type: Number,
+    default: 1,
+    min: 1
+  },
   checkedInCount: {
     type: Number,
     default: 0,
@@ -77,15 +82,15 @@ const ticketSchema = new mongoose.Schema({
 ticketSchema.methods.markAsUsed = function () {
   this.status = 'used';
   this.usedAt = new Date();
-  if (this.checkedInCount < this.quantity) {
-    this.checkedInCount = this.quantity;
+  if (this.checkedInCount < this.admissionSize) {
+    this.checkedInCount = this.admissionSize;
   }
   return this.save();
 };
 
 ticketSchema.methods.checkIn = function (count = 1) {
-  this.checkedInCount = Math.min(this.quantity, this.checkedInCount + count);
-  if (this.checkedInCount >= this.quantity) {
+  this.checkedInCount = Math.min(this.admissionSize, this.checkedInCount + count);
+  if (this.checkedInCount >= this.admissionSize) {
     this.status = 'used';
     this.usedAt = new Date();
   }

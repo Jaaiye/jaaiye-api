@@ -10,6 +10,7 @@ class TransactionEntity {
     reference,
     transReference,
     amount,
+    baseAmount,
     currency,
     status,
     transId,
@@ -28,6 +29,7 @@ class TransactionEntity {
     this.reference = reference;
     this.transReference = transReference;
     this.amount = amount;
+    this.baseAmount = baseAmount;
     this.currency = currency || 'NGN';
     this.status = status || 'created';
     this.transId = transId;
@@ -89,6 +91,7 @@ class TransactionEntity {
       reference: this.reference,
       transReference: this.transReference,
       amount: this.amount,
+      baseAmount: this.baseAmount,
       currency: this.currency,
       status: this.status,
       transId: this.transId,

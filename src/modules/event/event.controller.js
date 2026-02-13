@@ -169,6 +169,7 @@ class EventController {
       name: req.body.name,
       description: req.body.description,
       price: Number(req.body.price || 0),
+      admissionSize: Number(req.body.admissionSize || 0),
       capacity: req.body.capacity !== undefined && req.body.capacity !== null && req.body.capacity !== '' ? Number(req.body.capacity) : null,
       quantityLimit: req.body.quantityLimit !== undefined && req.body.quantityLimit !== null && req.body.quantityLimit !== '' ? Number(req.body.quantityLimit) : null,
       isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
@@ -200,7 +201,9 @@ class EventController {
 
   getAvailableTicketTypes = asyncHandler(async (req, res) => {
     const EventSchema = require('../entities/Event.schema');
-    const doc = await EventSchema.findById(req.params.id);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
+    const query = isObjectId ? { _id: req.params.id } : { slug: req.params.id };
+    const doc = await EventSchema.findOne(query);
     if (!doc) {
       return res.status(404).json({ success: false, error: 'Event not found' });
     }

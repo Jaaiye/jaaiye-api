@@ -44,7 +44,7 @@ const allowedOrigins = [
   process.env.FRONTEND_ORIGIN,
   'https://jaaiye-admin.vercel.app',
   'http://localhost:3000',
-  'http://localhost:3030',
+  'http://localhost:3031',
   'https://jaaiye-checkout.vercel.app',
   'https://tickets.jaaiye.com',
   'https://events.jaaiye.com',
@@ -170,6 +170,9 @@ app.get('/test-cors', (req, res) => {
   res.json({ message: 'CORS is working!' });
 });
 
+// Webhook test endpoint (for testing webhook connectivity)
+app.use('/webhooks/test', require('./routes/webhookTestRoutes'));
+
 app.use('/webhooks', require('./routes/webhookRoutes'));
 
 // Public OAuth redirect endpoints (must be before API key validation)
@@ -255,6 +258,7 @@ const queueModule = require('./modules/queue/queue.module');
 const ticketModule = require('./modules/ticket/ticket.module');
 
 queueModule.getPaymentPollingQueue().start();
+queueModule.getWithdrawalPollingQueue().start();
 
 // Initialize and start uptime monitor
 const uptimeMonitor = queueModule.getUptimeMonitor();

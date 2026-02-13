@@ -103,6 +103,7 @@ class CreateEventUseCase {
         name: type.name,
         description: type.description,
         price: type.price === undefined || type.price === null || type.price === '' ? 0 : Number(type.price),
+        admissionSize: type.admissionSize === undefined || type.admissionSize === null || type.admissionSize === '' ? 1 : Number(type.admissionSize),
         capacity: type.capacity === undefined || type.capacity === null || type.capacity === '' ? null : Number(type.capacity),
         soldCount: 0,
         isActive: type.isActive === undefined ? true : Boolean(type.isActive),

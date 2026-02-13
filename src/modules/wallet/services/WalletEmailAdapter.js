@@ -113,6 +113,29 @@ class WalletEmailAdapter {
       html
     });
   }
+
+  /**
+   * Send withdrawal receipt to admin
+   * @param {Object} payload - Withdrawal details
+   */
+  async sendWithdrawalReceiptToAdmin(payload) {
+    const adminEmail = process.env.WITHDRAWAL_RECEIPT_EMAIL;
+
+    if (!adminEmail) {
+      console.warn('WITHDRAWAL_RECEIPT_EMAIL not configured, skipping admin receipt email');
+      return;
+    }
+
+    const html = templates.withdrawalReceiptEmail(payload);
+    const subject = `💸 Withdrawal Receipt - ${payload.eventTitle || 'Event'} - ₦${payload.amount.toLocaleString()}`;
+
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: adminEmail,
+      subject,
+      html
+    });
+  }
 }
 
 module.exports = WalletEmailAdapter;

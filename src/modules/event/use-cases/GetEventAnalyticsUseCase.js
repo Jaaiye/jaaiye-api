@@ -1,8 +1,3 @@
-/**
- * Get Event Analytics Use Case
- * Application layer - get analytics for a specific event
- */
-
 const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
 
 class GetEventAnalyticsUseCase {
@@ -57,6 +52,14 @@ class GetEventAnalyticsUseCase {
       return ticketDate >= start && ticketDate <= end && t.status !== 'cancelled';
     });
 
+    // Create admission size lookup map from event ticket types for consistent calculation
+    const admissionSizeMap = {};
+    if (event.ticketTypes) {
+      event.ticketTypes.forEach(tt => {
+        admissionSizeMap[String(tt._id || tt.id)] = tt.admissionSize || 1;
+      });
+    }
+
     // Filter transactions by date range
     const filteredTransactions = successfulTransactions.filter(t => {
       const transactionDate = new Date(t.createdAt);
@@ -73,14 +76,24 @@ class GetEventAnalyticsUseCase {
     const ticketTypeBreakdown = this._calculateTicketTypeBreakdown(event, filteredTickets, filteredTransactions);
 
     // Overall metrics
-    // Total tickets sold: count from tickets
+    // Total tickets sold: count from tickets (physical tickets/QR codes)
     const totalTicketsSold = filteredTickets.reduce((sum, t) => sum + (t.quantity || 1), 0);
 
-    // Total revenue: sum from transactions
-    const totalRevenue = filteredTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    // Total attendees: total people admitted across all tickets (pulling from event config)
+    const totalAttendees = filteredTickets.reduce((sum, t) => {
+      const typeId = t.ticketTypeId?.toString();
+      const size = admissionSizeMap[typeId] || t.admissionSize || 1;
+      return sum + size;
+    }, 0);
 
-    // Average ticket price: revenue / tickets sold
-    const averageTicketPrice = totalTicketsSold > 0 ? totalRevenue / totalTicketsSold : 0;
+    // Total checked-in: total people who have arrived
+    const totalCheckedIn = filteredTickets.reduce((sum, t) => sum + (t.checkedInCount || 0), 0);
+
+    // Total revenue: sum from transactions
+    const totalRevenue = filteredTransactions.reduce((sum, t) => sum + Number(t.baseAmount || 0), 0);
+
+    // Check-in rate: percentage of attendees who have checked in
+    const checkInRate = totalAttendees > 0 ? (totalCheckedIn / totalAttendees) * 100 : 0;
 
     // Conversion metrics (if we had view data, but for now just ticket sales)
     const conversionRate = 0; // Would need view/impression data
@@ -99,8 +112,10 @@ class GetEventAnalyticsUseCase {
       },
       metrics: {
         totalTicketsSold,
+        totalAttendees,
+        totalCheckedIn,
         totalRevenue,
-        averageTicketPrice,
+        checkInRate,
         conversionRate
       },
       salesByPeriod,
@@ -154,7 +169,7 @@ class GetEventAnalyticsUseCase {
         periods[periodKey] = 0;
       }
       // Sum transaction amounts (transactions have amount field)
-      periods[periodKey] += Number(transaction.amount || 0);
+      periods[periodKey] += Number(transaction.baseAmount || 0);
     });
 
     return periods;
@@ -163,7 +178,7 @@ class GetEventAnalyticsUseCase {
   _calculateTicketTypeBreakdown(event, tickets, transactions) {
     const breakdown = {};
 
-    // Initialize with event ticket types
+    // 1. Initialize with event ticket types
     if (event.ticketTypes && event.ticketTypes.length > 0) {
       event.ticketTypes.forEach(tt => {
         const id = tt._id?.toString() || tt.id;
@@ -174,12 +189,13 @@ class GetEventAnalyticsUseCase {
           price: Number(tt.price || 0),
           admissionSize: tt.admissionSize || 1,
           soldCount: 0,
+          admissionCount: 0,
           revenue: 0
         };
       });
     }
 
-    // 1. Calculate soldCount from tickets (Source of truth for ticket volume)
+    // 2. Calculate soldCount, admissionCount, and revenue from tickets (The Ground Truth)
     tickets.forEach(ticket => {
       const typeId = ticket.ticketTypeId?.toString() || 'unknown';
       if (!breakdown[typeId]) {
@@ -188,64 +204,44 @@ class GetEventAnalyticsUseCase {
           name: ticket.ticketTypeName || 'Unknown',
           type: 'custom',
           price: Number(ticket.price || 0),
+          admissionSize: ticket.admissionSize || 1,
           soldCount: 0,
+          admissionCount: 0,
           revenue: 0
         };
       }
 
       const quantity = Number(ticket.quantity || 1);
+      const ticketAdmissionSize = breakdown[typeId].admissionSize;
+      const ticketPrice = Number(ticket.price || 0);
+
       breakdown[typeId].soldCount += quantity;
+      breakdown[typeId].admissionCount += (quantity * ticketAdmissionSize);
+      breakdown[typeId].revenue += (quantity * ticketPrice);
     });
 
-    // 2. Calculate revenue from transactions (Source of truth for money)
-    // Map transaction ID to its ticket type(s)
-    const transactionTypeMap = {};
-    tickets.forEach(ticket => {
-      if (ticket.transactionId) {
-        const txId = ticket.transactionId.toString();
-        const typeId = ticket.ticketTypeId?.toString() || 'unknown';
-        if (!transactionTypeMap[txId]) {
-          transactionTypeMap[txId] = new Set();
-        }
-        transactionTypeMap[txId].add(typeId);
-      }
-    });
+    // 3. Reconcile with total transaction baseAmount
+    // This catches revenue from transactions that might not have created tickets or price discrepancies
+    const totalTicketRevenue = Object.values(breakdown).reduce((sum, item) => sum + item.revenue, 0);
+    const totalTransactionBaseAmount = transactions.reduce((sum, tx) => sum + Number(tx.baseAmount || 0), 0);
 
-    transactions.forEach(transaction => {
-      const txId = transaction._id?.toString() || transaction.id;
-      let targetTypeIds = [];
+    const diff = totalTransactionBaseAmount - totalTicketRevenue;
 
-      // Priority 1: Use the ticketTypeId stored directly on the transaction
-      if (transaction.ticketTypeId) {
-        targetTypeIds = [transaction.ticketTypeId.toString()];
-      }
-      // Priority 2: Use the types of the tickets created by this transaction
-      else if (transactionTypeMap[txId]) {
-        targetTypeIds = Array.from(transactionTypeMap[txId]);
-      }
-      // Priority 3: Fallback to unknown
-      else {
-        targetTypeIds = ['unknown'];
-      }
+    // If there's a significant difference (> 0.01 to avoid float issues), add as an adjustment
+    if (Math.abs(diff) > 0.01) {
+      breakdown['adjustments'] = {
+        ticketTypeId: 'adjustments',
+        name: 'Adjustments / Other',
+        type: 'adjustment',
+        price: 0,
+        admissionSize: 0,
+        soldCount: 0,
+        admissionCount: 0,
+        revenue: diff
+      };
+    }
 
-      // Distribute transaction amount among found types
-      const amountPerType = Number(transaction.amount || 0) / targetTypeIds.length;
-      targetTypeIds.forEach(typeId => {
-        if (!breakdown[typeId]) {
-          breakdown[typeId] = {
-            ticketTypeId: typeId,
-            name: 'Unknown',
-            type: 'custom',
-            price: amountPerType,
-            soldCount: 0,
-            revenue: 0
-          };
-        }
-        breakdown[typeId].revenue += amountPerType;
-      });
-    });
-
-    return Object.values(breakdown);
+    return Object.values(breakdown).filter(item => item.soldCount > 0 || item.revenue !== 0);
   }
 
   _getWeek(date) {

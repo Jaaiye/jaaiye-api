@@ -64,6 +64,7 @@ class WalletController {
     const result = await this.getWalletDetailsUseCase.execute({
       ownerType: normalizedOwnerType,
       ownerId: authResult.resolvedOwnerId || finalOwnerId,
+      userId,
       limit,
       skip
     });
@@ -112,6 +113,7 @@ class WalletController {
     const result = await this.getWalletDetailsUseCase.execute({
       ownerType: normalizedOwnerType,
       ownerId: authResult.resolvedOwnerId || finalOwnerId,
+      userId,
       limit,
       skip
     });

@@ -23,6 +23,7 @@ class TransactionRepository extends ITransactionRepository {
       reference: data.reference,
       transReference: data.transReference,
       amount: data.amount,
+      baseAmount: data.baseAmount,
       currency: data.currency,
       status: data.status,
       transId: data.transId,

@@ -191,7 +191,8 @@ class TicketModule {
   getGetTicketByPublicIdUseCase() {
     if (!this._getTicketByPublicIdUseCase) {
       this._getTicketByPublicIdUseCase = new GetTicketByPublicIdUseCase({
-        ticketRepository: this.getTicketRepository()
+        ticketRepository: this.getTicketRepository(),
+        eventRepository: this.getEventRepository()
       });
     }
     return this._getTicketByPublicIdUseCase;
@@ -201,6 +202,7 @@ class TicketModule {
     if (!this._scanAndVerifyTicketUseCase) {
       this._scanAndVerifyTicketUseCase = new ScanAndVerifyTicketUseCase({
         ticketRepository: this.getTicketRepository(),
+        eventRepository: this.getEventRepository(),
         qrCodeAdapter: this.getQRCodeAdapter()
       });
     }

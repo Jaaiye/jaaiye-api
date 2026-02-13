@@ -8,9 +8,7 @@ const { body, param, query } = require('express-validator');
 const createTicketValidator = [
   body('eventId')
     .notEmpty()
-    .withMessage('Event ID is required')
-    .isMongoId()
-    .withMessage('Invalid event ID'),
+    .withMessage('Event ID is required'),
   body('ticketTypeId')
     .optional()
     .isMongoId()
@@ -43,8 +41,8 @@ const getTicketByIdValidator = [
 
 const getEventTicketsValidator = [
   param('eventId')
-    .isMongoId()
-    .withMessage('Invalid event ID')
+    .notEmpty()
+    .withMessage('Event ID is required'),
 ];
 
 const cancelTicketValidator = [
@@ -64,8 +62,6 @@ const getTicketByPublicIdValidator = [
     .withMessage('Public ID must be a string'),
   query('eventId')
     .optional()
-    .isMongoId()
-    .withMessage('Invalid event ID')
 ];
 
 const scanAndVerifyTicketValidator = [
@@ -76,9 +72,7 @@ const scanAndVerifyTicketValidator = [
     .trim()
     .withMessage('Identifier must be a string'),
   body('eventId')
-    .optional()
-    .isMongoId()
-    .withMessage('Invalid event ID')
+    .optional(),
 ];
 
 module.exports = {

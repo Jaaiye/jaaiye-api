@@ -7,8 +7,9 @@
 const { TicketNotFoundError, TicketAlreadyUsedError } = require('../errors');
 
 class ScanAndVerifyTicketUseCase {
-  constructor({ ticketRepository, qrCodeAdapter }) {
+  constructor({ ticketRepository, eventRepository, qrCodeAdapter }) {
     this.ticketRepository = ticketRepository;
+    this.eventRepository = eventRepository;
     this.qrCodeAdapter = qrCodeAdapter;
   }
 
@@ -73,7 +74,14 @@ class ScanAndVerifyTicketUseCase {
       // If eventId is provided, verify the ticket belongs to that event
       if (eventId) {
         const ticketEventId = ticket.eventId?._id?.toString() || ticket.eventId?.toString() || ticket.eventId;
-        const requestedEventId = eventId.toString();
+
+        // Resolve requested eventId (could be slug)
+        const event = await this.eventRepository.findByIdOrSlug(eventId);
+        if (!event) {
+          throw new TicketNotFoundError('Event not found');
+        }
+
+        const requestedEventId = event.id.toString();
         if (ticketEventId !== requestedEventId) {
           throw new TicketNotFoundError('Ticket does not belong to this event');
         }

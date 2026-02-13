@@ -61,6 +61,14 @@ class EventRepository extends IEventRepository {
     return this._toEntity(doc);
   }
 
+  async findByIdOrSlug(idOrSlug) {
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+    if (isObjectId) {
+      return this.findById(idOrSlug);
+    }
+    return this.findBySlug(idOrSlug);
+  }
+
   async find(filters, options = {}) {
     const { limit = 20, skip = 0, sort = { startTime: 1 } } = options;
 

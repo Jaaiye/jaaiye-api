@@ -42,6 +42,9 @@ class CreateTicketUseCase {
 
     const targetUserId = await this._resolveTargetUser(dto);
     const eventDoc = await this._getAndValidateEvent(dto.eventId);
+    // Update eventId to the resolved ObjectId
+    dto.eventId = eventDoc._id.toString();
+
     const { resolvedPrice, chosenType, ticketTypeIdForTracking, ticketTypeNameForTracking, ticketTypeIdForSales } =
       await this._determineTicketPricing(eventDoc, dto);
 
@@ -106,7 +109,15 @@ class CreateTicketUseCase {
   }
 
   async _getAndValidateEvent(eventId) {
-    const eventDoc = await EventSchema.findById(eventId);
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
+    let eventDoc;
+
+    if (isObjectId) {
+      eventDoc = await EventSchema.findById(eventId);
+    } else {
+      eventDoc = await EventSchema.findOne({ slug: eventId });
+    }
+
     if (!eventDoc) {
       throw new NotFoundError('Event not found');
     }

@@ -9,8 +9,7 @@ const initializePaymentValidator = [
   body('eventId')
     .notEmpty()
     .withMessage('Event ID is required')
-    .isMongoId()
-    .withMessage('Invalid event ID'),
+    .withMessage('Event ID is required'),
   body('email')
     .notEmpty()
     .withMessage('Email is required')
@@ -50,8 +49,7 @@ const registerTransactionValidator = [
   body('eventId')
     .notEmpty()
     .withMessage('Event ID is required')
-    .isMongoId()
-    .withMessage('Invalid event ID'),
+    .withMessage('Event ID is required'),
   body('currency')
     .optional()
     .isString()

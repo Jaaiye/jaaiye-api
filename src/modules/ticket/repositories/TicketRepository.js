@@ -29,6 +29,7 @@ class TicketRepository extends ITicketRepository {
       ticketTypeId: data.ticketTypeId,
       ticketTypeName: data.ticketTypeName,
       price: data.price,
+      admissionSize:data.admissionSize,
       quantity: data.quantity,
       qrCode: data.qrCode,
       ticketData: data.ticketData,

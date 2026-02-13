@@ -1,12 +1,13 @@
 /**
  * GetWalletDetailsUseCase
- * Read-only wallet view: balance + recent ledger entries.
+ * Read-only wallet view: balance + recent ledger entries + bank accounts.
  */
 
 class GetWalletDetailsUseCase {
-  constructor({ walletRepository, walletLedgerEntryRepository }) {
+  constructor({ walletRepository, walletLedgerEntryRepository, bankAccountRepository }) {
     this.walletRepository = walletRepository;
     this.walletLedgerEntryRepository = walletLedgerEntryRepository;
+    this.bankAccountRepository = bankAccountRepository;
   }
 
   /**
@@ -15,10 +16,11 @@ class GetWalletDetailsUseCase {
    * @param {Object} params
    * @param {'EVENT'|'GROUP'|'PLATFORM'} params.ownerType
    * @param {string|null} params.ownerId
+   * @param {string} params.userId - User ID to fetch bank accounts for
    * @param {number} [params.limit=50]
    * @param {number} [params.skip=0]
    */
-  async execute({ ownerType, ownerId, limit = 50, skip = 0 }) {
+  async execute({ ownerType, ownerId, userId, limit = 50, skip = 0 }) {
     if (!ownerType) {
       throw new Error('ownerType is required');
     }
@@ -27,7 +29,8 @@ class GetWalletDetailsUseCase {
     if (!wallet) {
       return {
         wallet: null,
-        ledger: []
+        ledger: [],
+        bankAccounts: []
       };
     }
 
@@ -36,9 +39,20 @@ class GetWalletDetailsUseCase {
       skip
     });
 
+    // Fetch user's bank accounts if userId is provided
+    let bankAccounts = [];
+    if (userId && this.bankAccountRepository) {
+      try {
+        bankAccounts = await this.bankAccountRepository.findByUser(userId);
+      } catch (error) {
+        console.warn('Failed to fetch bank accounts:', error.message);
+      }
+    }
+
     return {
       wallet: wallet.toJSON ? wallet.toJSON() : wallet,
-      ledger: ledgerEntries.map(entry => (entry.toJSON ? entry.toJSON() : entry))
+      ledger: ledgerEntries.map(entry => (entry.toJSON ? entry.toJSON() : entry)),
+      bankAccounts: bankAccounts.map(acc => (acc.toJSON ? acc.toJSON() : acc))
     };
   }
 }

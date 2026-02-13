@@ -4,7 +4,14 @@
  */
 
 const { WalletRepository, WalletLedgerEntryRepository, WithdrawalRepository } = require('./repositories');
-const { GetWalletDetailsUseCase, AdjustWalletBalanceUseCase, RequestWithdrawalWithPayoutUseCase, GetWithdrawalsUseCase, GetWithdrawalDetailsUseCase } = require('./use-cases');
+const {
+  GetWalletDetailsUseCase,
+  AdjustWalletBalanceUseCase,
+  RequestWithdrawalWithPayoutUseCase,
+  GetWithdrawalsUseCase,
+  GetWithdrawalDetailsUseCase,
+  PollPendingWithdrawalsUseCase
+} = require('./use-cases');
 const WalletController = require('./wallet.controller');
 const createWalletRoutes = require('./wallet.routes');
 const WalletNotificationService = require('./services/WalletNotificationService');
@@ -47,7 +54,8 @@ class WalletModule {
     if (!this._instances.getWalletDetailsUseCase) {
       this._instances.getWalletDetailsUseCase = new GetWalletDetailsUseCase({
         walletRepository: this.getWalletRepository(),
-        walletLedgerEntryRepository: this.getWalletLedgerEntryRepository()
+        walletLedgerEntryRepository: this.getWalletLedgerEntryRepository(),
+        bankAccountRepository: new BankAccountRepository()
       });
     }
     return this._instances.getWalletDetailsUseCase;
@@ -87,7 +95,9 @@ class WalletModule {
         walletLedgerEntryRepository: this.getWalletLedgerEntryRepository(),
         bankAccountRepository: new BankAccountRepository(),
         withdrawalRepository: new WithdrawalRepository(),
-        flutterwaveAdapter: new FlutterwaveAdapter()
+        flutterwaveAdapter: new FlutterwaveAdapter(),
+        walletEmailAdapter: new WalletEmailAdapter(),
+        eventRepository: new EventRepository()
       });
     }
     return this._instances.requestWithdrawalWithPayoutUseCase;
@@ -130,6 +140,20 @@ class WalletModule {
       });
     }
     return this._instances.walletAuthorizationService;
+  }
+
+  getPollPendingWithdrawalsUseCase() {
+    if (!this._instances.pollPendingWithdrawalsUseCase) {
+      const ProcessFlutterwaveTransferWebhookUseCase = require('../payment/use-cases/ProcessFlutterwaveTransferWebhookUseCase');
+      const paymentModule = require('../payment/payment.module');
+
+      this._instances.pollPendingWithdrawalsUseCase = new PollPendingWithdrawalsUseCase({
+        withdrawalRepository: this.getWithdrawalRepository(),
+        flutterwaveAdapter: new FlutterwaveAdapter(),
+        processFlutterwaveTransferWebhookUseCase: paymentModule.getProcessFlutterwaveTransferWebhookUseCase()
+      });
+    }
+    return this._instances.pollPendingWithdrawalsUseCase;
   }
 
   // ============================================================================

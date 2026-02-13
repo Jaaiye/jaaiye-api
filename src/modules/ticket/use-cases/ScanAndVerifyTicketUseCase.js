@@ -28,14 +28,16 @@ class ScanAndVerifyTicketUseCase {
   /**
    * Format ticket response with simplified event and user data
    * @param {Object} ticket - Ticket entity
+   * @param {number} effectiveAdmissionSize - The actual admission size from event data
    * @returns {Object} Formatted ticket response
    */
-  _formatTicketResponse(ticket) {
+  _formatTicketResponse(ticket, effectiveAdmissionSize) {
     return {
       id: ticket.id,
       publicId: ticket.publicId,
       status: ticket.status,
       quantity: ticket.quantity,
+      admissionSize: effectiveAdmissionSize || ticket.admissionSize || 1,
       checkedInCount: ticket.checkedInCount,
       ticketTypeName: ticket.ticketTypeName,
       usedAt: ticket.usedAt || null,
@@ -62,7 +64,7 @@ class ScanAndVerifyTicketUseCase {
       const normalizedPublicId = identifier.trim().toLowerCase();
       ticket = await this.ticketRepository.findByPublicId(normalizedPublicId, {
         populate: [
-          { path: 'eventId', select: 'title' },
+          { path: 'eventId' }, // Populate full event to get ticketTypes
           { path: 'userId', select: 'fullName username' }
         ]
       });
@@ -97,7 +99,7 @@ class ScanAndVerifyTicketUseCase {
       const ticketId = decoded.ticketId;
       ticket = await this.ticketRepository.findById(ticketId, {
         populate: [
-          { path: 'eventId', select: 'title' },
+          { path: 'eventId' }, // Populate full event to get ticketTypes
           { path: 'userId', select: 'fullName username' }
         ]
       });
@@ -107,12 +109,21 @@ class ScanAndVerifyTicketUseCase {
       }
     }
 
+    // Get admission size from Event configuration
+    let admissionSize = ticket.admissionSize || 1;
+    if (ticket.eventId && ticket.eventId.ticketTypes && ticket.ticketTypeId) {
+      const ticketTypeConfig = ticket.eventId.ticketTypes.id(ticket.ticketTypeId);
+      if (ticketTypeConfig) {
+        admissionSize = ticketTypeConfig.admissionSize || 1;
+      }
+    }
+
     // Check if ticket is already fully used
     if (ticket.isUsed()) {
       // Get ticket with verifiedBy populated
       const usedTicket = await this.ticketRepository.findById(ticket.id, {
         populate: [
-          { path: 'eventId', select: 'title' },
+          { path: 'eventId' },
           { path: 'userId', select: 'fullName username' },
           { path: 'verifiedBy', select: 'fullName username' }
         ]
@@ -122,42 +133,42 @@ class ScanAndVerifyTicketUseCase {
         success: false,
         message: 'Ticket already fully used',
         status: 'used',
-        ticket: this._formatTicketResponse(usedTicket)
+        ticket: this._formatTicketResponse(usedTicket, admissionSize)
       };
     }
 
     // Validate check-in count
     const requestedCount = parseInt(checkInCount) || 1;
-    const remainingAdmissions = ticket.quantity - (ticket.checkedInCount || 0);
+    const remainingAdmissions = admissionSize - (ticket.checkedInCount || 0);
 
     if (requestedCount > remainingAdmissions) {
       return {
         success: false,
         message: `Cannot check in ${requestedCount} people. Only ${remainingAdmissions} admissions remaining.`,
         status: 'limit_exceeded',
-        ticket: this._formatTicketResponse(ticket)
+        ticket: this._formatTicketResponse(ticket, admissionSize)
       };
     }
 
     // Mark as checked in with scanner info
-    await this.ticketRepository.update(ticket.id, {
-      checkedInCount: (ticket.checkedInCount || 0) + requestedCount,
+    const newCheckedInCount = (ticket.checkedInCount || 0) + requestedCount;
+    const updateData = {
+      checkedInCount: newCheckedInCount,
       verifiedBy: scannerUserId
-    });
+    };
 
     // Check if now fully used
-    const newCheckedInCount = (ticket.checkedInCount || 0) + requestedCount;
-    if (newCheckedInCount >= ticket.quantity) {
-      await this.ticketRepository.update(ticket.id, {
-        status: 'used',
-        usedAt: new Date()
-      });
+    if (newCheckedInCount >= admissionSize) {
+      updateData.status = 'used';
+      updateData.usedAt = new Date();
     }
+
+    await this.ticketRepository.update(ticket.id, updateData);
 
     // Get updated ticket with verifiedBy populated
     const updatedTicket = await this.ticketRepository.findById(ticket.id, {
       populate: [
-        { path: 'eventId', select: 'title' },
+        { path: 'eventId' },
         { path: 'userId', select: 'fullName username' },
         { path: 'verifiedBy', select: 'fullName username' }
       ]
@@ -168,10 +179,10 @@ class ScanAndVerifyTicketUseCase {
     return {
       success: true,
       message: isFullyUsed
-        ? `Ticket fully verified (${updatedTicket.quantity}/${updatedTicket.quantity})`
-        : `Verified ${requestedCount} people. (${updatedTicket.checkedInCount}/${updatedTicket.quantity} checked in)`,
+        ? `Ticket fully verified (${admissionSize}/${admissionSize})`
+        : `Verified ${requestedCount} people. (${updatedTicket.checkedInCount}/${admissionSize} checked in)`,
       status: isFullyUsed ? 'verified' : 'partial',
-      ticket: this._formatTicketResponse(updatedTicket)
+      ticket: this._formatTicketResponse(updatedTicket, admissionSize)
     };
   }
 }

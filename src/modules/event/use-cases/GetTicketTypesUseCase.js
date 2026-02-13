@@ -11,14 +11,7 @@ class GetTicketTypesUseCase {
   }
 
   async execute(eventId) {
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(eventId);
-    let event;
-
-    if (isObjectId) {
-      event = await this.eventRepository.findById(eventId);
-    } else {
-      event = await this.eventRepository.findBySlug(eventId);
-    }
+    const event = await this.eventRepository.findByIdOrSlug(eventId);
 
     if (!event) {
       throw new EventNotFoundError();
@@ -31,6 +24,7 @@ class GetTicketTypesUseCase {
       name: tt.name,
       description: tt.description,
       price: Number(tt.price || 0),
+      admissionSize: Number(tt.admissionSize || 1),
       capacity: tt.capacity !== null && tt.capacity !== undefined ? Number(tt.capacity) : null,
       soldCount: Number(tt.soldCount || 0),
       quantityLimit: tt.quantityLimit !== null && tt.quantityLimit !== undefined ? Number(tt.quantityLimit) : null,

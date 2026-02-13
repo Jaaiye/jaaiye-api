@@ -321,11 +321,13 @@ class FlutterwaveAdapter {
    */
   async resolveBankAccount({ accountNumber, bankCode }) {
     try {
-      const res = await axios.get(`${API_BASE}/accounts/resolve`, {
-        headers: { Authorization: `Bearer ${this.secretKey}` },
-        params: {
-          account_number: accountNumber,
-          account_bank: bankCode
+      const res = await axios.post(`${API_BASE}/accounts/resolve`, {
+        account_number: accountNumber,
+        account_bank: bankCode
+      }, {
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -414,6 +416,47 @@ class FlutterwaveAdapter {
     } catch (error) {
       console.error('Error creating Flutterwave transfer:', error.response?.data || error.message);
       throw error;
+    }
+  }
+
+  /**
+   * Verify transfer status
+   * @param {string} transferId - Flutterwave transfer ID
+   * @returns {Promise<Object>} Transfer data
+   */
+  async verifyTransfer(transferId) {
+    try {
+      const res = await axios.get(`${API_BASE}/transfers/${transferId}`, {
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = res.data;
+      if (data && data.status === 'success' && data.data) {
+        return {
+          id: data.data.id,
+          reference: data.data.reference,
+          status: data.data.status, // SUCCESSFUL, FAILED, PENDING, NEW
+          amount: data.data.amount,
+          fee: data.data.fee,
+          currency: data.data.currency,
+          narration: data.data.narration,
+          complete_message: data.data.complete_message,
+          bank_name: data.data.bank_name,
+          account_number: data.data.account_number,
+          full_name: data.data.full_name,
+          created_at: data.data.created_at,
+          updated_at: data.data.updated_at
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error verifying Flutterwave transfer:', error.response?.data || error.message);
+      // Don't throw - return null to indicate verification failed
+      return null;
     }
   }
 }

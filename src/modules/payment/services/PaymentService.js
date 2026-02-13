@@ -100,16 +100,31 @@ class PaymentService {
 
     const createdTickets = [];
 
+    // Fetch event to get ticket type details (for admission size/names)
+    const event = eventId ? await this.eventRepository.findById(eventId) : null;
+
     // Handle assigned recipients
     if (Array.isArray(assignees) && assignees.length > 0) {
       for (const assignee of assignees) {
         const { name, email } = assignee;
         try {
+          // Determine admission size based on ticket type
+          let admissionSize = 1;
+          if (event && event.ticketTypes) {
+            const tt = event.ticketTypes.id ? event.ticketTypes.id(ticketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(ticketTypeId));
+            if (tt) {
+              admissionSize = tt.admissionSize || 1;
+            }
+          }
+
           const ticketDTO = new CreateTicketDTO({
             eventId,
+            ticketTypeId: ticketTypeId || null,
             userId,
             quantity: 1,
-            bypassCapacity: false
+            admissionSize,
+            bypassCapacity: false,
+            transactionId: transaction.id || transaction._id
           });
           const ticket = await this.createTicketUseCase.execute(ticketDTO);
           createdTickets.push(ticket);
@@ -177,7 +192,6 @@ class PaymentService {
               // Try to find user by email
               const assigneeUser = await this.userRepository.findByEmail(email);
               if (assigneeUser) {
-                const event = await this.eventRepository.findById(eventId);
                 if (event) {
                   await this.sendNotificationUseCase.execute(
                     assigneeUser.id,
@@ -209,9 +223,6 @@ class PaymentService {
       // Support both single ticketTypeId and array of ticketTypes
       const ticketTypesToCreate = parsedTicketTypes.length > 0 ? parsedTicketTypes : Array(quantity).fill(ticketTypeId);
 
-      // Fetch event to get ticket type details (for admission size/names)
-      const event = eventId ? await this.eventRepository.findById(eventId) : null;
-
       logger.info('[PaymentService] Creating tickets', {
         ticketTypesLength: parsedTicketTypes.length,
         quantity,
@@ -242,7 +253,8 @@ class PaymentService {
             eventId,
             ticketTypeId: currentTicketTypeId,
             userId,
-            quantity: admissionSize,
+            quantity: 1, // Each record is a unique QR code
+            admissionSize: admissionSize, // Number of people this ticket admits
             bypassCapacity: false,
             skipEmail: true, // Prevent individual emails, we'll send one consolidated email
             transactionId: transaction.id || transaction._id
@@ -359,7 +371,6 @@ class PaymentService {
       if (createdTickets.length > 0 && this.sendNotificationUseCase) {
         try {
           const buyer = await this.userRepository.findById(userId);
-          const event = await this.eventRepository.findById(eventId);
 
           if (buyer && event) {
             const ticketCount = createdTickets.length;
@@ -418,7 +429,6 @@ class PaymentService {
     }
 
     // Notify event creator about ticket sale
-    const event = eventId ? await this.eventRepository.findById(eventId) : null;
     if (this.sendNotificationUseCase && event && event.creatorId) {
       try {
         const creator = await this.userRepository.findById(event.creatorId);
@@ -553,7 +563,6 @@ class PaymentService {
         }
         // Handle event wallet funding (category === 'event')
         else if (eventId) {
-          const event = await this.eventRepository.findById(eventId);
           if (event && event.category === 'event') {
             const fundingResult = await this.walletService.fundWalletFromTransaction({
               ownerType: 'EVENT',

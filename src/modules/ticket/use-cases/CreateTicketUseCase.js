@@ -45,7 +45,7 @@ class CreateTicketUseCase {
     // Update eventId to the resolved ObjectId
     dto.eventId = eventDoc._id.toString();
 
-    const { resolvedPrice, chosenType, ticketTypeIdForTracking, ticketTypeNameForTracking, ticketTypeIdForSales } =
+    const { resolvedPrice, chosenType, ticketTypeIdForTracking, ticketTypeNameForTracking, ticketTypeIdForSales, resolvedAdmissionSize } =
       await this._determineTicketPricing(eventDoc, dto);
 
     const ticket = await this._createTicket({
@@ -54,7 +54,8 @@ class CreateTicketUseCase {
       ticketTypeIdForTracking,
       ticketTypeNameForTracking,
       resolvedPrice,
-      quantity: dto.quantity,
+      admissionSize: resolvedAdmissionSize,
+      quantity: 1, // Each record is a single physical ticket/QR code
       transactionId: dto.transactionId
     });
 
@@ -134,6 +135,7 @@ class CreateTicketUseCase {
   async _determineTicketPricing(eventDoc, dto) {
     let chosenType = null;
     let resolvedPrice = 0;
+    let resolvedAdmissionSize = dto.admissionSize || 1;
 
     if (dto.price !== null && dto.price !== undefined) {
       resolvedPrice = Number(dto.price);
@@ -142,6 +144,7 @@ class CreateTicketUseCase {
     } else if (Array.isArray(eventDoc.ticketTypes) && eventDoc.ticketTypes.length > 0) {
       chosenType = await this._selectTicketType(eventDoc, dto);
       resolvedPrice = Number(chosenType.price) || 0;
+      resolvedAdmissionSize = chosenType.admissionSize || 1;
 
       if (chosenType.type === 'complimentary') {
         resolvedPrice = 0;
@@ -161,7 +164,8 @@ class CreateTicketUseCase {
       chosenType,
       ticketTypeIdForTracking: chosenType?._id,
       ticketTypeNameForTracking: chosenType?.name || 'Standard',
-      ticketTypeIdForSales: chosenType ? chosenType._id : null
+      ticketTypeIdForSales: chosenType ? chosenType._id : null,
+      resolvedAdmissionSize
     };
   }
 
@@ -200,13 +204,14 @@ class CreateTicketUseCase {
     return chosenType;
   }
 
-  async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, quantity, transactionId }) {
+  async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, admissionSize, quantity, transactionId }) {
     logger.debug('[CreateTicketUseCase] Creating ticket', {
       userId: targetUserId,
       eventId,
       ticketTypeId: ticketTypeIdForTracking,
       ticketTypeName: ticketTypeNameForTracking,
       price: resolvedPrice,
+      admissionSize,
       quantity
     });
 
@@ -217,6 +222,7 @@ class CreateTicketUseCase {
       ticketTypeName: ticketTypeNameForTracking,
       transactionId,
       price: resolvedPrice,
+      admissionSize,
       quantity
     });
 

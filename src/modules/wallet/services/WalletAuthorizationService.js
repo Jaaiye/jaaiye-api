@@ -138,16 +138,8 @@ class WalletAuthorizationService {
                 return { allowed: false, reason: 'Event not found' };
             }
 
-            // Only creator of user-origin events can withdraw
+            // Allow withdrawal for any event type as long as user is the creator
             const isCreator = event.creatorId && String(event.creatorId) === String(userId);
-            const isUserOrigin = event.origin === 'user';
-
-            if (!isUserOrigin) {
-                return {
-                    allowed: false,
-                    reason: 'Withdrawals are only allowed for user-created events'
-                };
-            }
 
             if (!isCreator) {
                 return {

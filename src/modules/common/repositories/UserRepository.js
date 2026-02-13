@@ -457,6 +457,7 @@ class UserRepository extends IUserRepository {
       isActive: obj.isActive,
       isBlocked: obj.isBlocked,
       profilePicture: obj.profilePicture,
+      isGuest: obj.isGuest,
       preferences: obj.preferences,
       googleCalendar: obj.googleCalendar,
       appleId: obj.appleId,

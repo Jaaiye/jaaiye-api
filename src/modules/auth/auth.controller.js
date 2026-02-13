@@ -20,7 +20,8 @@ class AuthController {
     logoutUseCase,
     refreshTokenUseCase,
     resendUseCase,
-    createUserUseCase
+    createUserUseCase,
+    guestLoginUseCase
   }) {
     this.registerUseCase = registerUseCase;
     this.loginUseCase = loginUseCase;
@@ -33,6 +34,7 @@ class AuthController {
     this.refreshTokenUseCase = refreshTokenUseCase;
     this.resendUseCase = resendUseCase;
     this.createUserUseCase = createUserUseCase;
+    this.guestLoginUseCase = guestLoginUseCase;
   }
 
   /**
@@ -216,6 +218,31 @@ class AuthController {
     const result = await this.createUserUseCase.execute(email, fullName);
 
     return successResponse(res, result, 200, 'User created successfully');
+  });
+
+  /**
+   * Guest login
+   * POST /auth/guest
+   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   */
+  guestLogin = asyncHandler(async (req, res) => {
+    const result = await this.guestLoginUseCase.execute();
+
+    return successResponse(res, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      firebaseToken: result.firebaseToken,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        username: result.user.username,
+        fullName: result.user.fullName,
+        role: result.user.role,
+        isGuest: result.user.isGuest,
+        emailVerified: result.user.emailVerified,
+        profilePicture: result.user.profilePicture
+      }
+    }, 200, 'Guest login successful');
   });
 }
 

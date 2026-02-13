@@ -50,6 +50,10 @@ const userSchema = new mongoose.Schema(
       backgroundColor: String,
       url: String
     },
+    isGuest: {
+      type: Boolean,
+      default: false
+    },
     preferences: {
       type: mongoose.Schema.Types.Mixed,
       default: {}

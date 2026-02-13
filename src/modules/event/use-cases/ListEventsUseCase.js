@@ -14,9 +14,13 @@ class ListEventsUseCase {
     const filters = dto.getFilters();
     const options = dto.getOptions();
 
+    // Check if user is a guest
+    const user = userId ? await this.userRepository.findById(userId) : null;
+    const isGuest = user && user.isGuest;
+
     // The user wants fixed logic regardless of input:
     // 1. Events -> always fetch all
-    // 2. Hangouts -> only mine
+    // 2. Hangouts -> only mine (or empty if guest)
 
     if (dto.category === 'event') {
       // For 'event', we always fetch all events
@@ -24,8 +28,8 @@ class ListEventsUseCase {
       // No calendar or scope restrictions applied to events
     } else if (dto.category === 'hangout') {
       // For 'hangout', we only fetch the user's own hangouts
-      if (!userId) {
-        // Unauthenticated users cannot view hangouts
+      if (!userId || isGuest) {
+        // Unauthenticated users or Guest users cannot view hangouts
         return { events: [], pagination: { page: dto.page, limit: dto.limit, total: 0, pages: 0 } };
       }
 
@@ -50,8 +54,8 @@ class ListEventsUseCase {
       }
     } else {
       // category === 'all' (default or explicitly passed)
-      if (!userId) {
-        // Unauthenticated users only see public events
+      if (!userId || isGuest) {
+        // Unauthenticated users or Guest users only see public events
         filters.category = 'event';
       } else {
         // Authenticated users see ALL categories: All Events + My Hangouts

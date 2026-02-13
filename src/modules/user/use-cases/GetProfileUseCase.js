@@ -43,6 +43,7 @@ class GetProfileUseCase {
         isActive: user.isActive,
         isBlocked: user.isBlocked,
         createdAt: user.createdAt,
+        isGuestUser: !!user.isGuest,
         isGoogle,
         isApple,
         isGoogleCalendarLinked

@@ -18,6 +18,7 @@ class UserEntity {
     isActive = true,
     isBlocked = false,
     profilePicture,
+    isGuest = false,
     preferences = {},
     googleCalendar,
     appleId,
@@ -38,6 +39,7 @@ class UserEntity {
     this.isActive = isActive;
     this.isBlocked = isBlocked;
     this.profilePicture = profilePicture;
+    this.isGuest = isGuest;
     this.preferences = preferences;
     this.googleCalendar = googleCalendar;
     this.appleId = appleId;
@@ -199,6 +201,7 @@ class UserEntity {
       role: this.role,
       isActive: this.isActive,
       profilePicture: this.profilePicture,
+      isGuest: this.isGuest,
       preferences: this.preferences,
       refresh: this.refresh,
       createdAt: this.createdAt,

@@ -43,6 +43,9 @@ function createAuthRoutes({ authController, authMiddleware }) {
   // POST /auth/create-user - Quick user creation
   router.post('/create-user', authController.createUser);
 
+  // POST /auth/guest - Guest login
+  router.post('/guest', authController.guestLogin);
+
   return router;
 }
 

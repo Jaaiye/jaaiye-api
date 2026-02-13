@@ -46,6 +46,13 @@ class WalletModule {
     return this._instances.walletLedgerEntryRepository;
   }
 
+  getWithdrawalRepository() {
+    if (!this._instances.withdrawalRepository) {
+      this._instances.withdrawalRepository = new WithdrawalRepository();
+    }
+    return this._instances.withdrawalRepository;
+  }
+
   // ============================================================================
   // USE CASES
   // ============================================================================

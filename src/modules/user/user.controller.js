@@ -116,6 +116,7 @@ class UserController {
     formattedUser.isGoogleCalendarLinked = result.user.isGoogleCalendarLinked;
     formattedUser.isGoogle = result.user.isGoogle;
     formattedUser.isApple = result.user.isApple;
+    formattedUser.isGuestUser = result.user.isGuestUser;
     return successResponse(res, { user: formattedUser });
   });
 

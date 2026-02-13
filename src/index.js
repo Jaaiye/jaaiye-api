@@ -188,6 +188,10 @@ app.get('/api/v1/calendars/google/oauth/callback', handleOAuthRedirect);
 // Apply API key validation to all other routes
 app.use(validateMobileApiKey);
 
+// Guest Restriction Middleware
+const { restrictGuest } = require('./middleware/guestRestrictionMiddleware');
+app.use(restrictGuest);
+
 app.use('/api/v1/auth', require('./modules/auth/auth.module').getAuthRoutes());
 app.use('/api/v1/users', require('./modules/user/user.module').getUserRoutes());
 app.use('/api/v1/admin', require('./modules/admin/admin.module').getAdminRoutes());

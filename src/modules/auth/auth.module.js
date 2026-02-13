@@ -32,7 +32,8 @@ const {
   LogoutUseCase,
   RefreshTokenUseCase,
   ResendUseCase,
-  CreateUserUseCase
+  CreateUserUseCase,
+  GuestLoginUseCase
 } = require('./use-cases');
 
 // Presentation
@@ -268,6 +269,17 @@ class AuthModule {
     return this._instances.createUserUseCase;
   }
 
+  getGuestLoginUseCase() {
+    if (!this._instances.guestLoginUseCase) {
+      this._instances.guestLoginUseCase = new GuestLoginUseCase({
+        userRepository: this.getUserRepository(),
+        firebaseAdapter: this.getFirebaseAdapter(),
+        calendarAdapter: this.getCalendarAdapter()
+      });
+    }
+    return this._instances.guestLoginUseCase;
+  }
+
   /**
    * Get or create controller instance
    */
@@ -284,7 +296,8 @@ class AuthModule {
         logoutUseCase: this.getLogoutUseCase(),
         refreshTokenUseCase: this.getRefreshTokenUseCase(),
         resendUseCase: this.getResendUseCase(),
-        createUserUseCase: this.getCreateUserUseCase()
+        createUserUseCase: this.getCreateUserUseCase(),
+        guestLoginUseCase: this.getGuestLoginUseCase()
       });
     }
     return this._instances.authController;

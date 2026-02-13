@@ -6,8 +6,9 @@
 const { TicketNotFoundError } = require('../errors');
 
 class GetTicketByPublicIdUseCase {
-  constructor({ ticketRepository }) {
+  constructor({ ticketRepository, eventRepository }) {
     this.ticketRepository = ticketRepository;
+    this.eventRepository = eventRepository;
   }
 
   async execute(publicId, eventId = null) {
@@ -26,7 +27,14 @@ class GetTicketByPublicIdUseCase {
     // If eventId is provided, verify the ticket belongs to that event
     if (eventId) {
       const ticketEventId = ticket.eventId?._id?.toString() || ticket.eventId?.toString() || ticket.eventId;
-      const requestedEventId = eventId.toString();
+
+      // Resolve requested eventId (could be slug)
+      const event = await this.eventRepository.findByIdOrSlug(eventId);
+      if (!event) {
+        throw new TicketNotFoundError('Event not found');
+      }
+
+      const requestedEventId = event.id.toString();
       if (ticketEventId !== requestedEventId) {
         throw new TicketNotFoundError('Ticket does not belong to this event');
       }

@@ -63,7 +63,7 @@ class WalletController {
 
     const result = await this.getWalletDetailsUseCase.execute({
       ownerType: normalizedOwnerType,
-      ownerId: finalOwnerId,
+      ownerId: authResult.resolvedOwnerId || finalOwnerId,
       limit,
       skip
     });
@@ -111,7 +111,7 @@ class WalletController {
 
     const result = await this.getWalletDetailsUseCase.execute({
       ownerType: normalizedOwnerType,
-      ownerId: finalOwnerId,
+      ownerId: authResult.resolvedOwnerId || finalOwnerId,
       limit,
       skip
     });
@@ -146,7 +146,20 @@ class WalletController {
     }
 
     // For PLATFORM wallet, ownerId should be null/undefined
-    const finalOwnerId = normalizedOwnerType === 'PLATFORM' ? null : ownerId;
+    let finalOwnerId = normalizedOwnerType === 'PLATFORM' ? null : ownerId;
+
+    // Resolve ownerId if it's a slug
+    if (normalizedOwnerType !== 'PLATFORM') {
+      const authResult = await this.walletAuthorizationService.canViewWallet({
+        ownerType: normalizedOwnerType,
+        ownerId: finalOwnerId,
+        userId: adjustedBy,
+        isAdmin: true
+      });
+      if (authResult.resolvedOwnerId) {
+        finalOwnerId = authResult.resolvedOwnerId;
+      }
+    }
 
     const result = await this.adjustWalletBalanceUseCase.execute({
       ownerType: normalizedOwnerType,
@@ -177,9 +190,23 @@ class WalletController {
       });
     }
 
-    const result = await this.requestWithdrawalWithPayoutUseCase.execute({
+    // Authorization check
+    const authResult = await this.walletAuthorizationService.canWithdrawFromWallet({
       ownerType: normalizedOwnerType,
       ownerId,
+      userId: requestedBy
+    });
+
+    if (!authResult.allowed) {
+      return res.status(403).json({
+        status: 'fail',
+        message: authResult.reason || 'You do not have permission to withdraw from this wallet'
+      });
+    }
+
+    const result = await this.requestWithdrawalWithPayoutUseCase.execute({
+      ownerType: normalizedOwnerType,
+      ownerId: authResult.resolvedOwnerId || ownerId,
       requestedBy,
       amount: Number(amount),
       bankAccountId: bankAccountId || null
@@ -224,7 +251,7 @@ class WalletController {
 
     const result = await this.getWithdrawalsUseCase.executeByWallet({
       ownerType: normalizedOwnerType,
-      ownerId,
+      ownerId: authResult.resolvedOwnerId || ownerId,
       limit,
       skip
     });

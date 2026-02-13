@@ -202,7 +202,8 @@ class PaymentModule {
   getInitializePaystackPaymentUseCase() {
     if (!this._initializePaystackPaymentUseCase) {
       this._initializePaystackPaymentUseCase = new InitializePaystackPaymentUseCase({
-        paystackAdapter: this.getPaystackAdapter()
+        paystackAdapter: this.getPaystackAdapter(),
+        eventRepository: this.getEventRepository()
       });
     }
     return this._initializePaystackPaymentUseCase;
@@ -264,7 +265,8 @@ class PaymentModule {
   getRegisterTransactionUseCase() {
     if (!this._registerTransactionUseCase) {
       this._registerTransactionUseCase = new RegisterTransactionUseCase({
-        transactionRepository: this.getTransactionRepository()
+        transactionRepository: this.getTransactionRepository(),
+        eventRepository: this.getEventRepository()
       });
     }
     return this._registerTransactionUseCase;

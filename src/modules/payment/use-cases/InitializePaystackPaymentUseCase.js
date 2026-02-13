@@ -7,12 +7,20 @@ const { InitializePaymentDTO } = require('../dto');
 const { PaymentInitializationError } = require('../errors');
 
 class InitializePaystackPaymentUseCase {
-  constructor({ paystackAdapter }) {
+  constructor({ paystackAdapter, eventRepository }) {
     this.paystackAdapter = paystackAdapter;
+    this.eventRepository = eventRepository;
   }
 
   async execute(dto) {
     dto.validate();
+
+    if (dto.eventId) {
+      const event = await this.eventRepository.findByIdOrSlug(dto.eventId);
+      if (event) {
+        dto.eventId = event.id;
+      }
+    }
 
     try {
       const metadata = {

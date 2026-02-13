@@ -40,14 +40,14 @@ class WalletAuthorizationService {
 
         // EVENT wallet
         if (ownerType === 'EVENT') {
-            const event = await this.eventRepository.findById(ownerId);
+            const event = await this.eventRepository.findByIdOrSlug(ownerId);
             if (!event) {
                 return { allowed: false, reason: 'Event not found' };
             }
 
             // Check if user is the creator
             if (event.creatorId && String(event.creatorId) === String(userId)) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: event.id };
             }
 
             // Check if user is an accepted co-organizer
@@ -60,12 +60,12 @@ class WalletAuthorizationService {
             });
 
             if (teamMember) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: event.id };
             }
 
             // Admins can view any event wallet
             if (isAdmin) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: event.id };
             }
 
             return {
@@ -83,22 +83,22 @@ class WalletAuthorizationService {
 
             // Check if user is the creator
             if (group.creator && String(group.creator) === String(userId)) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: group.id };
             }
 
             // Check if user is an admin member
             if (group.isAdmin(userId)) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: group.id };
             }
 
             // Check if user is a member (can view but not withdraw)
             if (group.isMember(userId)) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: group.id };
             }
 
             // System admins can view any group wallet
             if (isAdmin) {
-                return { allowed: true };
+                return { allowed: true, resolvedOwnerId: group.id };
             }
 
             return {
@@ -133,7 +133,7 @@ class WalletAuthorizationService {
         }
 
         if (ownerType === 'EVENT') {
-            const event = await this.eventRepository.findById(ownerId);
+            const event = await this.eventRepository.findByIdOrSlug(ownerId);
             if (!event) {
                 return { allowed: false, reason: 'Event not found' };
             }
@@ -156,7 +156,7 @@ class WalletAuthorizationService {
                 };
             }
 
-            return { allowed: true };
+            return { allowed: true, resolvedOwnerId: event.id };
         }
 
         if (ownerType === 'GROUP') {
@@ -174,7 +174,7 @@ class WalletAuthorizationService {
                 };
             }
 
-            return { allowed: true };
+            return { allowed: true, resolvedOwnerId: group.id };
         }
 
         return { allowed: false, reason: 'Invalid ownerType' };

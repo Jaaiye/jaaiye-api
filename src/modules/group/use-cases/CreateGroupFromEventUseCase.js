@@ -24,19 +24,21 @@ class CreateGroupFromEventUseCase {
 
   async execute(userId, eventId, groupName) {
     // Get event
-    const event = await this.eventRepository.findById(eventId);
+    const event = await this.eventRepository.findByIdOrSlug(eventId);
     if (!event) {
       throw new EventNotFoundError();
     }
+    // Update eventId to the resolved ObjectId
+    const resolvedEventId = event.id;
 
     // Check if user is participant
-    const participant = await this.eventParticipantRepository.findByEventAndUser(eventId, userId);
+    const participant = await this.eventParticipantRepository.findByEventAndUser(resolvedEventId, userId);
     if (!participant) {
       throw new EventAccessDeniedError('You must be a participant in the event to create a group from it');
     }
 
     // Create group from event
-    const group = await this.groupRepository.createFromEvent(eventId, groupName, userId);
+    const group = await this.groupRepository.createFromEvent(resolvedEventId, groupName, userId);
 
     // Sync to Firebase (non-blocking)
     setImmediate(async () => {
@@ -70,24 +72,24 @@ class CreateGroupFromEventUseCase {
     // Send notifications (non-blocking)
     setImmediate(async () => {
       try {
-      await Promise.all(
-        group.members
-          .filter(member => {
-            const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
-            return memberUserId.toString() !== userId.toString();
-          })
-          .map(member => {
-            const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
-            return this.notificationAdapter.send(memberUserId, {
-              title: 'Added to Group',
-              body: `You've been added to the group "${group.name}" created from event "${event.title || 'Event'}"`
-            }, {
-              type: 'group_member_added',
-              groupId: group.id,
-              eventId
-            });
-          })
-      );
+        await Promise.all(
+          group.members
+            .filter(member => {
+              const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+              return memberUserId.toString() !== userId.toString();
+            })
+            .map(member => {
+              const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+              return this.notificationAdapter.send(memberUserId, {
+                title: 'Added to Group',
+                body: `You've been added to the group "${group.name}" created from event "${event.title || 'Event'}"`
+              }, {
+                type: 'group_member_added',
+                groupId: group.id,
+                eventId: resolvedEventId
+              });
+            })
+        );
       } catch (error) {
         console.error('Failed to send notifications:', error);
       }

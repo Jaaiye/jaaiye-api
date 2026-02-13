@@ -38,7 +38,7 @@ class WalletWithdrawalService {
     if (!ownerType || !ownerId || !userId) return false;
 
     if (ownerType === 'EVENT') {
-      const event = await this.eventRepository.findById(ownerId);
+      const event = await this.eventRepository.findByIdOrSlug(ownerId);
       if (!event) return false;
       return event.origin === 'user'
         && event.creatorId

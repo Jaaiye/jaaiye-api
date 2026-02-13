@@ -7,12 +7,21 @@ const { RegisterTransactionDTO } = require('../dto');
 const { TransactionNotFoundError } = require('../errors');
 
 class RegisterTransactionUseCase {
-  constructor({ transactionRepository }) {
+  constructor({ transactionRepository, eventRepository }) {
     this.transactionRepository = transactionRepository;
+    this.eventRepository = eventRepository;
   }
 
   async execute(dto) {
     dto.validate();
+
+    // Resolve eventId if it's a slug
+    if (dto.eventId) {
+      const event = await this.eventRepository.findByIdOrSlug(dto.eventId);
+      if (event) {
+        dto.eventId = event.id;
+      }
+    }
 
     // Check if transaction already exists
     const existingTransaction = await this.transactionRepository.findByProviderAndReference(

@@ -18,9 +18,12 @@ class InitializeFlutterwavePaymentUseCase {
     try {
       // Validate that user is not event creator or team member
       if (dto.eventId && dto.userId) {
-        const event = await this.eventRepository.findById(dto.eventId);
+        const event = await this.eventRepository.findByIdOrSlug(dto.eventId);
 
         if (event) {
+          // Resolve eventId to ObjectId
+          dto.eventId = event.id;
+
           // Check if user is the event creator
           if (event.creatorId && String(event.creatorId) === String(dto.userId)) {
             throw new PaymentInitializationError(

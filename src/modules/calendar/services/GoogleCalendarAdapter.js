@@ -8,6 +8,7 @@ const { google } = require('googleapis');
 const crypto = require('crypto');
 const { GoogleAccountNotLinkedError, GoogleTokenExpiredError, GoogleRefreshTokenInvalidError } = require('../errors');
 const logger = require('../../../utils/logger');
+const { GOOGLE_OAUTH_SCOPES } = require('../../../constants/calendarConstants');
 
 class GoogleCalendarAdapter {
   constructor({ userRepository, notificationAdapter }) {
@@ -125,10 +126,7 @@ class GoogleCalendarAdapter {
    * @private
    */
   _validateCalendarScopes(tokens) {
-    const requiredScopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events'
-    ];
+    const requiredScopes = GOOGLE_OAUTH_SCOPES;
 
     if (!tokens.scope) {
       throw new Error('No scope information in tokens');
@@ -316,13 +314,7 @@ class GoogleCalendarAdapter {
     // Google will redirect to backend, backend will redirect to mobile app
     const client = this._createOAuth2Client(backendRedirectUri);
 
-    // Required scopes for Google Calendar
-    const scopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.calendarlist.readonly'
-    ];
+    const scopes = GOOGLE_OAUTH_SCOPES;
 
     const authUrl = client.generateAuthUrl({
       access_type: 'offline', // Required for refresh token
@@ -692,6 +684,9 @@ class GoogleCalendarAdapter {
       });
 
       // Send notification to user
+      if (!this.notificationAdapter) {
+        logger.warn('NotificationAdapter not available, skipping re-link notification:', { userId });
+      } else {
         await this.notificationAdapter.send(userId, {
           title: 'Google Account Re-link Required',
           body: 'Your Google Calendar connection has expired. Please re-link your Google account to continue syncing events.'
@@ -700,6 +695,7 @@ class GoogleCalendarAdapter {
           action: 're_link_google_account',
           path: 'calenderScreen'
         });
+      }
 
       logger.info('Marked Google account as invalid:', { userId });
     } catch (error) {

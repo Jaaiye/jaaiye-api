@@ -29,10 +29,18 @@ const DEFAULT_QUERY_PARAMS = {
   SORT_ORDER: 1
 };
 
+const GOOGLE_OAUTH_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly'
+];
+
 module.exports = {
   ERROR_MESSAGES,
   SUCCESS_MESSAGES,
   ACCESS_LEVELS,
-  DEFAULT_QUERY_PARAMS
+  DEFAULT_QUERY_PARAMS,
+  GOOGLE_OAUTH_SCOPES
 };
 

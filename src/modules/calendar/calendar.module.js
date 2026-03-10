@@ -7,6 +7,10 @@ const { UserRepository } = require('../common/repositories');
 const { CalendarRepository } = require('./repositories');
 const { EventRepository } = require('../event/repositories');
 const { GoogleCalendarAdapter, CalendarSyncAdapter, CalendarService } = require('./services');
+const { NotificationAdapter } = require('../common/services');
+const { SendNotificationUseCase } = require('../notification/use-cases');
+const { PushNotificationAdapter, FirebaseAdapter: NotificationFirebaseAdapter, DeviceTokenAdapter } = require('../notification/services');
+const { NotificationRepository } = require('../notification/repositories');
 // CalendarService removed - functionality moved to use cases
 const {
   CreateCalendarUseCase,
@@ -75,10 +79,34 @@ class CalendarModule {
   // ADAPTERS
   // ============================================================================
 
+  getNotificationAdapter() {
+    if (!this._instances.notificationAdapter) {
+      const firebaseAdapter = new NotificationFirebaseAdapter();
+      const deviceTokenAdapter = new DeviceTokenAdapter({
+        userRepository: this.getUserRepository()
+      });
+      const pushNotificationAdapter = new PushNotificationAdapter({
+        firebaseAdapter,
+        deviceTokenAdapter
+      });
+      const notificationRepository = new NotificationRepository();
+      const sendNotificationUseCase = new SendNotificationUseCase({
+        notificationRepository,
+        pushNotificationAdapter
+      });
+      this._instances.notificationAdapter = new NotificationAdapter({
+        sendNotificationUseCase,
+        notificationRepository
+      });
+    }
+    return this._instances.notificationAdapter;
+  }
+
   getGoogleCalendarAdapter() {
     if (!this._instances.googleCalendarAdapter) {
       this._instances.googleCalendarAdapter = new GoogleCalendarAdapter({
-        userRepository: this.getUserRepository()
+        userRepository: this.getUserRepository(),
+        notificationAdapter: this.getNotificationAdapter()
       });
     }
     return this._instances.googleCalendarAdapter;

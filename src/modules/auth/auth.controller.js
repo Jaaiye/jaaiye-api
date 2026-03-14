@@ -6,7 +6,7 @@
 
 const { asyncHandler } = require('../../utils/asyncHandler');
 const { successResponse } = require('../../utils/response');
-const { RegisterDTO, LoginDTO, GoogleOAuthDTO, AppleOAuthDTO } = require('./dto');
+const { RegisterDTO, LoginDTO, GoogleOAuthDTO, AppleOAuthDTO, ConvertGuestDTO } = require('./dto');
 
 class AuthController {
   constructor({
@@ -21,7 +21,8 @@ class AuthController {
     refreshTokenUseCase,
     resendUseCase,
     createUserUseCase,
-    guestLoginUseCase
+    guestLoginUseCase,
+    convertGuestUseCase
   }) {
     this.registerUseCase = registerUseCase;
     this.loginUseCase = loginUseCase;
@@ -35,6 +36,7 @@ class AuthController {
     this.resendUseCase = resendUseCase;
     this.createUserUseCase = createUserUseCase;
     this.guestLoginUseCase = guestLoginUseCase;
+    this.convertGuestUseCase = convertGuestUseCase;
   }
 
   /**
@@ -243,6 +245,39 @@ class AuthController {
         profilePicture: result.user.profilePicture
       }
     }, 200, 'Guest login successful');
+  });
+
+  /**
+   * Convert guest account to a permanent user account
+   * POST /auth/convert-guest
+   * Request: { email, password, fullName }
+   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   */
+  convertGuest = asyncHandler(async (req, res) => {
+    // Requires authentication to know which guest user to convert
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User must be authenticated to convert an account' });
+    }
+
+    const dto = new ConvertGuestDTO(req.body);
+    const result = await this.convertGuestUseCase.execute(userId, dto);
+
+    return successResponse(res, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      firebaseToken: result.firebaseToken,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        username: result.user.username,
+        fullName: result.user.fullName,
+        role: result.user.role,
+        isGuest: result.user.isGuest,
+        emailVerified: result.user.emailVerified,
+        profilePicture: result.user.profilePicture
+      }
+    }, 200, 'Guest account converted successfully. Please verify your email.');
   });
 }
 

@@ -46,6 +46,9 @@ function createAuthRoutes({ authController, authMiddleware }) {
   // POST /auth/guest - Guest login
   router.post('/guest', authController.guestLogin);
 
+  // POST /auth/convert-guest - Convert guest to permanent user
+  router.post('/convert-guest', authMiddleware, authController.convertGuest);
+
   return router;
 }
 

@@ -33,7 +33,8 @@ const {
   RefreshTokenUseCase,
   ResendUseCase,
   CreateUserUseCase,
-  GuestLoginUseCase
+  GuestLoginUseCase,
+  ConvertGuestUseCase
 } = require('./use-cases');
 
 // Presentation
@@ -280,6 +281,18 @@ class AuthModule {
     return this._instances.guestLoginUseCase;
   }
 
+  getConvertGuestUseCase() {
+    if (!this._instances.convertGuestUseCase) {
+      this._instances.convertGuestUseCase = new ConvertGuestUseCase({
+        userRepository: this.getUserRepository(),
+        emailService: this.getEmailAdapter(),
+        emailQueue: this.getEmailQueue(),
+        firebaseAdapter: this.getFirebaseAdapter()
+      });
+    }
+    return this._instances.convertGuestUseCase;
+  }
+
   /**
    * Get or create controller instance
    */
@@ -297,7 +310,8 @@ class AuthModule {
         refreshTokenUseCase: this.getRefreshTokenUseCase(),
         resendUseCase: this.getResendUseCase(),
         createUserUseCase: this.getCreateUserUseCase(),
-        guestLoginUseCase: this.getGuestLoginUseCase()
+        guestLoginUseCase: this.getGuestLoginUseCase(),
+        convertGuestUseCase: this.getConvertGuestUseCase()
       });
     }
     return this._instances.authController;

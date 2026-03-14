@@ -1,4 +1,5 @@
 const logger = require('./logger');
+const { GOOGLE_OAUTH_SCOPES } = require('../constants/calendarConstants');
 
 /**
  * Handle Google OAuth errors with standardized responses
@@ -82,11 +83,7 @@ exports.validateGoogleTokens = (tokens) => {
       throw new Error('Token scope is required');
     }
 
-    // Check if tokens have required scopes
-    const requiredScopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events'
-    ];
+    const requiredScopes = GOOGLE_OAUTH_SCOPES;
 
     const hasRequiredScopes = requiredScopes.some(scope =>
       tokens.scope.includes(scope)
@@ -113,10 +110,7 @@ exports.validateCalendarScopes = (tokens) => {
       throw new Error('Token scope is required');
     }
 
-    const requiredScopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events'
-    ];
+    const requiredScopes = GOOGLE_OAUTH_SCOPES;
 
     const hasRequiredScopes = requiredScopes.some(scope =>
       tokens.scope.includes(scope)

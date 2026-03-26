@@ -99,18 +99,28 @@ class FriendshipRepository extends IFriendshipRepository {
   }
 
   async getFriends(userId, status = 'active') {
-    const docs = await FriendshipSchema.find({
-      $or: [
-        { user1: userId, status },
-        { user2: userId, status }
-      ]
-    })
-      .populate('user1', 'username fullName profilePicture email')
-      .populate('user2', 'username fullName profilePicture email')
-      .sort({ createdAt: -1 });
+  const docs = await FriendshipSchema.find({
+    $or: [
+      { user1: userId, status },
+      { user2: userId, status }
+    ]
+  })
+    .populate('user1', 'username fullName profilePicture email')
+    .populate('user2', 'username fullName profilePicture email')
+    .sort({ createdAt: -1 });
 
-    return docs.map(doc => this._toEntity(doc));
-  }
+  return docs.map(doc => {
+    const entity = this._toEntity(doc);
+    
+    // CRITICAL: Attach the populated data back to the entity 
+    // so the UseCase can see it!
+    entity._populatedUser1 = doc.user1;
+    entity._populatedUser2 = doc.user2;
+    
+    return entity;
+  });
+}
+
 
   async areFriends(user1Id, user2Id) {
     const friendship = await this.findFriendship(user1Id, user2Id);

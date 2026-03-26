@@ -131,5 +131,21 @@ userSchema.index({ appleId: 1 });
 userSchema.index({ 'googleCalendar.calendars.resourceId': 1 });
 userSchema.index({ 'ics.token': 1 });
 
+// Add this to your User Schema file
+userSchema.post('findOneAndDelete', async function(doc) {
+  if (doc) {
+    const Friendship = mongoose.model('Friendship');
+    // Remove all friendships where this user was either user1 or user2
+    await Friendship.deleteMany({
+      $or: [
+        { user1: doc._id },
+        { user2: doc._id }
+      ]
+    });
+    console.log(`Cleaned up friendships for deleted user: ${doc._id}`);
+  }
+});
+
+
 // Export model (check if already compiled to avoid overwrite errors)
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);

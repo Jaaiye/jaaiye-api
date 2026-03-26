@@ -34,14 +34,15 @@ const friendData = isUser1
   : friendship._populatedUser1;
 
         return {
-          id: friendData._id || friendData,
-          username: friendData.username || 'Deleted User',
-          fullName: friendData.fullName || 'Deleted User',
-          profilePicture: friendData.profilePicture,
-          email: friendData.email,
-          friendshipId: friendship.id,
-          addedAt: friendship.createdAt
-        };
+  // Use .id because your _toEntity mapper explicitly creates it
+  id: friendData.id || friendData._id || friendData, 
+  username: friendData.username || 'Deleted User',
+  fullName: friendData.fullName || 'Deleted User',
+  profilePicture: friendData.profilePicture,
+  email: friendData.email,
+  friendshipId: friendship.id,
+  addedAt: friendship.createdAt
+};
       })
       .filter(f => f !== null); // This removes the empty slots from the list
 

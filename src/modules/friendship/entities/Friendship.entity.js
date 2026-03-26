@@ -41,16 +41,21 @@ class FriendshipEntity {
   /**
    * Business Rule: Get the other user in the friendship
    * @param {string} userId - Current user ID
-   * @returns {string} Other user ID
+   * @returns {string|null} Other user ID or null if friend is deleted
    */
   getOtherUser(userId) {
+    if (!userId) return null;
     const userIdStr = userId.toString();
-    if (this.user1.toString() === userIdStr) {
+
+    // Safely check user1
+    if (this.user1?.toString() === userIdStr) {
       return this.user2;
     }
-    if (this.user2.toString() === userIdStr) {
+    // Safely check user2
+    if (this.user2?.toString() === userIdStr) {
       return this.user1;
     }
+    
     return null;
   }
 
@@ -60,8 +65,14 @@ class FriendshipEntity {
    * @returns {boolean}
    */
   involvesUser(userId) {
+    if (!userId) return false;
     const userIdStr = userId.toString();
-    return this.user1.toString() === userIdStr || this.user2.toString() === userIdStr;
+    
+    // Using optional chaining prevents the "toString of null" crash
+    const u1 = this.user1?.toString();
+    const u2 = this.user2?.toString();
+    
+    return u1 === userIdStr || u2 === userIdStr;
   }
 
   /**
@@ -82,5 +93,3 @@ class FriendshipEntity {
 }
 
 module.exports = FriendshipEntity;
-
-

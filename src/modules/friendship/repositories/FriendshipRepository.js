@@ -27,20 +27,16 @@ class FriendshipRepository extends IFriendshipRepository {
 
     // Extract populated user data if available
     const getUserData = (field) => {
-      if (!field) return null;
-      if (typeof field === 'string') return null; // Just an ID, not populated
-      if (field._id) {
-        // Populated user object
-        return {
-          id: field._id.toString(),
-          username: field.username,
-          fullName: field.fullName,
-          profilePicture: field.profilePicture,
-          email: field.email
-        };
-      }
-      return null;
-    };
+  if (!field || typeof field === 'string') return null;
+  
+  // Return the whole object so .id, ._id, .username etc. are all available
+  return {
+    ...field,
+    id: field._id?.toString() || field.id,
+    _id: field._id || field.id
+  };
+};
+
 
     const entity = new FriendshipEntity({
       id: doc._id.toString(),

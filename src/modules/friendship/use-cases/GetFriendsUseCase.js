@@ -13,36 +13,28 @@ class GetFriendsUseCase {
    * @param {string} userId - User ID
    * @returns {Promise<Object>} Friends list
    */
-  async execute(userId) {
+    async execute(userId) {
     const friendships = await this.friendshipRepository.getFriends(userId);
 
-    const friends = friendships.map((friendship) => {
-      // Get the other user's data from populated fields
-      const isUser1 = friendship.user1.toString() === userId.toString();
-      const friendData = isUser1
-        ? friendship._populatedUser2
-        : friendship._populatedUser1;
+    const friends = friendships
+      .map((friendship) => {
+        // Safety check: if user1 or user2 is null (deleted user), return null
+        if (!friendship.user1 || !friendship.user2) return null;
 
-      // Fallback: if populated data not available, construct minimal object
-      if (!friendData) {
-        const friendId = friendship.getOtherUser(userId);
+        const isUser1 = friendship.user1._id?.toString() === userId.toString();
+        const friendData = isUser1 ? friendship.user2 : friendship.user1;
+
         return {
-          id: friendId.toString(),
+          id: friendData._id || friendData,
+          username: friendData.username || 'Deleted User',
+          fullName: friendData.fullName || 'Deleted User',
+          profilePicture: friendData.profilePicture,
+          email: friendData.email,
           friendshipId: friendship.id,
           addedAt: friendship.createdAt
         };
-      }
-
-      return {
-        id: friendData.id,
-        username: friendData.username,
-        fullName: friendData.fullName,
-        profilePicture: friendData.profilePicture,
-        email: friendData.email,
-        friendshipId: friendship.id,
-        addedAt: friendship.createdAt
-      };
-    });
+      })
+      .filter(f => f !== null); // This removes the empty slots from the list
 
     return { friends };
   }

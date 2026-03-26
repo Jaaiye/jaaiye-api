@@ -189,6 +189,17 @@ friendshipSchema.virtual('otherUser').get(function() {
   return null;
 });
 
+// Add this to your Friendship Schema if you use Soft Deletes
+friendshipSchema.pre('find', function() {
+  // This automatically filters out friendships with deactivated users 
+  // every time you run a query like .find() or .getFriends()
+  this.populate({
+    path: 'user1',
+    match: { 'deleted.status': { $ne: true } }
+  });
+});
+
+
 const Friendship = mongoose.model('Friendship', friendshipSchema);
 
 module.exports = Friendship;

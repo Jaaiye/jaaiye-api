@@ -51,35 +51,40 @@ class GetUserGroupsUseCase {
      * @returns {Array} Mapped friends data
      */
   _mapFriendsFromFriendships(friendships, userId) {
-    return friendships.map((friendship) => {
-      // Determine which user is the friend
-      const isUser1 = friendship.user1.toString() === userId.toString();
-      const friendData = isUser1
-        ? friendship._populatedUser2
-        : friendship._populatedUser1;
+    return friendships
+      .map((friendship) => {
+        // 1. Safety check: If user1 or user2 is missing, skip this record
+        if (!friendship.user1 || !friendship.user2) return null;
 
-      // Fallback: if populated data not available, construct minimal object
-      if (!friendData) {
-        const friendId = friendship.getOtherUser(userId);
+        // 2. Safe comparison using Optional Chaining
+        const isUser1 = friendship.user1?.toString() === userId?.toString();
+        
+        const friendData = isUser1
+          ? friendship._populatedUser2
+          : friendship._populatedUser1;
+
+        // Fallback: if populated data not available
+        if (!friendData) {
+          const friendId = friendship.getOtherUser(userId);
+          return {
+            id: friendId?.toString(),
+            friendshipId: friendship.id,
+            addedAt: friendship.createdAt
+          };
+        }
+
         return {
-          id: friendId.toString(),
+          id: friendData.id,
+          username: friendData.username,
+          fullName: friendData.fullName,
+          profilePicture: friendData.profilePicture,
+          email: friendData.email,
           friendshipId: friendship.id,
           addedAt: friendship.createdAt
         };
-      }
-
-      return {
-        id: friendData.id,
-        username: friendData.username,
-        fullName: friendData.fullName,
-        profilePicture: friendData.profilePicture,
-        email: friendData.email,
-        friendshipId: friendship.id,
-        addedAt: friendship.createdAt
-      };
-    });
+      })
+      .filter(f => f !== null); // 3. Clean up the array
   }
 }
-
 module.exports = GetUserGroupsUseCase;
 

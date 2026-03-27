@@ -26,14 +26,9 @@ app.set('trust proxy', 1);
 const { traceMiddleware } = require('./middleware/traceMiddleware');
 app.use(traceMiddleware);
 
-// Horizon Observability
-const { horizon } = require('./config/horizon');
-const { expressHorizonMiddleware } = require('@kisameholmes/horizon_node');
-horizon.autoCaptureErrors();
-app.use(expressHorizonMiddleware(horizon));
-
 // Create HTTP server
 const server = require('http').createServer(app);
+
 
 // Middleware
 app.use(helmet()); // Security headers

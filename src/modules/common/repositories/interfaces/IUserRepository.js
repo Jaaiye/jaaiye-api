@@ -182,7 +182,18 @@ class IUserRepository {
   async unlinkGoogleAccount(userId) {
     throw new Error('Method not implemented');
   }
+
+  /**
+   * Find users with filters
+   * @param {Object} filters
+   * @param {Object} options
+   * @returns {Promise<{users: UserEntity[], total: number}>}
+   */
+  async find(filters, options = {}) {
+    throw new Error('Method not implemented');
+  }
 }
+
 
 module.exports = IUserRepository;
 

@@ -70,7 +70,18 @@ class INotificationRepository {
   async deleteMany(filter) {
     throw new Error('Not implemented');
   }
+
+  /**
+   * Find notifications with filters
+   * @param {Object} filters
+   * @param {Object} options
+   * @returns {Promise<{notifications: NotificationEntity[], total: number}>}
+   */
+  async find(filters, options = {}) {
+    throw new Error('Not implemented');
+  }
 }
+
 
 module.exports = INotificationRepository;
 

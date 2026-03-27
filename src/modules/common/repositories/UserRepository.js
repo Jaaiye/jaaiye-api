@@ -470,7 +470,32 @@ class UserRepository extends IUserRepository {
       updatedAt: obj.updatedAt
     });
   }
+
+  /**
+   * Find users with filters
+   * @param {Object} filters
+   * @param {Object} options
+   * @returns {Promise<{users: UserEntity[], total: number}>}
+   */
+  async find(filters, options = {}) {
+    const { limit = 20, skip = 0, sort = { createdAt: -1 } } = options;
+
+    const [docs, total] = await Promise.all([
+      UserSchema.find(filters)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .select('+password +googleCalendar.googleId +googleCalendar.refreshToken'),
+      UserSchema.countDocuments(filters)
+    ]);
+
+    return {
+      users: docs.map(doc => this._toEntity(doc)),
+      total
+    };
+  }
 }
+
 
 module.exports = UserRepository;
 

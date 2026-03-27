@@ -30,7 +30,11 @@ class AdminRoutes {
     router.get('/withdrawals', admin, this.adminController.listWithdrawals);
     router.get('/withdrawals/:withdrawalId', admin, this.adminController.getWithdrawalDetails);
 
+    // Group management
+    router.get('/groups', admin, this.adminController.listGroups);
+
     return router;
+
   }
 }
 

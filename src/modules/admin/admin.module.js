@@ -10,8 +10,10 @@ const {
   CreateAdminUserUseCase,
   UpdateUserRoleUseCase,
   ListWithdrawalsUseCase,
-  GetWithdrawalDetailsUseCase
+  GetWithdrawalDetailsUseCase,
+  ListGroupsUseCase
 } = require('./use-cases');
+
 const AdminController = require('./admin.controller');
 const AdminRoutes = require('./admin.routes');
 const { WithdrawalRepository, WalletRepository } = require('../wallet/repositories');
@@ -26,9 +28,11 @@ class AdminModule {
     this._listUsersUseCase = null;
     this._createAdminUserUseCase = null;
     this._updateUserRoleUseCase = null;
+    this._listGroupsUseCase = null;
     this._adminController = null;
     this._adminRoutes = null;
   }
+
 
   getUserRepository() {
     if (!this._userRepository) {
@@ -96,6 +100,16 @@ class AdminModule {
     return this._getWithdrawalDetailsUseCase;
   }
 
+  getListGroupsUseCase() {
+    if (!this._listGroupsUseCase) {
+      this._listGroupsUseCase = new ListGroupsUseCase({
+        groupRepository: new GroupRepository()
+      });
+    }
+    return this._listGroupsUseCase;
+  }
+
+
   getAdminController() {
     if (!this._adminController) {
       this._adminController = new AdminController({
@@ -104,9 +118,11 @@ class AdminModule {
         createAdminUserUseCase: this.getCreateAdminUserUseCase(),
         updateUserRoleUseCase: this.getUpdateUserRoleUseCase(),
         listWithdrawalsUseCase: this.getListWithdrawalsUseCase(),
-        getWithdrawalDetailsUseCase: this.getGetWithdrawalDetailsUseCase()
+        getWithdrawalDetailsUseCase: this.getGetWithdrawalDetailsUseCase(),
+        listGroupsUseCase: this.getListGroupsUseCase()
       });
     }
+
     return this._adminController;
   }
 

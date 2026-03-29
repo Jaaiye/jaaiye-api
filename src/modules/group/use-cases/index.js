@@ -9,6 +9,8 @@ module.exports = {
   UpdateMemberRoleUseCase: require('./UpdateMemberRoleUseCase'),
   SearchGroupsUseCase: require('./SearchGroupsUseCase'),
   DeleteGroupUseCase: require('./DeleteGroupUseCase'),
-  CreateGroupEventUseCase: require('./CreateGroupEventUseCase')
+  CreateGroupEventUseCase: require('./CreateGroupEventUseCase'),
+  ListGroupsUseCase: require('./ListGroupsUseCase')
 };
+
 

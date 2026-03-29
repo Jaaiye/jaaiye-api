@@ -11,8 +11,10 @@ const {
   CreateAdminUserUseCase,
   UpdateUserRoleUseCase,
   ListWithdrawalsUseCase,
-  GetWithdrawalDetailsUseCase
+  GetWithdrawalDetailsUseCase,
+  ListGroupsUseCase
 } = require('./use-cases');
+
 
 class AdminController {
   constructor({
@@ -21,8 +23,20 @@ class AdminController {
     createAdminUserUseCase,
     updateUserRoleUseCase,
     listWithdrawalsUseCase,
-    getWithdrawalDetailsUseCase
+    getWithdrawalDetailsUseCase,
+    listGroupsUseCase
   }) {
+    this.listGroups = asyncHandler(async (req, res) => {
+      const { limit, page, isActive } = req.query;
+      const result = await listGroupsUseCase.execute({
+        limit,
+        page,
+        isActive: isActive !== undefined ? isActive === 'true' : undefined
+      });
+      return successResponse(res, result);
+    });
+
+
     this.health = asyncHandler(async (req, res) => {
       const result = await getAdminHealthUseCase.execute();
       return successResponse(res, result);

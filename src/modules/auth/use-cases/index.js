@@ -14,6 +14,7 @@ const RefreshTokenUseCase = require('./RefreshTokenUseCase');
 const ResendUseCase = require('./ResendUseCase');
 const CreateUserUseCase = require('./CreateUserUseCase');
 const GuestLoginUseCase = require('./GuestLoginUseCase');
+const ConvertGuestUseCase = require('./ConvertGuestUseCase');
 
 module.exports = {
   RegisterUseCase,
@@ -27,6 +28,7 @@ module.exports = {
   RefreshTokenUseCase,
   ResendUseCase,
   CreateUserUseCase,
-  GuestLoginUseCase
+  GuestLoginUseCase,
+  ConvertGuestUseCase
 };
 

@@ -74,6 +74,30 @@ class GroupRepository extends IGroupRepository {
     return this._toEntity(doc);
   }
 
+  async find(filters = {}, options = {}) {
+    const { page = 1, limit = 20, sort = { createdAt: -1 } } = options;
+    const skip = (page - 1) * limit;
+
+    const query = GroupSchema.find(filters);
+
+    if (options.populate) {
+      query.populate(options.populate);
+    } else {
+      query.populate('creator', 'username fullName profilePicture')
+        .populate('members.user', 'username fullName profilePicture')
+        .populate('members.addedBy', 'username fullName')
+        .populate('events', 'title startTime endTime venue location description');
+    }
+
+    const docs = await query.sort(sort).skip(skip).limit(limit).lean();
+    const total = await GroupSchema.countDocuments(filters);
+
+    return {
+      groups: docs.map(doc => this._toEntity(doc)),
+      total
+    };
+  }
+
   async findByUser(userId, includeInactive = false) {
     const docs = await GroupSchema.getUserGroups(userId, includeInactive).lean();
     return docs.map(doc => this._toEntity(doc));

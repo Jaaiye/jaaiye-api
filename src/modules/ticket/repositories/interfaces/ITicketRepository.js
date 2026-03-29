@@ -69,10 +69,27 @@ class ITicketRepository {
    * @param {string} ticketTypeId
    * @returns {Promise<number>}
    */
+  /**
+   * Count tickets by event and ticket type
+   * @param {string} eventId
+   * @param {string} ticketTypeId
+   * @returns {Promise<number>}
+   */
   async countByEventAndType(eventId, ticketTypeId) {
     throw new Error('Method not implemented');
   }
+
+  /**
+   * Find tickets with filters
+   * @param {Object} filters
+   * @param {Object} options
+   * @returns {Promise<{tickets: TicketEntity[], total: number}>}
+   */
+  async find(filters, options = {}) {
+    throw new Error('Method not implemented');
+  }
 }
+
 
 module.exports = ITicketRepository;
 

@@ -29,7 +29,7 @@ class TicketRepository extends ITicketRepository {
       ticketTypeId: data.ticketTypeId,
       ticketTypeName: data.ticketTypeName,
       price: data.price,
-      admissionSize:data.admissionSize,
+      admissionSize: data.admissionSize,
       quantity: data.quantity,
       qrCode: data.qrCode,
       ticketData: data.ticketData,
@@ -196,6 +196,37 @@ class TicketRepository extends ITicketRepository {
     const ticket = await query;
     return this._toEntity(ticket);
   }
+
+  async find(filters, options = {}) {
+    const { limit = 20, skip = 0, sort = { createdAt: -1 } } = options;
+
+    const query = TicketSchema.find(filters);
+
+    if (options.populate) {
+      if (Array.isArray(options.populate)) {
+        options.populate.forEach(pop => {
+          query.populate(pop);
+        });
+      } else {
+        query.populate(options.populate);
+      }
+    }
+
+    const [docs, total] = await Promise.all([
+      query
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      TicketSchema.countDocuments(filters)
+    ]);
+
+    return {
+      tickets: this._toEntityArray(docs),
+      total
+    };
+  }
 }
+
 
 module.exports = TicketRepository;

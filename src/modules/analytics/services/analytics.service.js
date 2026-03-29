@@ -102,26 +102,31 @@ class AnalyticsService {
     const breakdownArray = Object.values(monthlyBreakdown).sort((a, b) => a.month.localeCompare(b.month));
 
     return {
-      totalRevenue, // Net revenue to organizers (excluding platform fee)
-      totalFees,    // Total platform fees collected (10%)
-      totalGatewayFees, // Total gateway fees paid (e.g. Flutterwave)
-      platformProfit,   // Actual platform profit (Fees - Gateway Fees)
-      totalGross,   // Total revenue including fees
-      transactionCount,
-      averageTransactionAmount: transactionCount > 0 ? totalRevenue / transactionCount : 0,
+      range: { from: startDate || '', to: endDate || '' },
+      totals: {
+        totalRevenue,
+        totalFees,
+        totalGatewayFees,
+        platformProfit,
+        totalGross,
+        transactionCount,
+        totalQuantity: transactions.reduce((sum, t) => sum + (Number(t.quantity) || 1), 0),
+        averageOrderValue: transactionCount > 0 ? totalGross / transactionCount : 0
+      },
+      transactionPerformance: {
+        totalTransactions: transactionCount,
+        successfulTransactions: transactionCount,
+        successRate: 100
+      },
       monthlyBreakdown: breakdownArray,
-      transactions: transactions.map(t => ({
-        id: t.id,
-        amount: t.amount,
-        baseAmount: t.baseAmount,
-        feeAmount: t.feeAmount,
-        gatewayFee: t.gatewayFee,
-        currency: t.currency,
-        provider: t.provider,
-        createdAt: t.createdAt
+      timeline: breakdownArray.map(b => ({
+        date: b.month,
+        revenue: b.revenue,
+        transactions: b.count
       }))
     };
   }
+
 
   /**
    * Get ticket analytics
@@ -139,26 +144,37 @@ class AnalyticsService {
       if (endDate) queryFilters.createdAt.$lte = new Date(endDate);
     }
 
-    const tickets = await this.ticketRepository.find(queryFilters, {
+    const result = await this.ticketRepository.find(queryFilters, {
       limit: 10000,
       skip: 0,
       sort: { createdAt: -1 }
     });
 
+    const tickets = result.tickets || [];
     const totalTickets = tickets.length;
-    const usedTickets = tickets.filter(t => t.used).length;
-    const cancelledTickets = tickets.filter(t => t.cancelled).length;
+
+    const usedTickets = tickets.filter(t => t.status === 'used' || t.usedAt).length;
+    const cancelledTickets = tickets.filter(t => t.status === 'cancelled').length;
     const activeTickets = totalTickets - usedTickets - cancelledTickets;
+    const totalRevenue = tickets.reduce((sum, t) => sum + (Number(t.price) || 0), 0);
 
     return {
-      totalTickets,
-      usedTickets,
-      cancelledTickets,
-      activeTickets,
-      usageRate: totalTickets > 0 ? (usedTickets / totalTickets) * 100 : 0,
-      cancellationRate: totalTickets > 0 ? (cancelledTickets / totalTickets) * 100 : 0
+      range: { from: startDate || '', to: endDate || '' },
+      summary: {
+        tickets: totalTickets,
+        revenue: totalRevenue,
+        orders: totalTickets, // Simplification
+        avgPrice: totalTickets > 0 ? totalRevenue / totalTickets : 0
+      },
+      statusBreakdown: [
+        { status: 'used', tickets: usedTickets, orders: 0, revenue: 0 },
+        { status: 'active', tickets: activeTickets, orders: 0, revenue: 0 },
+        { status: 'cancelled', tickets: cancelledTickets, orders: 0, revenue: 0 }
+      ],
+      topEvents: []
     };
   }
+
 
   /**
    * Get event analytics
@@ -184,21 +200,22 @@ class AnalyticsService {
 
     const events = result.events || [];
     const totalEvents = events.length;
-    const publicEvents = events.filter(e => e.visibility === 'public').length;
+    const publicEvents = events.filter(e => e.privacy === 'public').length;
     const privateEvents = totalEvents - publicEvents;
 
     return {
-      totalEvents,
-      publicEvents,
-      privateEvents,
-      events: events.map(e => ({
-        id: e.id,
-        title: e.title,
-        visibility: e.visibility,
-        createdAt: e.createdAt
-      }))
+      range: { from: startDate || '', to: endDate || '' },
+      statusCounts: [
+        { status: 'public', count: publicEvents },
+        { status: 'private', count: privateEvents }
+      ],
+      upcomingEvents: events.filter(e => new Date(e.startTime) > new Date()).length,
+      categoryMix: [],
+      topRevenueEvents: []
     };
   }
+
+
 
   /**
    * Get user analytics
@@ -215,23 +232,33 @@ class AnalyticsService {
       if (endDate) queryFilters.createdAt.$lte = new Date(endDate);
     }
 
-    const users = await this.userRepository.find(queryFilters, {
+    const result = await this.userRepository.find(queryFilters, {
       limit: 10000,
       skip: 0,
       sort: { createdAt: -1 }
     });
 
+    const users = result.users || [];
     const totalUsers = users.length;
+
     const verifiedUsers = users.filter(u => u.emailVerified).length;
-    const unverifiedUsers = totalUsers - verifiedUsers;
+    const activeUsers = users.filter(u => u.isActive).length;
 
     return {
-      totalUsers,
-      verifiedUsers,
-      unverifiedUsers,
-      verificationRate: totalUsers > 0 ? (verifiedUsers / totalUsers) * 100 : 0
+      range: { from: startDate || '', to: endDate || '' },
+      totals: {
+        totalUsers,
+        verifiedUsers,
+        activeUsers,
+        providerLinks: {
+          google: users.filter(u => u.googleCalendar?.googleId).length,
+          apple: users.filter(u => u.appleId).length
+        }
+      },
+      growthTimeline: []
     };
   }
+
 
   /**
    * Get engagement analytics
@@ -248,35 +275,42 @@ class AnalyticsService {
       if (endDate) queryFilters.createdAt.$lte = new Date(endDate);
     }
 
-    const notifications = await this.notificationRepository.find(queryFilters, {
+    const notificationResult = await this.notificationRepository.find(queryFilters, {
       limit: 10000,
       skip: 0,
       sort: { createdAt: -1 }
     });
 
+    const notifications = notificationResult.notifications || [];
     const totalNotifications = notifications.length;
+
     const readNotifications = notifications.filter(n => n.read).length;
     const unreadNotifications = totalNotifications - readNotifications;
 
-    const groups = await this.groupRepository.find(queryFilters, {
+    const groupResult = await this.groupRepository.find(queryFilters, {
       limit: 10000,
       skip: 0,
       sort: { createdAt: -1 }
     });
 
+    const groups = groupResult.groups || [];
+
     return {
-      notifications: {
-        total: totalNotifications,
-        read: readNotifications,
-        unread: unreadNotifications,
-        readRate: totalNotifications > 0 ? (readNotifications / totalNotifications) * 100 : 0
+      range: { from: startDate || '', to: endDate || '' },
+      groupMetrics: {
+        totalGroups: groups.length,
+        activeGroups: groups.filter(g => g.isActive).length,
+        totalMembers: groups.reduce((sum, g) => sum + (g.members?.length || 0), 0),
+        averageMembers: groups.length > 0 ? groups.reduce((sum, g) => sum + (g.members?.length || 0), 0) / groups.length : 0
       },
-      groups: {
-        total: groups.length
+      notificationMetrics: {
+        totalNotifications: totalNotifications,
+        readNotifications: readNotifications,
+        readRate: totalNotifications > 0 ? (readNotifications / totalNotifications) * 100 : 0
       }
     };
   }
+
 }
 
 module.exports = AnalyticsService;
-

@@ -5,13 +5,17 @@ const UpdateUserRoleUseCase = require('./UpdateUserRoleUseCase');
 const ListWithdrawalsUseCase = require('./ListWithdrawalsUseCase');
 const GetWithdrawalDetailsUseCase = require('./GetWithdrawalDetailsUseCase');
 
+const ListGroupsUseCase = require('./ListGroupsUseCase');
+
 module.exports = {
   GetAdminHealthUseCase,
   ListUsersUseCase,
   CreateAdminUserUseCase,
   UpdateUserRoleUseCase,
   ListWithdrawalsUseCase,
-  GetWithdrawalDetailsUseCase
+  GetWithdrawalDetailsUseCase,
+  ListGroupsUseCase
 };
+
 
 

@@ -94,7 +94,26 @@ class NotificationRepository extends INotificationRepository {
   async count(filter) {
     return NotificationSchema.countDocuments(filter);
   }
+
+  async find(filters, options = {}) {
+    const { limit = 20, skip = 0, sort = { createdAt: -1 } } = options;
+
+    const [docs, total] = await Promise.all([
+      NotificationSchema.find(filters)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      NotificationSchema.countDocuments(filters)
+    ]);
+
+    return {
+      notifications: docs.map(doc => this._toEntity(doc)),
+      total
+    };
+  }
 }
+
 
 module.exports = NotificationRepository;
 

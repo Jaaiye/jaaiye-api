@@ -16,7 +16,7 @@ class ListGroupsUseCase {
 
         const { groups, total } = await this.groupRepository.find(filters, {
             page: parseInt(options.page) || 1,
-            limit: parseInt(options.limit) || 20,
+            limit: parseInt(options.limit) || 10,
             sort: options.sort || { createdAt: -1 },
             populate: [
                 { path: 'creator', select: 'username fullName email' },
@@ -29,9 +29,9 @@ class ListGroupsUseCase {
             groups: groups.map(group => group.toJSON()),
             pagination: {
                 page: parseInt(options.page) || 1,
-                limit: parseInt(options.limit) || 20,
+                limit: parseInt(options.limit) || 10,
                 total,
-                pages: Math.ceil(total / (parseInt(options.limit) || 20))
+                pages: Math.ceil(total / (parseInt(options.limit) || 10))
             }
         };
     }

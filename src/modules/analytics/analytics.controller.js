@@ -15,8 +15,10 @@ const {
 
 function extractRange(query) {
   return {
-    from: query.from,
-    to: query.to,
+    startDate: query.startDate || query.from,
+    endDate: query.endDate || query.to,
+    from: query.from || query.startDate,
+    to: query.to || query.endDate,
   };
 }
 

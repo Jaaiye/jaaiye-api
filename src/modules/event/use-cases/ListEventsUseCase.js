@@ -15,7 +15,7 @@ class ListEventsUseCase {
     const filters = dto.getFilters();
     const options = dto.getOptions();
 
-    filters.startDate = { $gte: new Date() };
+    filters.startTime = { $gte: new Date() };
 
     // Check if user is a guest
     const user = userId ? await this.userRepository.findById(userId) : null;

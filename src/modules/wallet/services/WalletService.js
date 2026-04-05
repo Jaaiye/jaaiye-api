@@ -29,10 +29,10 @@ class WalletService {
   }
 
   /**
-   * Fund a wallet from a successful transaction with a 10% exclusive fee.
+   * Fund a wallet from a successful transaction with a 5% exclusive fee.
    *
    * - Wallet receives the netAmount (transaction.amount assumed to be net).
-   * - Platform wallet receives 10% of netAmount as fee.
+   * - Platform wallet receives 5% of netAmount as fee.
    *
    * @param {Object} params
    * @param {string} params.ownerType - 'EVENT' | 'GROUP'
@@ -50,10 +50,10 @@ class WalletService {
       throw new Error('Invalid transaction amount for wallet funding');
     }
 
-    // Use stored feeAmount if available, otherwise calculate 10%
+    // Use stored feeAmount if available, otherwise calculate 5%
     const fee = Number(transactionEntity.feeAmount) !== undefined && transactionEntity.feeAmount !== null
       ? Number(transactionEntity.feeAmount)
-      : baseAmount * 0.10;
+      : baseAmount * 0.05;
 
     const netAmountForUser = baseAmount; // The full ticket price before platform fee
 

@@ -512,7 +512,7 @@ class PaymentService {
       gatewayFee: gatewayFee || transaction.gatewayFee
     });
 
-    // Fund wallets with 10% exclusive fee
+    // Fund wallets with 5% exclusive fee
     if (this.walletService) {
       try {
         // Handle group funding
@@ -531,7 +531,7 @@ class PaymentService {
               const creator = await this.userRepository.findById(group.creator);
               if (creator && creator.email) {
                 const grossAmount = Number(transaction.amount);
-                const feeAmount = grossAmount * 0.10;
+                const feeAmount = grossAmount * 0.05;
                 const netAmount = grossAmount - feeAmount;
                 const walletBalanceAfter = fundingResult.walletBalance;
 
@@ -575,7 +575,7 @@ class PaymentService {
               const owner = await this.userRepository.findById(event.creatorId);
               if (owner && owner.email) {
                 const grossAmount = Number(transaction.amount);
-                const feeAmount = grossAmount * 0.10;
+                const feeAmount = grossAmount * 0.05;
                 const netAmount = grossAmount;
                 const walletBalanceAfter = fundingResult.walletBalance;
 

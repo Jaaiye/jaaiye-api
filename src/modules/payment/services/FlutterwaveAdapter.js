@@ -99,18 +99,30 @@ class FlutterwaveAdapter {
    */
   isValidSignature(headers, body) {
     const secretHash = this.webhookSecret;
-    const signature = headers['verif-hash'] || headers['flutterwave-signature'];
+    const verifHash = headers['verif-hash'];
+    const flwSignature = headers['flutterwave-signature'];
 
-    if (!secretHash || !signature) {
-      console.warn('Flutterwave webhook signature validation skipped - missing secret or signature');
+    if (!secretHash) {
+      console.warn('Flutterwave webhook secret not configured');
       return true; // Allow in dev if not set
     }
 
-    const hash = crypto.createHmac('sha256', secretHash)
-      .update(JSON.stringify(body))
-      .digest('hex');
+    // 1. Standard Payment Webhook uses a plain secret string in verif-hash
+    if (verifHash) {
+      return verifHash === secretHash;
+    }
 
-    return hash === signature;
+    // 2. Payout/Transfer webhooks use HMAC SHA256 in flutterwave-signature
+    if (flwSignature) {
+      const hash = crypto.createHmac('sha256', secretHash)
+        .update(JSON.stringify(body))
+        .digest('hex');
+      return hash === flwSignature;
+    }
+
+    // If neither is present, it's an invalid or unauthenticated request
+    console.warn('Missing Flutterwave webhook signature headers');
+    return false;
   }
 
   /**

@@ -142,7 +142,6 @@ class EmailAdapter {
       const result = await this.resend.emails.send({
         from: this.fromEmail,
         to: email,
-        cc: 'Fashinaololade96@gmail.com',
         subject,
         html
       });
@@ -171,7 +170,7 @@ class EmailAdapter {
    */
   async sendSystemAlert(subject, message) {
     try {
-      const adminEmail = 'Fashinaololade96@gmail.com'; // User's email from recorded CCs
+      const adminEmail = 'letsjaaiye@gmail.com'; // User's email from recorded CCs
 
       const result = await this.resend.emails.send({
         from: this.fromEmail,

@@ -35,6 +35,7 @@ class TicketRepository extends ITicketRepository {
       ticketData: data.ticketData,
       publicId: data.publicId,
       status: data.status,
+      checkedInCount: data.checkedInCount,
       usedAt: data.usedAt,
       verifiedBy: verifiedBy,
       createdAt: data.createdAt,

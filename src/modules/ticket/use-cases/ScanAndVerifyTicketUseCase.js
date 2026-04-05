@@ -111,8 +111,11 @@ class ScanAndVerifyTicketUseCase {
 
     // Get admission size from Event configuration
     let admissionSize = ticket.admissionSize || 1;
-    if (ticket.eventId && ticket.eventId.ticketTypes && ticket.ticketTypeId) {
-      const ticketTypeConfig = ticket.eventId.ticketTypes.id(ticket.ticketTypeId);
+    if (ticket.eventId && Array.isArray(ticket.eventId.ticketTypes) && ticket.ticketTypeId) {
+      const targetId = ticket.ticketTypeId.toString();
+      const ticketTypeConfig = ticket.eventId.ticketTypes.find(tt =>
+        (tt._id?.toString() || tt.id?.toString()) === targetId
+      );
       if (ticketTypeConfig) {
         admissionSize = ticketTypeConfig.admissionSize || 1;
       }

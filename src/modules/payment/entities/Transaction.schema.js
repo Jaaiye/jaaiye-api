@@ -6,7 +6,7 @@ const transactionSchema = new mongoose.Schema({
   transReference: { type: String }, // payment gateway generated
   amount: { type: Number, required: true }, // Grand total (base + fee)
   baseAmount: { type: Number, required: true }, // Ticket price * quantity
-  feeAmount: { type: Number, required: true }, // Platform fee (10%)
+  feeAmount: { type: Number, required: true }, // Platform fee (5%)
   gatewayFee: { type: Number, default: 0 }, // Fee charged by payment provider (e.g. Flutterwave)
   currency: { type: String, default: 'NGN' },
   status: { type: String, enum: ['pending', 'successful', 'failed', 'cancelled', 'completed', 'created'], default: 'created' },

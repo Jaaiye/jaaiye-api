@@ -423,7 +423,7 @@ function walletEventCreditedEmail({ eventTitle, grossAmount, feeAmount, netAmoun
         <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:500;">${formatCurrency(grossAmount)}</td>
       </tr>
       <tr>
-        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee (10%)</td>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee (5%)</td>
         <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(feeAmount)}</td>
       </tr>
       <tr>
@@ -452,7 +452,7 @@ function walletGroupCreditedEmail({ groupName, hangoutTitle, amount, feeAmount, 
         <td style="padding:6px 0;color:${TEXT};font-size:14px;font-weight:500;">${formatCurrency(amount)}</td>
       </tr>
       <tr>
-        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee (10%)</td>
+        <td style="padding:6px 0;color:${MUTED};font-size:14px;">Service fee (5%)</td>
         <td style="padding:6px 0;color:${TEXT};font-size:14px;">${formatCurrency(feeAmount)}</td>
       </tr>
       <tr>

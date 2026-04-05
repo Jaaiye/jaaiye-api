@@ -42,8 +42,10 @@ class WalletRefundService {
       throw new Error('Refund amount cannot exceed original transaction amount');
     }
 
-    // Calculate fee that was originally charged (10% of original amount)
-    const originalFee = originalAmount * 0.10;
+    // Calculate fee that was originally charged (5% of original amount if not stored)
+    const originalFee = Number(transactionEntity.feeAmount) !== undefined && transactionEntity.feeAmount !== null
+      ? Number(transactionEntity.feeAmount)
+      : originalAmount * 0.05;
     const originalNet = originalAmount - originalFee;
 
     // For refunds, we debit proportionally:

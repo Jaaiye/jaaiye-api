@@ -52,7 +52,7 @@ class AnalyticsService {
       return sum + revenue;
     }, 0);
 
-    // Calculate total platform fees collected (10%)
+    // Calculate total platform fees collected (5%)
     const totalFees = transactions.reduce((sum, t) => {
       return sum + (Number(t.feeAmount) || 0);
     }, 0);

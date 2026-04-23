@@ -85,8 +85,10 @@ class CreateGroupFromEventUseCase {
                 body: `You've been added to the group "${group.name}" created from event "${event.title || 'Event'}"`
               }, {
                 type: 'group_member_added',
+                groupName: group.name,
                 groupId: group.id,
-                eventId: resolvedEventId
+                eventId: resolvedEventId,
+                path: `chatScreen`
               });
             })
         );

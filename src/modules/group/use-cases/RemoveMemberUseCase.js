@@ -67,8 +67,11 @@ class RemoveMemberUseCase {
                 body: `You've been promoted to admin of the group "${group.name}" because the previous admin left.`
               }, {
                 type: 'group_member_added',
-                groupId: groupId,
-                role: 'admin'
+                role: 'admin',
+                groupName: group.name,
+                groupId: group.id,
+                eventId: group.eventId,
+                path: `chatScreen`
               });
             } catch (error) {
               console.error('[RemoveMember] Failed to handle admin promotion sync/notification:', error);

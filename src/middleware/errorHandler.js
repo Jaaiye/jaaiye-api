@@ -164,6 +164,11 @@ const errorHandler = (error, req, res, next) => {
   error.statusCode = error.statusCode || 500;
   error.status = error.status || 'error';
 
+  // Extract trace ID from ALS or headers
+  const als = require('../utils/als');
+  const store = als.getStore();
+  const traceId = store?.traceId || req.headers['x-trace-id'] || 'no-trace-id';
+
   // Minimal, sanitized request context
   const context = sanitizeLogData({
     method: req.method,
@@ -172,68 +177,58 @@ const errorHandler = (error, req, res, next) => {
     userId: req.user?.id || 'unauthenticated',
     statusCode: error.statusCode,
     errorName: error.name,
-    errorMessage: error.message
+    errorMessage: error.message,
+    traceId
   });
 
-  // Filter out high-volume, low-value errors to save log quota
-  const isHighVolumeError = error.statusCode === 404 || error.name === 'ValidationError' || error.name === 'NotFoundError';
-  const isSecurityError = error.statusCode === 401 || error.statusCode === 403;
-
-  // Log server errors (5xx) and security events (401/403). Skip the rest.
+  // Log all errors
   if (error.statusCode >= 500) {
-    logger.error('Server Error', { ...context, stack: error.stack });
-  } else if (isSecurityError) {
-    logger.warn('Security Event', context);
+    logger.error(`Server Error: ${error.message}`, { ...context, stack: error.stack });
+  } else {
+    // 4xx errors are logged as warnings
+    const isSecurityError = error.statusCode === 401 || error.statusCode === 403;
+    const logLevel = isSecurityError ? 'Security Event' : 'Client Error';
+    logger.warn(`${logLevel}: ${error.message}`, context);
   }
-  // 404s and Validation errors are now completely silent in logs
 
-  // Handle specific error types
+  // Handle specific error types and return standardized response
+  let status = error.statusCode;
+  let payload = {
+    success: false,
+    error: error.message,
+    traceId
+  };
+
   if (error.name === 'ValidationError') {
-    return res.status(400).json(handleValidationError(error));
+    status = 400;
+    payload = { ...handleValidationError(error), traceId };
+  } else if (error instanceof SyntaxError && error.message.includes('JSON')) {
+    status = 400;
+    payload.error = 'Invalid JSON in request body';
+  } else if (error.name === 'JsonWebTokenError') {
+    status = 401;
+    payload = { ...handleJWTError(error), traceId };
+  } else if (error.name === 'TokenExpiredError') {
+    status = 401;
+    payload = { ...handleJWTExpiredError(error), traceId };
+  } else if (error.code === 11000) {
+    status = 409;
+    payload = { ...handleDuplicateKeyError(error), traceId };
+  } else if (error.name === 'CastError') {
+    status = 400;
+    payload = { ...handleCastError(error), traceId };
+  } else if (error.name === 'NotFoundError' || error.statusCode === 404) {
+    status = 404;
+    payload.error = error.message || 'Resource not found';
+  } else if (error.isOperational) {
+    // Already has standard status and message
+  } else {
+    // Programming or unknown errors
+    status = 500;
+    payload = { ...handleDefaultError(error), traceId };
   }
 
-  // Handle SyntaxError (JSON parsing errors)
-  if (error instanceof SyntaxError && error.message.includes('JSON')) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid JSON in request body'
-    });
-  }
-
-  if (error.name === 'JsonWebTokenError') {
-    return res.status(401).json(handleJWTError(error));
-  }
-
-  if (error.name === 'TokenExpiredError') {
-    return res.status(401).json(handleJWTExpiredError(error));
-  }
-
-  if (error.code === 11000) {
-    return res.status(409).json(handleDuplicateKeyError(error));
-  }
-
-  if (error.name === 'CastError') {
-    return res.status(400).json(handleCastError(error));
-  }
-
-  // Handle NotFoundError specifically
-  if (error.name === 'NotFoundError' || error.statusCode === 404) {
-    return res.status(404).json({
-      success: false,
-      error: error.message || 'Resource not found'
-    });
-  }
-
-  // Handle operational errors
-  if (error.isOperational) {
-    return res.status(error.statusCode).json({
-      success: false,
-      error: error.message
-    });
-  }
-
-  // Handle programming or unknown errors
-  return res.status(500).json(handleDefaultError(error));
+  return res.status(status).json(payload);
 };
 
 module.exports = {

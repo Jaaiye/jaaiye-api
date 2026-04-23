@@ -103,8 +103,10 @@ class CreateGroupEventUseCase {
                 body: `A new event "${event.title}" has been created in group "${group.name}"`
               }, {
                 type: notificationType,
+                groupName: group.name,
                 groupId: group.id,
-                eventId: event.id
+                eventId: event.id,
+                path: `chatScreen`
               });
             })
         );

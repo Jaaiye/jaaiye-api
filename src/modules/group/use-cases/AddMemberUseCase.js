@@ -60,7 +60,10 @@ class AddMemberUseCase {
             body: `You've been added to the group "${group.name}"`
           }, {
             type: 'group_member_added',
-            groupId: group.id
+            groupName: group.name,
+            groupId: group.id,
+            eventId: group.eventId,
+            path: `chatScreen`
           });
         } catch (error) {
           console.error('Failed to send notification:', error);

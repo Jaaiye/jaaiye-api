@@ -184,7 +184,7 @@ app.get('/oauth/redirect', handleOAuthRedirect);
 app.get('/api/v1/calendars/google/oauth/callback', handleOAuthRedirect);
 
 // Apply API key validation to all other routes
-app.use(validateMobileApiKey);
+// app.use(validateMobileApiKey);
 
 // Guest Restriction Middleware
 const { restrictGuest } = require('./middleware/guestRestrictionMiddleware');
@@ -212,7 +212,9 @@ app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRo
 app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
 app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
 app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
+app.use('/api/v1/app-config', require('./modules/common/app-config.module').getAppConfigRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
+
 
 // 404 handler
 app.use((req, res, next) => {

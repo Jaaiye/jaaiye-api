@@ -24,8 +24,28 @@ class WalletController {
   }
 
   /**
-   * Get wallet details (balance + ledger entries)
-   * GET /api/v1/wallets/:ownerType/:ownerId
+   * @swagger
+   * /wallets/{ownerType}/{ownerId}:
+   *   get:
+   *     summary: Get wallet details
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: ownerType
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [EVENT, GROUP, PLATFORM]
+   *       - in: path
+   *         name: ownerId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Wallet details
    */
   getWalletDetails = asyncHandler(async (req, res) => {
     const { ownerType, ownerId } = req.params;
@@ -73,8 +93,28 @@ class WalletController {
   });
 
   /**
-   * Get wallet ledger entries only
-   * GET /api/v1/wallets/:ownerType/:ownerId/ledger
+   * @swagger
+   * /wallets/{ownerType}/{ownerId}/ledger:
+   *   get:
+   *     summary: Get wallet ledger
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: ownerType
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [EVENT, GROUP, PLATFORM]
+   *       - in: path
+   *         name: ownerId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Ledger entries
    */
   getWalletLedger = asyncHandler(async (req, res) => {
     const { ownerType, ownerId } = req.params;
@@ -130,8 +170,40 @@ class WalletController {
   });
 
   /**
-   * Adjust wallet balance (admin/superadmin only)
-   * POST /api/v1/admin/wallets/:ownerType/:ownerId/adjust
+   * @swagger
+   * /admin/wallets/{ownerType}/{ownerId}/adjust:
+   *   post:
+   *     summary: Adjust wallet balance (Admin)
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: ownerType
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [EVENT, GROUP, PLATFORM]
+   *       - in: path
+   *         name: ownerId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [amount, reason]
+   *             properties:
+   *               amount:
+   *                 type: number
+   *               reason:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Adjusted
    */
   adjustWalletBalance = asyncHandler(async (req, res) => {
     const { ownerType, ownerId } = req.params;
@@ -175,8 +247,40 @@ class WalletController {
   });
 
   /**
-   * Request withdrawal with payout
-   * POST /api/v1/wallets/:ownerType/:ownerId/withdraw
+   * @swagger
+   * /wallets/{ownerType}/{ownerId}/withdraw:
+   *   post:
+   *     summary: Request withdrawal
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: ownerType
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [EVENT, GROUP]
+   *       - in: path
+   *         name: ownerId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [amount]
+   *             properties:
+   *               amount:
+   *                 type: number
+   *               bankAccountId:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Withdrawal requested
    */
   requestWithdrawal = asyncHandler(async (req, res) => {
     const { ownerType, ownerId } = req.params;
@@ -218,8 +322,28 @@ class WalletController {
   });
 
   /**
-   * Get withdrawals for a wallet
-   * GET /api/v1/wallets/:ownerType/:ownerId/withdrawals
+   * @swagger
+   * /wallets/{ownerType}/{ownerId}/withdrawals:
+   *   get:
+   *     summary: Get wallet withdrawals
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: ownerType
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [EVENT, GROUP]
+   *       - in: path
+   *         name: ownerId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: List of withdrawals
    */
   getWalletWithdrawals = asyncHandler(async (req, res) => {
     const { ownerType, ownerId } = req.params;
@@ -280,8 +404,22 @@ class WalletController {
   });
 
   /**
-   * Get withdrawal details
-   * GET /api/v1/wallets/withdrawals/:withdrawalId
+   * @swagger
+   * /wallets/withdrawals/{withdrawalId}:
+   *   get:
+   *     summary: Get withdrawal detail
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: withdrawalId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Withdrawal details
    */
   getWithdrawalDetails = asyncHandler(async (req, res) => {
     const { withdrawalId } = req.params;

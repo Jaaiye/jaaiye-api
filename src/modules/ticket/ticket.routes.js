@@ -29,6 +29,7 @@ class TicketRoutes {
     // Ticket management routes
     router.post('/', protect, admin, ...createTicketValidator, validate, this.ticketController.createTicket);
     router.get('/my-tickets', protect, this.ticketController.getMyTickets);
+    router.get('/my', protect, this.ticketController.getMyTickets);
     router.get('/active', protect, this.ticketController.getActiveTickets);
     router.get('/event/:eventId', protect, admin, ...getEventTicketsValidator, validate, this.ticketController.getEventTickets);
     router.get('/public/:publicId', protect, scanner, ...getTicketByPublicIdValidator, validate, this.ticketController.getTicketByPublicId);

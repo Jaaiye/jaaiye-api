@@ -83,22 +83,25 @@ class CreateGroupEventUseCase {
     // Add event to group
     await this.groupRepository.addEvent(groupId, event.id);
 
-    // Send notifications (non-blocking)
+    // Send notifications & WebSockets (non-blocking)
     setImmediate(async () => {
       try {
+        const { sendToUser, sendToGroup } = require('../../../utils/socket');
+
         await Promise.all(
           group.members
             .filter(member => {
               const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
               return memberUserId.toString() !== userId.toString();
             })
-            .map(member => {
-              const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
+            .map(async (member) => {
+              const memberUserId = (typeof member.user === 'object' ? member.user.id || member.user._id : member.user).toString();
               const notificationType = participationMode === 'auto_add'
-                ? 'group_event_auto_added'
-                : 'group_event_invitation';
+                ? 'GROUP_EVENT_AUTO_ADDED'
+                : 'GROUP_EVENT_INVITATION';
 
-              return this.notificationAdapter.send(memberUserId, {
+              // 1. Push Notification
+              await this.notificationAdapter.send(memberUserId, {
                 title: 'New Group Event',
                 body: `A new event "${event.title}" has been created in group "${group.name}"`
               }, {
@@ -106,12 +109,32 @@ class CreateGroupEventUseCase {
                 groupName: group.name,
                 groupId: group.id,
                 eventId: event.id,
+                count: group.members.length,
+                path: `chatScreen`
+              });
+
+              // 2. WebSocket Notification (Personal)
+              sendToUser(memberUserId, 'GROUP_EVENT_CREATED', {
+                groupId: group.id,
+                groupName: group.name,
+                eventId: event.id,
+                eventTitle: event.title,
+                type: notificationType,
                 path: `chatScreen`
               });
             })
         );
+
+        // 3. WebSocket Notification (Group-wide room)
+        sendToGroup(groupId, 'GROUP_EVENT_CREATED', {
+          groupId,
+          eventId: event.id,
+          eventTitle: event.title,
+          createdBy: userId
+        });
+
       } catch (error) {
-        console.error('Failed to send notifications:', error);
+        console.error('CreateGroupEvent background notifications error:', error);
       }
     });
 

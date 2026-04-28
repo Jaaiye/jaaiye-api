@@ -90,6 +90,22 @@ class UpdateEventUseCase {
       console.warn('Google calendar sync failed during event update', error);
     }
 
+    // WebSocket: Notify anyone currently viewing this event
+    try {
+      const { sendToGroup } = require('../../../utils/socket');
+      sendToGroup(updatedEvent.id, 'EVENT_UPDATED', {
+        eventId: updatedEvent.id,
+        title: updatedEvent.title,
+        venue: updatedEvent.venue,
+        startTime: updatedEvent.startTime,
+        endTime: updatedEvent.endTime,
+        status: updatedEvent.status,
+        image: updatedEvent.image
+      });
+    } catch (err) {
+      console.error('WebSocket Event Update Error:', err);
+    }
+
     return updatedEvent.toJSON();
   }
 }

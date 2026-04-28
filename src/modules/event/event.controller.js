@@ -55,6 +55,43 @@ class EventController {
     this.resendEventTicketsUseCase = resendEventTicketsUseCase;
   }
 
+  /**
+   * @swagger
+   * /events:
+   *   post:
+   *     summary: Create a new event
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         multipart/form-data:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               title:
+   *                 type: string
+   *               description:
+   *                 type: string
+   *               date:
+   *                 type: string
+   *                 format: date-time
+   *               location:
+   *                 type: string
+   *               category:
+   *                 type: string
+   *               ticketTypes:
+   *                 type: string
+   *                 description: JSON string of ticket types
+   *               image:
+   *                 type: string
+   *                 format: binary
+   *                 description: Event banner image
+   *     responses:
+   *       201:
+   *         description: Event created successfully
+   */
   createEvent = asyncHandler(async (req, res) => {
     const { CreateEventDTO } = require('./dto');
 
@@ -74,12 +111,46 @@ class EventController {
     return successResponse(res, result, 201, 'Event created successfully');
   });
 
+  /**
+   * @swagger
+   * /events/{id}:
+   *   get:
+   *     summary: Get event details
+   *     tags: [Events]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Event details
+   */
   getEvent = asyncHandler(async (req, res) => {
     const result = await this.getEventUseCase.execute(req.params.id, req.user?.id);
 
     return successResponse(res, { event: result });
   });
 
+  /**
+   * @swagger
+   * /events/{id}:
+   *   put:
+   *     summary: Update event
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Event updated
+   */
   updateEvent = asyncHandler(async (req, res) => {
     const { UpdateEventDTO } = require('./dto');
     const dto = new UpdateEventDTO(req.body);
@@ -88,12 +159,54 @@ class EventController {
     return successResponse(res, { event: result }, 200, 'Event updated successfully');
   });
 
+  /**
+   * @swagger
+   * /events:
+   *   delete:
+   *     summary: Delete event
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [id]
+   *             properties:
+   *               id:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Event deleted
+   */
   deleteEvent = asyncHandler(async (req, res) => {
     const result = await this.deleteEventUseCase.execute(req.body.id, req.user.id);
 
     return successResponse(res, null, 200, 'Event deleted successfully');
   });
 
+  /**
+   * @swagger
+   * /events:
+   *   get:
+   *     summary: List events
+   *     tags: [Events]
+   *     parameters:
+   *       - in: query
+   *         name: scope
+   *         schema:
+   *           type: string
+   *           enum: [public, mine, creator]
+   *       - in: query
+   *         name: category
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: List of events
+   */
   listEvents = asyncHandler(async (req, res) => {
     const { ListEventsDTO } = require('./dto');
     const dto = new ListEventsDTO(req.query);
@@ -233,6 +346,24 @@ class EventController {
     return successResponse(res, { event: updatedEvent }, 200, 'Event image updated successfully');
   });
 
+  /**
+   * @swagger
+   * /events/{id}/publish:
+   *   post:
+   *     summary: Publish event
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Event published
+   */
   publishEvent = asyncHandler(async (req, res) => {
     const result = await this.publishEventUseCase.execute(req.params.id, req.user.id);
     return successResponse(res, { event: result }, 200, 'Event published successfully');
@@ -243,6 +374,24 @@ class EventController {
     return successResponse(res, { event: result }, 200, 'Event unpublished successfully');
   });
 
+  /**
+   * @swagger
+   * /events/{id}/cancel:
+   *   post:
+   *     summary: Cancel event
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Event cancelled
+   */
   cancelEvent = asyncHandler(async (req, res) => {
     const reason = req.body.reason || 'Event cancelled by organizer';
     const result = await this.cancelEventUseCase.execute(req.params.id, req.user.id, reason);
@@ -255,6 +404,24 @@ class EventController {
     return successResponse(res, { teamMember: result }, 201, 'Team member added successfully');
   });
 
+  /**
+   * @swagger
+   * /events/{id}/team:
+   *   get:
+   *     summary: Get event team
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: List of team members
+   */
   getTeam = asyncHandler(async (req, res) => {
     const result = await this.getEventTeamUseCase.execute(req.params.id);
     return successResponse(res, result);
@@ -288,6 +455,24 @@ class EventController {
   });
 
   // Analytics
+  /**
+   * @swagger
+   * /events/{id}/analytics:
+   *   get:
+   *     summary: Get event analytics
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Event analytics
+   */
   getAnalytics = asyncHandler(async (req, res) => {
     const { startDate, endDate, groupBy } = req.query;
     const result = await this.getEventAnalyticsUseCase.execute(req.params.id, req.user.id, {
@@ -299,6 +484,38 @@ class EventController {
   });
 
   // Issue ticket (for event creators/co-organizers)
+  /**
+   * @swagger
+   * /events/{id}/tickets/issue:
+   *   post:
+   *     summary: Issue tickets manually
+   *     tags: [Events]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [userId, ticketTypeId, quantity]
+   *             properties:
+   *               userId:
+   *                 type: string
+   *               ticketTypeId:
+   *                 type: string
+   *               quantity:
+   *                 type: number
+   *     responses:
+   *       201:
+   *         description: Tickets issued
+   */
   issueTicket = asyncHandler(async (req, res) => {
     console.log('[EventController] issueTicket called', {
       eventId: req.params.id,

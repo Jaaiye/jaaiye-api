@@ -93,26 +93,40 @@ class CreateGroupUseCase {
       }
     });
 
-    // Send notifications (non-blocking)
+    // Send notifications & WebSockets (non-blocking)
     if (dto.memberIds.length > 0) {
       setImmediate(async () => {
         try {
+          const { sendToUser } = require('../../../utils/socket');
+
           await Promise.all(
-            dto.memberIds.map(memberId =>
-              this.notificationAdapter.send(memberId, {
+            dto.memberIds.map(async (memberId) => {
+              // 1. Push Notification
+              await this.notificationAdapter.send(memberId, {
                 title: 'Added to Group',
                 body: `You've been added to the group "${group.name}"`
               }, {
-                type: 'group_member_added',
+                type: 'GROUP_MEMBER_ADDED',
                 groupName: group.name,
                 groupId: group.id,
                 eventId: group.eventId,
+                count: populatedGroup.members.length,
                 path: `chatScreen`
-              })
-            )
+              });
+
+              // 2. WebSocket Notification
+              sendToUser(memberId, 'GROUP_MEMBER_ADDED', {
+                groupId: group.id,
+                groupName: group.name,
+                eventId: group.eventId,
+                userId: memberId,
+                count: populatedGroup.members.length,
+                path: `chatScreen`
+              });
+            })
           );
         } catch (error) {
-          console.error('Failed to send notifications:', error);
+          console.error('CreateGroup background notifications error:', error);
         }
       });
     }

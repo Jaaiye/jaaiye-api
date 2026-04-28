@@ -28,6 +28,32 @@ class TicketController {
     scanAndVerifyTicketUseCase,
     cancelTicketUseCase
   }) {
+    /**
+     * @swagger
+     * /tickets:
+     *   post:
+     *     summary: Create a ticket
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [eventId]
+     *             properties:
+     *               eventId:
+     *                 type: string
+     *               ticketTypeId:
+     *                 type: string
+     *               quantity:
+     *                 type: number
+     *     responses:
+     *       201:
+     *         description: Ticket created
+     */
     this.createTicket = asyncHandler(async (req, res) => {
       const dto = new CreateTicketDTO(req.body);
       const ticket = await createTicketUseCase.execute(dto);
@@ -48,24 +74,84 @@ class TicketController {
       }, 201, 'Ticket created successfully');
     });
 
+    /**
+     * @swagger
+     * /tickets/my:
+     *   get:
+     *     summary: Get my tickets
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: List of tickets
+     */
     this.getMyTickets = asyncHandler(async (req, res) => {
       const userId = req.user._id || req.user.id;
       const result = await getMyTicketsUseCase.execute(userId);
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /tickets/active:
+     *   get:
+     *     summary: Get active tickets
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: List of active tickets
+     */
     this.getActiveTickets = asyncHandler(async (req, res) => {
       const userId = req.user._id || req.user.id;
       const result = await getActiveTicketsUseCase.execute(userId);
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /tickets/event/{eventId}:
+     *   get:
+     *     summary: Get tickets for an event
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: eventId
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: List of tickets
+     */
     this.getEventTickets = asyncHandler(async (req, res) => {
       const { eventId } = req.params;
       const result = await getEventTicketsUseCase.execute(eventId);
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /tickets/{ticketId}:
+     *   get:
+     *     summary: Get specific ticket details
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: ticketId
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: Ticket details
+     */
     this.getTicketById = asyncHandler(async (req, res) => {
       const { ticketId } = req.params;
       const userId = req.user._id || req.user.id;
@@ -86,6 +172,30 @@ class TicketController {
      * Accepts either token or publicId in request body
      * Automatically detects type and verifies/marks ticket as used
      */
+    /**
+     * @swagger
+     * /tickets/scan:
+     *   post:
+     *     summary: Scan and verify ticket
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [identifier]
+     *             properties:
+     *               identifier:
+     *                 type: string
+     *               eventId:
+     *                 type: string
+     *     responses:
+     *       200:
+     *         description: Ticket verified
+     */
     this.scanAndVerify = asyncHandler(async (req, res) => {
       const { identifier, eventId } = req.body;
       const userId = req.user._id || req.user.id;
@@ -105,6 +215,28 @@ class TicketController {
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /tickets/cancel:
+     *   patch:
+     *     summary: Cancel a ticket
+     *     tags: [Tickets]
+     *     security:
+     *       - bearerAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [ticketId]
+     *             properties:
+     *               ticketId:
+     *                 type: string
+     *     responses:
+     *       200:
+     *         description: Ticket cancelled
+     */
     this.cancelTicket = asyncHandler(async (req, res) => {
       const { ticketId } = req.body;
       const userId = req.user._id || req.user.id;

@@ -63,6 +63,20 @@ class SendFriendRequestUseCase {
         requestId: friendRequest.id,
         path: 'friendRequestsScreen'
       }).catch(err => console.error('Failed to send notification:', err));
+
+      // WebSocket: Notify recipient so they see the request "pop up" or a red dot instantly
+      try {
+        const { sendToUser } = require('../../../utils/socket');
+        sendToUser(recipientId, 'FRIEND_REQUEST_RECEIVED', {
+          requestId: friendRequest.id,
+          requesterId: requesterId,
+          requesterName: requester.username || requester.fullName,
+          requesterAvatar: requester.profilePicture || '',
+          type: 'FRIEND_REQUEST_RECEIVED'
+        });
+      } catch (err) {
+        console.error('WebSocket Friendship Request Error:', err);
+      }
     }
 
     return { requestId: friendRequest.id };

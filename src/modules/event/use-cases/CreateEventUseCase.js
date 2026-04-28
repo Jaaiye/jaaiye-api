@@ -313,20 +313,45 @@ class CreateEventUseCase {
             }
           });
 
+          const { sendToUser, broadcast } = require('../../../utils/socket');
+
           await Promise.all(
-            uniqueParticipantsToNotify.map(participant => {
+            uniqueParticipantsToNotify.map(async (participant) => {
               const participantUserId = participant.user?.toString ? participant.user.toString() : String(participant.user);
-              return this.notificationAdapter.send(participantUserId, {
+
+              // 1. Push Notification
+              await this.notificationAdapter.send(participantUserId, {
                 title: 'Hangout Invitation',
                 body: `You have been invited to the hangout "${event.title}"`
               }, {
-                type: 'hangout_invitation',
+                type: 'HANGOUT_INVITATION',
                 eventId: event.id,
                 slug: eventSlug,
                 path: `hangoutScreen/${eventSlug}`
               });
+
+              // 2. WebSocket Notification
+              sendToUser(participantUserId, 'HANGOUT_INVITATION', {
+                eventId: event.id,
+                title: event.title,
+                slug: eventSlug,
+                type: 'HANGOUT_INVITATION'
+              });
             })
           );
+
+          // 3. Broadcast for Public Events (Discovery)
+          if (event.category === 'event' && event.status === 'published') {
+            broadcast('EVENT_CREATED', {
+              eventId: event.id,
+              title: event.title,
+              category: event.category,
+              startTime: event.startTime,
+              venue: event.venue,
+              image: event.image,
+              slug: eventSlug
+            });
+          }
 
           // Sync event to participants' calendars (Jaaiye + Google) - non-blocking
           if (this.calendarSyncService) {

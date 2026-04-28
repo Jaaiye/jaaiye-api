@@ -37,6 +37,18 @@ class PaymentController {
     getMyTransactionsUseCase,
     listTransactionsUseCase
   }) {
+    /**
+     * @swagger
+     * /payments/paystack/init:
+     *   post:
+     *     summary: Initialize Paystack payment
+     *     tags: [Payments]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: Payment initialized
+     */
     this.initializePaystack = asyncHandler(async (req, res) => {
       const userId = req.user && req.user._id ? req.user._id : req.body.userId;
       const dto = new InitializePaymentDTO({
@@ -47,6 +59,18 @@ class PaymentController {
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /payments/flutterwave/init:
+     *   post:
+     *     summary: Initialize Flutterwave payment
+     *     tags: [Payments]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: Payment initialized
+     */
     this.initializeFlutterwave = asyncHandler(async (req, res) => {
       const userId = req.user && req.user._id ? req.user._id : req.body.userId;
       const idempotencyKey = req.headers['x-idempotency-key'] || req.headers['X-Idempotency-Key'];
@@ -58,12 +82,52 @@ class PaymentController {
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /payments/paystack/verify:
+     *   post:
+     *     summary: Verify Paystack payment
+     *     tags: [Payments]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [reference]
+     *             properties:
+     *               reference:
+     *                 type: string
+     *     responses:
+     *       200:
+     *         description: Verification complete
+     */
     this.verifyPaystack = asyncHandler(async (req, res) => {
       const { reference } = req.body;
       const result = await verifyPaystackPaymentUseCase.execute(reference);
       return res.status(200).json({ result });
     });
 
+    /**
+     * @swagger
+     * /payments/flutterwave/verify:
+     *   post:
+     *     summary: Verify Flutterwave payment
+     *     tags: [Payments]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [reference]
+     *             properties:
+     *               reference:
+     *                 type: string
+     *     responses:
+     *       200:
+     *         description: Verification complete
+     */
     this.verifyFlutterwave = asyncHandler(async (req, res) => {
       const { reference } = req.body;
       const result = await verifyFlutterwavePaymentUseCase.execute(reference);
@@ -106,6 +170,33 @@ class PaymentController {
       })();
     });
 
+    /**
+     * @swagger
+     * /payments/register:
+     *   post:
+     *     summary: Register transaction
+     *     tags: [Payments]
+     *     security:
+     *       - bearerAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [reference, amount, provider]
+     *             properties:
+     *               reference:
+     *                 type: string
+     *               amount:
+     *                 type: number
+     *               provider:
+     *                 type: string
+     *                 enum: [paystack, flutterwave]
+     *     responses:
+     *       201:
+     *         description: Transaction registered
+     */
     this.registerTransaction = asyncHandler(async (req, res) => {
       const userId = req.user && req.user._id ? req.user._id : req.body.userId;
       if (!userId) {
@@ -123,12 +214,36 @@ class PaymentController {
       });
     });
 
+    /**
+     * @swagger
+     * /payments/update:
+     *   put:
+     *     summary: Update transaction
+     *     tags: [Payments]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: Transaction updated
+     */
     this.updateTransaction = asyncHandler(async (req, res) => {
       const dto = new UpdateTransactionDTO(req.body);
       const result = await updateTransactionUseCase.execute(dto);
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /transactions/my:
+     *   get:
+     *     summary: Get my transactions
+     *     tags: [Payments]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: List of transactions
+     */
     this.getMyTransactions = asyncHandler(async (req, res) => {
       const userId = req.user._id || req.user.id;
       const result = await getMyTransactionsUseCase.execute(userId);

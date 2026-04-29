@@ -328,7 +328,7 @@ class CreateEventUseCase {
                 type: 'HANGOUT_INVITATION',
                 eventId: event.id,
                 slug: eventSlug,
-                path: `hangoutScreen/${eventSlug}`
+                path: `hangoutPreviewScreen`
               });
 
               // 2. WebSocket Notification

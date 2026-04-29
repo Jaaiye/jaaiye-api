@@ -6,11 +6,12 @@
 const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
 
 class GetEventUseCase {
-  constructor({ eventRepository, calendarRepository, eventTeamRepository, userRepository }) {
+  constructor({ eventRepository, calendarRepository, eventTeamRepository, userRepository, groupRepository }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
     this.eventTeamRepository = eventTeamRepository;
     this.userRepository = userRepository;
+    this.groupRepository = groupRepository;
   }
 
   async execute(eventId, userId) {
@@ -98,6 +99,14 @@ class GetEventUseCase {
         throw new EventAccessDeniedError();
       }
       eventData.isScanner = false;
+    }
+
+    // Include groupId for hangouts (inverse lookup)
+    if (event.category === 'hangout') {
+      const group = await this.groupRepository.findByEvent(event.id);
+      if (group) {
+        eventData.groupId = group.id;
+      }
     }
 
     // Add URL for creators and co-organizers

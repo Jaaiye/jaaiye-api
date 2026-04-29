@@ -203,7 +203,8 @@ class EventModule {
         eventRepository: this.getEventRepository(),
         calendarRepository: this.getCalendarRepository(),
         eventTeamRepository: this.getEventTeamRepository(),
-        userRepository: this.getUserRepository()
+        userRepository: this.getUserRepository(),
+        groupRepository: this.getGroupRepository()
       });
     }
     return this._instances.getEventUseCase;

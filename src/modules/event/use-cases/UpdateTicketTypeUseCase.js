@@ -86,7 +86,7 @@ class UpdateTicketTypeUseCase {
     if (updateData.salesEndDate !== undefined) updateObj.salesEndDate = updateData.salesEndDate ? new Date(updateData.salesEndDate) : null;
     if (updateData.type !== undefined) updateObj.type = updateData.type;
     if (updateData.quantityLimit !== undefined) updateObj.quantityLimit = updateData.quantityLimit === null || updateData.quantityLimit === '' ? null : Number(updateData.quantityLimit);
-    if (updateData.admissionSize !== undefined) updateObj.admissionSize = Number(updateData.admissionSize);
+    if (updateData.admissionSize !== undefined) updateObj.admissionSize = Math.max(1, Number(updateData.admissionSize));
 
     // Update ticket type
     await eventDoc.updateTicketType(ticketTypeId, updateObj);

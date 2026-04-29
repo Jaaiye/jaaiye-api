@@ -282,7 +282,7 @@ class EventController {
       name: req.body.name,
       description: req.body.description,
       price: Number(req.body.price || 0),
-      admissionSize: Number(req.body.admissionSize || 0),
+      admissionSize: Math.max(1, Number(req.body.admissionSize || 1)),
       capacity: req.body.capacity !== undefined && req.body.capacity !== null && req.body.capacity !== '' ? Number(req.body.capacity) : null,
       quantityLimit: req.body.quantityLimit !== undefined && req.body.quantityLimit !== null && req.body.quantityLimit !== '' ? Number(req.body.quantityLimit) : null,
       isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,

@@ -103,6 +103,8 @@ const allowedOrigins = [
   'https://logs.jaaiye.com',
   'http://localhost:3005',
   'https://immodest-courthouse.outray.app',
+  'https://api.jaaiye.com',
+  'https://dev.jaaiye.com',
 ].filter(Boolean);
 
 const corsOptions = {

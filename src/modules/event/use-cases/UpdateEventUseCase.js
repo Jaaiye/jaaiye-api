@@ -92,8 +92,8 @@ class UpdateEventUseCase {
 
     // WebSocket: Notify anyone currently viewing this event
     try {
-      const { sendToGroup } = require('../../../utils/socket');
-      sendToGroup(updatedEvent.id, 'EVENT_UPDATED', {
+      const { sendToEvent } = require('../../../utils/socket');
+      sendToEvent(updatedEvent.id, 'EVENT_UPDATED', {
         eventId: updatedEvent.id,
         title: updatedEvent.title,
         venue: updatedEvent.venue,

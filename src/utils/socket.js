@@ -44,23 +44,27 @@ function initSocket(server) {
         logger.info(`User ${userId} authenticated and connected via Socket.io from ${ip}`);
 
         socket.on('join_group', (groupId) => {
-            socket.join(`group_${groupId}`);
-            logger.debug(`User ${userId} joined group room: group_${groupId}`);
+            const id = (groupId && typeof groupId === 'object') ? (groupId.id || groupId._id || groupId).toString() : String(groupId);
+            socket.join(`group_${id}`);
+            logger.debug(`User ${userId} joined group room: group_${id}`);
         });
 
         socket.on('leave_group', (groupId) => {
-            socket.leave(`group_${groupId}`);
-            logger.debug(`User ${userId} left group room: group_${groupId}`);
+            const id = (groupId && typeof groupId === 'object') ? (groupId.id || groupId._id || groupId).toString() : String(groupId);
+            socket.leave(`group_${id}`);
+            logger.debug(`User ${userId} left group room: group_${id}`);
         });
 
         socket.on('join_event', (eventId) => {
-            socket.join(`event_${eventId}`);
-            logger.debug(`User ${userId} joined event room: event_${eventId}`);
+            const id = (eventId && typeof eventId === 'object') ? (eventId.id || eventId._id || eventId).toString() : String(eventId);
+            socket.join(`event_${id}`);
+            logger.debug(`User ${userId} joined event room: event_${id}`);
         });
 
         socket.on('leave_event', (eventId) => {
-            socket.leave(`event_${eventId}`);
-            logger.debug(`User ${userId} left event room: event_${eventId}`);
+            const id = (eventId && typeof eventId === 'object') ? (eventId.id || eventId._id || eventId).toString() : String(eventId);
+            socket.leave(`event_${id}`);
+            logger.debug(`User ${userId} left event room: event_${id}`);
         });
 
         socket.on('disconnect', () => {
@@ -86,15 +90,25 @@ function initSocket(server) {
 }
 
 /**
+ * Send message to a specific room
+ * @param {string} room - Target room name
+ * @param {string} event - Event name
+ * @param {Object} data - Data to send
+ */
+function sendToRoom(room, event, data) {
+    if (!io) return;
+    logger.info(`[WS] Emitting ${event} to room ${room}`, { event, room });
+    io.to(room).emit(event, data);
+}
+
+/**
  * Send message to a specific user
  * @param {string} userId - Target user ID
  * @param {string} event - Event name
  * @param {Object} data - Data to send
  */
 function sendToUser(userId, event, data) {
-    if (!io) return;
-    logger.info(`[WS] Emitting ${event} to user ${userId}`, { event, userId });
-    io.to(userId).emit(event, data);
+    sendToRoom(String(userId), event, data);
 }
 
 /**
@@ -104,9 +118,17 @@ function sendToUser(userId, event, data) {
  * @param {Object} data - Data to send
  */
 function sendToGroup(groupId, event, data) {
-    if (!io) return;
-    logger.info(`[WS] Emitting ${event} to group ${groupId}`, { event, groupId });
-    io.to(`group_${groupId}`).emit(event, data);
+    sendToRoom(`group_${groupId}`, event, data);
+}
+
+/**
+ * Send message to a specific event room
+ * @param {string} eventId - Target event ID
+ * @param {string} event - Event name
+ * @param {Object} data - Data to send
+ */
+function sendToEvent(eventId, event, data) {
+    sendToRoom(`event_${eventId}`, event, data);
 }
 
 /**
@@ -131,6 +153,8 @@ module.exports = {
     initSocket,
     sendToUser,
     sendToGroup,
+    sendToEvent,
+    sendToRoom,
     broadcast,
     getIo
 };

@@ -340,19 +340,6 @@ class CreateEventUseCase {
             })
           );
 
-          // 3. Broadcast for Public Events (Discovery)
-          if (event.category === 'event' && event.status === 'published') {
-            broadcast('EVENT_CREATED', {
-              eventId: event.id,
-              title: event.title,
-              category: event.category,
-              startTime: event.startTime,
-              venue: event.venue,
-              image: event.image,
-              slug: eventSlug
-            });
-          }
-
           // Sync event to participants' calendars (Jaaiye + Google) - non-blocking
           if (this.calendarSyncService) {
             const participantUserIds = createdParticipants.map(p =>
@@ -555,15 +542,38 @@ class CreateEventUseCase {
           }
         }
       }
-    }
 
-    return {
-      event: event.toJSON(),
-      calendar: calendar.toObject ? calendar.toObject() : calendar,
-      participants
-    };
+      // Broadcast new public events to all users (Discovery Feed)
+      setImmediate(async () => {
+        try {
+          if (event.category === 'event' && event.status === 'published') {
+            const { broadcast } = require('../../../utils/socket');
+            // Fetch event again to get slug if it was missing
+            const eventWithSlug = await this.eventRepository.findById(event.id);
+
+            broadcast('EVENT_CREATED', {
+              eventId: event.id,
+              title: event.title,
+              category: event.category,
+              startTime: event.startTime,
+              venue: event.venue,
+              image: event.image,
+              slug: eventWithSlug?.slug || event.id,
+              origin: event.origin
+            });
+          }
+        } catch (err) {
+          console.error('[CreateEvent] Discovery broadcast error:', err);
+        }
+      });
+
+      return {
+        event: event.toJSON(),
+        calendar: calendar.toObject ? calendar.toObject() : calendar,
+        participants
+      };
+    }
   }
-}
 
 module.exports = CreateEventUseCase;
 

@@ -5,6 +5,7 @@
 
 const { ValidationError, NotFoundError } = require('../../common/errors');
 const { EventNotFoundError } = require('../errors');
+const logger = require('../../../utils/logger');
 
 class CreateEventUseCase {
   constructor({
@@ -542,38 +543,41 @@ class CreateEventUseCase {
           }
         }
       }
-
-      // Broadcast new public events to all users (Discovery Feed)
-      setImmediate(async () => {
-        try {
-          if (event.category === 'event' && event.status === 'published') {
-            const { broadcast } = require('../../../utils/socket');
-            // Fetch event again to get slug if it was missing
-            const eventWithSlug = await this.eventRepository.findById(event.id);
-
-            broadcast('EVENT_CREATED', {
-              eventId: event.id,
-              title: event.title,
-              category: event.category,
-              startTime: event.startTime,
-              venue: event.venue,
-              image: event.image,
-              slug: eventWithSlug?.slug || event.id,
-              origin: event.origin
-            });
-          }
-        } catch (err) {
-          console.error('[CreateEvent] Discovery broadcast error:', err);
-        }
-      });
-
-      return {
-        event: event.toJSON(),
-        calendar: calendar.toObject ? calendar.toObject() : calendar,
-        participants
-      };
     }
+
+    // Broadcast new public events to all users (Discovery Feed)
+    setImmediate(async () => {
+      try {
+        const { broadcast } = require('../../../utils/socket');
+
+        if (event.category === 'event' && event.status === 'published') {
+          // Fetch event again to get slug if it was missing (slug is generated in pre-save)
+          const eventWithSlug = await this.eventRepository.findById(event.id);
+
+          broadcast('EVENT_CREATED', {
+            eventId: event.id,
+            title: event.title,
+            category: event.category,
+            startTime: event.startTime,
+            venue: event.venue,
+            image: event.image,
+            slug: eventWithSlug?.slug || event.id,
+            origin: event.origin
+          });
+        } else {
+          logger.debug(`[CreateEvent] Skipping broad discovery broadcast. Category: ${event.category}, Status: ${event.status}`);
+        }
+      } catch (err) {
+        console.error('[CreateEvent] Discovery broadcast error:', err);
+      }
+    });
+
+    return {
+      event: event.toJSON(),
+      calendar: calendar.toObject ? calendar.toObject() : calendar,
+      participants
+    };
   }
+}
 
 module.exports = CreateEventUseCase;
-

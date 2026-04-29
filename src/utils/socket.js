@@ -93,6 +93,7 @@ function initSocket(server) {
  */
 function sendToUser(userId, event, data) {
     if (!io) return;
+    logger.info(`[WS] Emitting ${event} to user ${userId}`, { event, userId });
     io.to(userId).emit(event, data);
 }
 
@@ -104,6 +105,7 @@ function sendToUser(userId, event, data) {
  */
 function sendToGroup(groupId, event, data) {
     if (!io) return;
+    logger.info(`[WS] Emitting ${event} to group ${groupId}`, { event, groupId });
     io.to(`group_${groupId}`).emit(event, data);
 }
 
@@ -114,6 +116,7 @@ function sendToGroup(groupId, event, data) {
  */
 function broadcast(event, data) {
     if (!io) return;
+    logger.info(`[WS] Broadcasting ${event} to all users`, { event });
     io.emit(event, data);
 }
 

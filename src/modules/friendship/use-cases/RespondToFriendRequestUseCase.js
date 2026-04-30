@@ -66,6 +66,20 @@ class RespondToFriendRequestUseCase {
           friendshipId: friendship.id,
           path: 'friendRequestsScreen'
         }).catch(err => console.error('Failed to send notification:', err));
+
+        // WebSocket: Notify the original requester so the new friend pops up in their list
+        try {
+          const { sendToUser } = require('../../../utils/socket');
+          sendToUser(friendRequest.requester, 'FRIEND_REQUEST_ACCEPTED', {
+            friendId: userId,
+            friendName: recipient.username || recipient.fullName,
+            friendAvatar: recipient.profilePicture || '',
+            friendshipId: friendship.id,
+            type: 'FRIEND_REQUEST_ACCEPTED'
+          });
+        } catch (err) {
+          console.error('WebSocket Friendship Error:', err);
+        }
       }
 
       return { friendshipId: friendship.id };

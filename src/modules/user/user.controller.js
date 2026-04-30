@@ -38,8 +38,16 @@ class UserController {
   }
 
   /**
-   * Get Firebase token
-   * GET /api/v1/users/firebase-token
+   * @swagger
+   * /users/firebase-token:
+   *   get:
+   *     summary: Get Firebase token
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: successful operation
    */
   getFirebaseToken = asyncHandler(async (req, res) => {
     const result = await this.getFirebaseTokenUseCase.execute(req.user.id);
@@ -47,8 +55,19 @@ class UserController {
   });
 
   /**
-   * Get list of banks (for dropdown)
-   * GET /api/v1/users/banks
+   * @swagger
+   * /users/banks:
+   *   get:
+   *     summary: Get list of banks
+   *     tags: [Users]
+   *     parameters:
+   *       - in: query
+   *         name: country
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: List of banks
    */
   getBanks = asyncHandler(async (req, res) => {
     const country = req.query.country || 'NG'; // Default to Nigeria
@@ -57,8 +76,29 @@ class UserController {
   });
 
   /**
-   * Add and verify bank account for withdrawals
-   * POST /api/v1/users/bank-accounts
+   * @swagger
+   * /users/bank-accounts:
+   *   post:
+   *     summary: Add and verify bank account
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               bankCode:
+   *                 type: string
+   *               bankName:
+   *                 type: string
+   *               accountNumber:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Bank account added
    */
   addBankAccount = asyncHandler(async (req, res) => {
     const { bankCode, bankName, accountNumber } = req.body;
@@ -71,8 +111,26 @@ class UserController {
   });
 
   /**
-   * Set default bank account
-   * POST /api/v1/users/bank-accounts/default
+   * @swagger
+   * /users/bank-accounts/default:
+   *   post:
+   *     summary: Set default bank account
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [bankAccountId]
+   *             properties:
+   *               bankAccountId:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Default set
    */
   setDefaultBankAccount = asyncHandler(async (req, res) => {
     const { bankAccountId } = req.body;
@@ -81,8 +139,16 @@ class UserController {
   });
 
   /**
-   * Get user's withdrawals
-   * GET /api/v1/users/withdrawals
+   * @swagger
+   * /users/withdrawals:
+   *   get:
+   *     summary: Get user withdrawals
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: List of withdrawals
    */
   getUserWithdrawals = asyncHandler(async (req, res) => {
     if (!this.getWithdrawalsUseCase) {
@@ -106,8 +172,28 @@ class UserController {
   });
 
   /**
-   * Get current user profile
-   * GET /api/v1/users/profile
+   * @swagger
+   * /users/profile:
+   *   get:
+   *     summary: Get current user profile
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: User profile
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     user:
+   *                       $ref: '#/components/schemas/User'
    */
   getProfile = asyncHandler(async (req, res) => {
     const result = await this.getProfileUseCase.execute(req.user.id);
@@ -121,8 +207,27 @@ class UserController {
   });
 
   /**
-   * Update user profile
-   * PUT /api/v1/users/profile
+   * @swagger
+   * /users/profile:
+   *   put:
+   *     summary: Update user profile
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               fullName:
+   *                 type: string
+   *               username:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Profile updated
    */
   updateProfile = asyncHandler(async (req, res) => {
     const dto = new UpdateProfileDTO(req.body);
@@ -136,8 +241,28 @@ class UserController {
   });
 
   /**
-   * Change password
-   * PUT /api/v1/users/password
+   * @swagger
+   * /users/password:
+   *   put:
+   *     summary: Change user password
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [currentPassword, newPassword]
+   *             properties:
+   *               currentPassword:
+   *                 type: string
+   *               newPassword:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Password updated
    */
   changePassword = asyncHandler(async (req, res) => {
     const dto = new ChangePasswordDTO(req.body);
@@ -146,8 +271,28 @@ class UserController {
   });
 
   /**
-   * Update email
-   * PUT /api/v1/users/email
+   * @swagger
+   * /users/email:
+   *   put:
+   *     summary: Update user email
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email, password]
+   *             properties:
+   *               email:
+   *                 type: string
+   *               password:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Email updated
    */
   updateEmail = asyncHandler(async (req, res) => {
     const dto = new UpdateEmailDTO(req.body);
@@ -156,8 +301,26 @@ class UserController {
   });
 
   /**
-   * Delete user account (soft delete)
-   * DELETE /api/v1/users
+   * @swagger
+   * /users:
+   *   delete:
+   *     summary: Delete user account
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [password]
+   *             properties:
+   *               password:
+   *                 type: string
+   *     responses:
+   *       204:
+   *         description: Account deleted
    */
   deleteUser = asyncHandler(async (req, res) => {
     await this.deleteAccountUseCase.execute(req.user.id, req.body.password);
@@ -165,8 +328,16 @@ class UserController {
   });
 
   /**
-   * Logout user
-   * POST /api/v1/users/logout
+   * @swagger
+   * /users/logout:
+   *   post:
+   *     summary: Logout user
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Logged out
    */
   logout = asyncHandler(async (req, res) => {
     try {

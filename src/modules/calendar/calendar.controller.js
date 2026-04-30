@@ -75,6 +75,18 @@ class CalendarController {
   // JAAIYE CALENDAR OPERATIONS
   // ============================================================================
 
+  /**
+   * @swagger
+   * /calendars:
+   *   post:
+   *     summary: Create jaaiye calendar
+   *     tags: [Calendar]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       201:
+   *         description: Calendar created
+   */
   createCalendar = asyncHandler(async (req, res) => {
     const { CreateCalendarDTO } = require('./dto');
     const dto = new CreateCalendarDTO(req.body);
@@ -88,6 +100,18 @@ class CalendarController {
     );
   });
 
+  /**
+   * @swagger
+   * /calendars:
+   *   get:
+   *     summary: Get calendars
+   *     tags: [Calendar]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: List of calendars
+   */
   getCalendars = asyncHandler(async (req, res) => {
     const result = await this.getCalendarsUseCase.execute(req.user.id);
     return successResponse(res, {
@@ -164,6 +188,24 @@ class CalendarController {
    * GET /api/v1/calendars/google/oauth/initiate
    * Query params: redirectUri (required)
    * Returns: { authUrl: string, state: string }
+   */
+  /**
+   * @swagger
+   * /calendars/google/oauth/initiate:
+   *   get:
+   *     summary: Initiate Google OAuth for calendar
+   *     tags: [Calendar]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: mobileRedirectUri
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: OAuth URL generated
    */
   initiateGoogleOAuth = asyncHandler(async (req, res) => {
     const { mobileRedirectUri } = req.query;

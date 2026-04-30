@@ -69,29 +69,46 @@ class CreateGroupFromEventUseCase {
       }
     });
 
-    // Send notifications (non-blocking)
+    // Send notifications & WebSockets (non-blocking)
     setImmediate(async () => {
       try {
+        const { sendToUser } = require('../../../utils/socket');
+
         await Promise.all(
           group.members
             .filter(member => {
               const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
               return memberUserId.toString() !== userId.toString();
             })
-            .map(member => {
-              const memberUserId = typeof member.user === 'object' ? member.user.id || member.user._id : member.user;
-              return this.notificationAdapter.send(memberUserId, {
+            .map(async (member) => {
+              const memberUserId = (typeof member.user === 'object' ? member.user.id || member.user._id : member.user).toString();
+
+              // 1. Push Notification
+              await this.notificationAdapter.send(memberUserId, {
                 title: 'Added to Group',
                 body: `You've been added to the group "${group.name}" created from event "${event.title || 'Event'}"`
               }, {
-                type: 'group_member_added',
+                type: 'GROUP_MEMBER_ADDED',
+                groupName: group.name,
                 groupId: group.id,
-                eventId: resolvedEventId
+                eventId: resolvedEventId,
+                count: group.members.length,
+                path: `chatScreen`
+              });
+
+              // 2. WebSocket Notification
+              sendToUser(memberUserId, 'GROUP_MEMBER_ADDED', {
+                groupId: group.id,
+                groupName: group.name,
+                eventId: resolvedEventId,
+                userId: memberUserId,
+                count: group.members.length,
+                path: `chatScreen`
               });
             })
         );
       } catch (error) {
-        console.error('Failed to send notifications:', error);
+        console.error('CreateGroupFromEvent background notifications error:', error);
       }
     });
 

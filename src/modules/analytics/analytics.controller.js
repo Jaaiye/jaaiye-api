@@ -30,6 +30,25 @@ class AnalyticsController {
     getUserAnalyticsUseCase,
     getEngagementAnalyticsUseCase
   }) {
+    /**
+     * @swagger
+     * /analytics/revenue:
+     *   get:
+     *     summary: Get revenue analytics
+     *     tags: [Analytics]
+     *     security:
+     *       - bearerAuth: []
+     *     parameters:
+     *       - in: query
+     *         name: startDate
+     *         schema: { type: string, format: date }
+     *       - in: query
+     *         name: endDate
+     *         schema: { type: string, format: date }
+     *     responses:
+     *       200:
+     *         description: Analytics data
+     */
     this.revenue = asyncHandler(async (req, res) => {
       const range = extractRange(req.query);
       const result = await getRevenueAnalyticsUseCase.execute(range);
@@ -48,6 +67,18 @@ class AnalyticsController {
       return successResponse(res, result);
     });
 
+    /**
+     * @swagger
+     * /analytics/users:
+     *   get:
+     *     summary: Get user analytics
+     *     tags: [Analytics]
+     *     security:
+     *       - bearerAuth: []
+     *     responses:
+     *       200:
+     *         description: Analytics data
+     */
     this.users = asyncHandler(async (req, res) => {
       const range = extractRange(req.query);
       const result = await getUserAnalyticsUseCase.execute(range);

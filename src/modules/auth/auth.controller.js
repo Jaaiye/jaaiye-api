@@ -40,9 +40,20 @@ class AuthController {
   }
 
   /**
-   * Register new user
-   * POST /auth/register
-   * Returns: { email, expiresIn } - NO TOKEN
+   * @swagger
+   * /auth/register:
+   *   post:
+   *     summary: Register new user
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/RegisterDTO'
+   *     responses:
+   *       201:
+   *         description: User registered successfully
    */
   register = asyncHandler(async (req, res) => {
     const dto = new RegisterDTO(req.body);
@@ -52,9 +63,44 @@ class AuthController {
   });
 
   /**
-   * Login user
-   * POST /auth/login
-   * Returns: { accessToken, refreshToken, user }
+   * @swagger
+   * /auth/login:
+   *   post:
+   *     summary: Login user
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [identifier, password]
+   *             properties:
+   *               identifier:
+   *                 type: string
+   *                 example: user@example.com
+   *               password:
+   *                 type: string
+   *                 example: password123
+   *     responses:
+   *       200:
+   *         description: Login successful
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     accessToken:
+   *                       type: string
+   *                     refreshToken:
+   *                       type: string
+   *                     user:
+   *                       type: object
    */
   login = asyncHandler(async (req, res) => {
     const { identifier, password } = req.body;
@@ -78,9 +124,25 @@ class AuthController {
   });
 
   /**
-   * Google OAuth login/register
-   * POST /auth/google/signin
-   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   * @swagger
+   * /auth/google/signin:
+   *   post:
+   *     summary: Google OAuth login/register
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               idToken:
+   *                 type: string
+   *               serverAuthCode:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: successful operation
    */
   googleOAuth = asyncHandler(async (req, res) => {
     const { idToken, serverAuthCode } = req.body;
@@ -104,10 +166,25 @@ class AuthController {
   });
 
   /**
-   * Apple OAuth login/register
-   * POST /auth/apple/signin
-   * Body: { identityToken, userData?: { fullName, email, firstName, lastName } }
-   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   * @swagger
+   * /auth/apple/signin:
+   *   post:
+   *     summary: Apple OAuth login/register
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               identityToken:
+   *                 type: string
+   *               userData:
+   *                 type: object
+   *     responses:
+   *       200:
+   *         description: successful operation
    */
   appleOAuth = asyncHandler(async (req, res) => {
     const { identityToken, userData } = req.body;
@@ -131,9 +208,24 @@ class AuthController {
   });
 
   /**
-   * Verify email with code
-   * POST /auth/verify-email
-   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   * @swagger
+   * /auth/verify-email:
+   *   post:
+   *     summary: Verify email with code
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [code]
+   *             properties:
+   *               code:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Email verified successfully
    */
   verifyEmail = asyncHandler(async (req, res) => {
     const { code } = req.body;
@@ -157,8 +249,24 @@ class AuthController {
   });
 
   /**
-   * Request password reset
-   * POST /auth/forgot-password
+   * @swagger
+   * /auth/forgot-password:
+   *   post:
+   *     summary: Request password reset
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email]
+   *             properties:
+   *               email:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Reset code sent
    */
   forgotPassword = asyncHandler(async (req, res) => {
     const { email } = req.body;
@@ -180,9 +288,24 @@ class AuthController {
   });
 
   /**
-   * Refresh access token
-   * POST /auth/refresh-token
-   * Returns: { accessToken, refreshToken }
+   * @swagger
+   * /auth/refresh-token:
+   *   post:
+   *     summary: Refresh access token
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [refreshToken]
+   *             properties:
+   *               refreshToken:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Token refreshed
    */
   refreshToken = asyncHandler(async (req, res) => {
     const { refreshToken } = req.body;
@@ -196,9 +319,27 @@ class AuthController {
   });
 
   /**
-   * Resend verification or reset code
-   * POST /auth/resend
-   * Request: { email, type: "verification" | "reset" }
+   * @swagger
+   * /auth/resend:
+   *   post:
+   *     summary: Resend verification or reset code
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email, type]
+   *             properties:
+   *               email:
+   *                 type: string
+   *               type:
+   *                 type: string
+   *                 enum: [verification, reset]
+   *     responses:
+   *       200:
+   *         description: Code resent
    */
   resend = asyncHandler(async (req, res) => {
     const { email, type } = req.body;
@@ -209,10 +350,26 @@ class AuthController {
   });
 
   /**
-   * Create user (quick creation with random password)
-   * POST /auth/create-user
-   * Request: { email, fullName }
-   * Returns: { accessToken }
+   * @swagger
+   * /auth/create-user:
+   *   post:
+   *     summary: Quick user creation (Random password)
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email, fullName]
+   *             properties:
+   *               email:
+   *                 type: string
+   *               fullName:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: User created
    */
   createUser = asyncHandler(async (req, res) => {
     const { email, fullName } = req.body;
@@ -223,9 +380,14 @@ class AuthController {
   });
 
   /**
-   * Guest login
-   * POST /auth/guest
-   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   * @swagger
+   * /auth/guest:
+   *   post:
+   *     summary: Guest login
+   *     tags: [Auth]
+   *     responses:
+   *       200:
+   *         description: Guest login successful
    */
   guestLogin = asyncHandler(async (req, res) => {
     const result = await this.guestLoginUseCase.execute();
@@ -248,10 +410,30 @@ class AuthController {
   });
 
   /**
-   * Convert guest account to a permanent user account
-   * POST /auth/convert-guest
-   * Request: { email, password, fullName }
-   * Returns: { accessToken, refreshToken, firebaseToken, user }
+   * @swagger
+   * /auth/convert-guest:
+   *   post:
+   *     summary: Convert guest account to permanent
+   *     tags: [Auth]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email, password, fullName]
+   *             properties:
+   *               email:
+   *                 type: string
+   *               password:
+   *                 type: string
+   *               fullName:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Account converted
    */
   convertGuest = asyncHandler(async (req, res) => {
     // Requires authentication to know which guest user to convert

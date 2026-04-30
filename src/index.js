@@ -7,7 +7,10 @@ const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
-const WebSocket = require('ws');
+
+const swaggerUi = require('swagger-ui-express');
+const specs = require('./config/swagger');
+const { initSocket } = require('./utils/socket');
 
 const connectDB = require('./config/database');
 const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
@@ -19,6 +22,54 @@ const logger = require('./utils/logger');
 // Initialize Express app
 const app = express();
 
+/**
+ * Swagger UI with automatic token population logic
+ */
+const swaggerOptions = {
+  swaggerOptions: {
+    persistAuthorization: true,
+  },
+  customJs: `
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = async (...args) => {
+        const response = await originalFetch(...args);
+        const url = args[0];
+        
+        // If this is a login request and successful
+        if (url.includes('/auth/login') && response.status === 200) {
+          const clone = response.clone();
+          const result = await clone.json();
+          if (result && result.success && result.data && result.data.accessToken) {
+            const token = result.data.accessToken;
+            // Set the token in Swagger UI's internal state
+            setTimeout(() => {
+              const ui = window.ui;
+              if (ui) {
+                ui.authActions.authorize({
+                  bearerAuth: {
+                    name: "bearerAuth",
+                    schema: {
+                      type: "http",
+                      scheme: "bearer",
+                      bearerFormat: "JWT"
+                    },
+                    value: token
+                  }
+                });
+                console.log('Successfully authorized with token from login');
+              }
+            }, 500);
+          }
+        }
+        return response;
+      };
+    })();
+  `
+};
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, swaggerOptions));
+
 // Trust proxy - needed for express-rate-limit when behind a reverse proxy (e.g. Vercel, Nginx, Heroku)
 app.set('trust proxy', 1);
 
@@ -28,6 +79,9 @@ app.use(traceMiddleware);
 
 // Create HTTP server
 const server = require('http').createServer(app);
+
+// Initialize WebSocket
+initSocket(server);
 
 
 // Middleware
@@ -39,6 +93,7 @@ const allowedOrigins = [
   process.env.FRONTEND_ORIGIN,
   'https://jaaiye-admin.vercel.app',
   'http://localhost:3000',
+  'http://localhost:5000',
   'http://localhost:3031',
   'https://jaaiye-checkout.vercel.app',
   'https://tickets.jaaiye.com',
@@ -46,16 +101,28 @@ const allowedOrigins = [
   'https://demoevent.jaaiye.com',
   'https://admin.jaaiye.com',
   'https://logs.jaaiye.com',
-  'http://localhost:3005'
+  'http://localhost:3005',
+  'https://immodest-courthouse.outray.app',
+  'https://api.jaaiye.com',
+  'https://dev.jaaiye.com',
 ].filter(Boolean);
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow non-browser/SSR requests without an origin
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
+
+    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+    const isAllowed = allowedOrigins.some(o =>
+      (o || '').toLowerCase().replace(/\/$/, '') === normalizedOrigin
+    );
+
+    if (isAllowed) {
       return callback(null, true);
     }
+
+    // Log the rejected origin to help debugging
+    console.warn(`[CORS Blocked] Origin: "${origin}" not allowed by policy.`);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -212,7 +279,9 @@ app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRo
 app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
 app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
 app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
+app.use('/api/v1/app-config', require('./modules/common/app-config.module').getAppConfigRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
+
 
 // 404 handler
 app.use((req, res, next) => {

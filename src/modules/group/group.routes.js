@@ -51,6 +51,13 @@ function createGroupRoutes(groupController) {
   );
 
   router.get(
+    '/my',
+    apiLimiter,
+    protect,
+    groupController.getUserGroups
+  );
+
+  router.get(
     '/search',
     apiLimiter,
     protect,

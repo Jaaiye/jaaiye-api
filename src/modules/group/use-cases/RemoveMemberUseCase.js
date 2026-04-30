@@ -67,8 +67,11 @@ class RemoveMemberUseCase {
                 body: `You've been promoted to admin of the group "${group.name}" because the previous admin left.`
               }, {
                 type: 'group_member_added',
-                groupId: groupId,
-                role: 'admin'
+                role: 'admin',
+                groupName: group.name,
+                groupId: group.id,
+                eventId: group.eventId,
+                path: `chatScreen`
               });
             } catch (error) {
               console.error('[RemoveMember] Failed to handle admin promotion sync/notification:', error);
@@ -77,29 +80,41 @@ class RemoveMemberUseCase {
         }
       }
 
-      // Sync removal to Firebase (non-blocking)
+      // Run background tasks (Firebase sync, Notifications, WebSockets)
       setImmediate(async () => {
         try {
-          await this.firebaseAdapter.removeMember(groupId, memberId);
-        } catch (error) {
-          console.error('[RemoveMember] Failed to remove member from Firebase:', error);
-        }
-      });
+          const { sendToUser, sendToGroup } = require('../../../utils/socket');
 
-      // Send removal notification (non-blocking)
-      setImmediate(async () => {
-        try {
+          // 1. Sync to Firebase
+          await this.firebaseAdapter.removeMember(groupId, memberId);
+
+          // 2. Send Push Notification
           await this.notificationAdapter.send(memberId, {
             title: 'Removed from Group',
             body: currentUserId.toString() === memberId.toString()
               ? `You've left the group "${group.name}"`
               : `You've been removed from the group "${group.name}"`
           }, {
-            type: 'group_member_removed',
+            type: 'GROUP_MEMBER_REMOVED',
             groupId: group.id
           });
+
+          // 3. WebSocket Notification (Personal)
+          sendToUser(memberId, 'GROUP_MEMBER_REMOVED', {
+            groupId: group.id,
+            groupName: group.name,
+            reason: currentUserId.toString() === memberId.toString() ? 'leave' : 'remove'
+          });
+
+          // 4. WebSocket Notification (Group-wide)
+          sendToGroup(groupId, 'GROUP_MEMBER_REMOVED', {
+            groupId: group.id,
+            userId: memberId,
+            count: updatedGroupEntity.members.length
+          });
+
         } catch (error) {
-          console.error('[RemoveMember] Failed to send removal notification:', error);
+          console.error('[RemoveMember] Background tasks error:', error);
         }
       });
 

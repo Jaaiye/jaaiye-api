@@ -38,32 +38,52 @@ class AddMemberUseCase {
     try {
       const updatedGroup = await this.groupRepository.addMember(groupId, memberId, userId, role);
 
-      // Sync to Firebase (non-blocking)
+      // Run background tasks (Firebase sync, Notifications, WebSockets)
       setImmediate(async () => {
         try {
+          const { sendToUser, sendToGroup } = require('../../../utils/socket');
+
+          // 1. Sync to Firebase
           await this.firebaseAdapter.addMember(groupId, {
             id: memberId,
             name: userToAdd.fullName || userToAdd.username,
             avatar: userToAdd.profilePicture || '',
             role
           });
-        } catch (error) {
-          console.error('Failed to add member to Firebase:', error);
-        }
-      });
 
-      // Send notification (non-blocking)
-      setImmediate(async () => {
-        try {
+          // 2. Send Push Notification
           await this.notificationAdapter.send(memberId, {
             title: 'Added to Group',
             body: `You've been added to the group "${group.name}"`
           }, {
-            type: 'group_member_added',
-            groupId: group.id
+            type: 'GROUP_MEMBER_ADDED',
+            groupName: group.name,
+            groupId: group.id,
+            eventId: group.eventId,
+            count: updatedGroup.members.length,
+            path: `chatScreen`
           });
+
+          // 3. Send WebSocket Notification (Personal)
+          sendToUser(memberId, 'GROUP_MEMBER_ADDED', {
+            groupId: group.id,
+            groupName: group.name,
+            eventId: group.eventId,
+            userId: memberId,
+            count: updatedGroup.members.length,
+            path: `chatScreen`
+          });
+
+          // 4. Send WebSocket Notification (Group-wide)
+          sendToGroup(groupId, 'GROUP_MEMBER_LIST_UPDATED', {
+            groupId: group.id,
+            userId: memberId,
+            role,
+            count: updatedGroup.members.length
+          });
+
         } catch (error) {
-          console.error('Failed to send notification:', error);
+          console.error('AddMember background task error:', error);
         }
       });
 

@@ -43,26 +43,26 @@ function initSocket(server) {
         socket.join(userId);
         logger.info(`User ${userId} authenticated and connected via Socket.io from ${ip}`);
 
-        socket.on('join_group', (groupId) => {
-            const id = (groupId && typeof groupId === 'object') ? (groupId.id || groupId._id || groupId).toString() : String(groupId);
+        socket.on('join_group', (data) => {
+            const id = (data && typeof data === 'object') ? (data.groupId || data.id || data._id || data).toString() : String(data);
             socket.join(`group_${id}`);
             logger.debug(`User ${userId} joined group room: group_${id}`);
         });
 
-        socket.on('leave_group', (groupId) => {
-            const id = (groupId && typeof groupId === 'object') ? (groupId.id || groupId._id || groupId).toString() : String(groupId);
+        socket.on('leave_group', (data) => {
+            const id = (data && typeof data === 'object') ? (data.groupId || data.id || data._id || data).toString() : String(data);
             socket.leave(`group_${id}`);
             logger.debug(`User ${userId} left group room: group_${id}`);
         });
 
-        socket.on('join_event', (eventId) => {
-            const id = (eventId && typeof eventId === 'object') ? (eventId.id || eventId._id || eventId).toString() : String(eventId);
+        socket.on('join_event', (data) => {
+            const id = (data && typeof data === 'object') ? (data.eventId || data.id || data._id || data).toString() : String(data);
             socket.join(`event_${id}`);
             logger.debug(`User ${userId} joined event room: event_${id}`);
         });
 
-        socket.on('leave_event', (eventId) => {
-            const id = (eventId && typeof eventId === 'object') ? (eventId.id || eventId._id || eventId).toString() : String(eventId);
+        socket.on('leave_event', (data) => {
+            const id = (data && typeof data === 'object') ? (data.eventId || data.id || data._id || data).toString() : String(data);
             socket.leave(`event_${id}`);
             logger.debug(`User ${userId} left event room: event_${id}`);
         });

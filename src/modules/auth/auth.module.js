@@ -15,6 +15,7 @@ const { CalendarSyncAdapter } = require('../calendar/services');
 // Infrastructure (Auth-specific)
 const TokenBlacklistRepository = require('./repositories/token-blacklist.repository');
 const CalendarAdapter = require('./services/calendar.adapter');
+const RedisAuthService = require('./services/RedisAuthService');
 
 // Queue Module (for email notifications)
 const NotificationQueue = require('../queue/notification.queue');
@@ -39,7 +40,7 @@ const {
 
 // Presentation
 const AuthController = require('./auth.controller');
-const { createAuthMiddleware } = require('./middleware');
+const { createAuthMiddleware, createOptionalAuthMiddleware, createLoginRateLimiter } = require('./middleware');
 const createAuthRoutes = require('./auth.routes');
 
 class AuthModule {
@@ -62,6 +63,13 @@ class AuthModule {
       this._instances.tokenBlacklistRepository = new TokenBlacklistRepository();
     }
     return this._instances.tokenBlacklistRepository;
+  }
+
+  getRedisAuthService() {
+    if (!this._instances.redisAuthService) {
+      this._instances.redisAuthService = new RedisAuthService();
+    }
+    return this._instances.redisAuthService;
   }
 
   /**
@@ -156,7 +164,8 @@ class AuthModule {
       this._instances.loginUseCase = new LoginUseCase({
         userRepository: this.getUserRepository(),
         firebaseAdapter: this.getFirebaseAdapter(),
-        emailQueue: this.getEmailQueue()
+        emailQueue: this.getEmailQueue(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.loginUseCase;
@@ -173,7 +182,8 @@ class AuthModule {
         firebaseAdapter: this.getFirebaseAdapter(),
         emailService: this.getEmailAdapter(),
         emailQueue: this.getEmailQueue(),
-        notificationQueue: this.getNotificationQueue()
+        notificationQueue: this.getNotificationQueue(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.googleOAuthUseCase;
@@ -188,7 +198,8 @@ class AuthModule {
         firebaseAdapter: this.getFirebaseAdapter(),
         emailService: this.getEmailAdapter(),
         emailQueue: this.getEmailQueue(),
-        notificationQueue: this.getNotificationQueue()
+        notificationQueue: this.getNotificationQueue(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.appleOAuthUseCase;
@@ -201,7 +212,8 @@ class AuthModule {
         firebaseAdapter: this.getFirebaseAdapter(),
         emailService: this.getEmailAdapter(),
         emailQueue: this.getEmailQueue(),
-        notificationQueue: this.getNotificationQueue()
+        notificationQueue: this.getNotificationQueue(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.verifyEmailUseCase;
@@ -213,7 +225,8 @@ class AuthModule {
         userRepository: this.getUserRepository(),
         emailService: this.getEmailAdapter(),
         emailQueue: this.getEmailQueue(),
-        notificationQueue: this.getNotificationQueue()
+        notificationQueue: this.getNotificationQueue(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.forgotPasswordUseCase;
@@ -222,7 +235,8 @@ class AuthModule {
   getResetPasswordUseCase() {
     if (!this._instances.resetPasswordUseCase) {
       this._instances.resetPasswordUseCase = new ResetPasswordUseCase({
-        userRepository: this.getUserRepository()
+        userRepository: this.getUserRepository(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.resetPasswordUseCase;
@@ -231,8 +245,8 @@ class AuthModule {
   getLogoutUseCase() {
     if (!this._instances.logoutUseCase) {
       this._instances.logoutUseCase = new LogoutUseCase({
-        userRepository: this.getUserRepository(),
-        tokenBlacklistRepository: this.getTokenBlacklistRepository()
+        tokenBlacklistRepository: this.getTokenBlacklistRepository(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.logoutUseCase;
@@ -242,7 +256,7 @@ class AuthModule {
     if (!this._instances.refreshTokenUseCase) {
       this._instances.refreshTokenUseCase = new RefreshTokenUseCase({
         userRepository: this.getUserRepository(),
-        tokenBlacklistRepository: this.getTokenBlacklistRepository()
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.refreshTokenUseCase;
@@ -254,7 +268,8 @@ class AuthModule {
         userRepository: this.getUserRepository(),
         emailService: this.getEmailAdapter(),
         emailQueue: this.getEmailQueue(),
-        notificationQueue: this.getNotificationQueue()
+        notificationQueue: this.getNotificationQueue(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.resendUseCase;
@@ -324,7 +339,8 @@ class AuthModule {
     if (!this._instances.authMiddleware) {
       this._instances.authMiddleware = createAuthMiddleware({
         userRepository: this.getUserRepository(),
-        tokenBlacklistRepository: this.getTokenBlacklistRepository()
+        tokenBlacklistRepository: this.getTokenBlacklistRepository(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.authMiddleware;
@@ -335,10 +351,10 @@ class AuthModule {
    */
   getOptionalAuthMiddleware() {
     if (!this._instances.optionalAuthMiddleware) {
-      const { createOptionalAuthMiddleware } = require('./middleware');
       this._instances.optionalAuthMiddleware = createOptionalAuthMiddleware({
         userRepository: this.getUserRepository(),
-        tokenBlacklistRepository: this.getTokenBlacklistRepository()
+        tokenBlacklistRepository: this.getTokenBlacklistRepository(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.optionalAuthMiddleware;
@@ -350,8 +366,16 @@ class AuthModule {
   getAuthRoutes() {
     return createAuthRoutes({
       authController: this.getAuthController(),
-      authMiddleware: this.getAuthMiddleware()
+      authMiddleware: this.getAuthMiddleware(),
+      loginRateLimiter: this.getLoginRateLimiter()
     });
+  }
+
+  getLoginRateLimiter() {
+    if (!this._instances.loginRateLimiter) {
+      this._instances.loginRateLimiter = createLoginRateLimiter(this.getRedisAuthService());
+    }
+    return this._instances.loginRateLimiter;
   }
 
   /**

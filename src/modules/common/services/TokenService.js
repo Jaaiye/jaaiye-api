@@ -5,6 +5,7 @@
  */
 
 const jwt = require('jsonwebtoken');
+const { randomUUID } = require('crypto');
 const { TokenExpiredError, InvalidTokenError } = require('../errors');
 
 class TokenService {
@@ -15,6 +16,7 @@ class TokenService {
    * @returns {string} JWT token
    */
   static generateAccessToken(user) {
+    const jti = randomUUID();
     const payload = {
       id: user.id,
       email: user.email,
@@ -22,11 +24,12 @@ class TokenService {
       fullName: user.fullName,
       role: user.role,
       emailVerified: user.emailVerified,
-      profilePicture: user.profilePicture
+      profilePicture: user.profilePicture,
+      jti,
     };
 
     return jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRE || '30d'
+      expiresIn: process.env.JWT_EXPIRE || '15m'
     });
   }
 
@@ -37,10 +40,11 @@ class TokenService {
    * @returns {string} JWT token
    */
   static generateRefreshToken(userId) {
-    const payload = { id: userId };
+    const jti = randomUUID();
+    const payload = { id: userId, jti };
 
-    return jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_REFRESH_EXPIRE || '90d'
+    return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+      expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d'
     });
   }
 
@@ -72,7 +76,7 @@ class TokenService {
    */
   static verifyRefreshToken(token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
       return decoded;
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
@@ -103,6 +107,29 @@ class TokenService {
   static extractUserId(token) {
     const decoded = this.decodeWithoutVerify(token);
     return decoded ? decoded.id : null;
+  }
+
+  /**
+   * Extract jti (JWT ID) from a token without verification
+   * @param {string} token - JWT token
+   * @returns {string|null}
+   */
+  static extractJti(token) {
+    const decoded = this.decodeWithoutVerify(token);
+    return decoded ? decoded.jti ?? null : null;
+  }
+
+  /**
+   * Get remaining seconds until token expiry.
+   * Returns 0 if already expired or undecodable.
+   * @param {string} token
+   * @returns {number}
+   */
+  static getRemainingSeconds(token) {
+    const decoded = this.decodeWithoutVerify(token);
+    if (!decoded || !decoded.exp) return 0;
+    const remaining = decoded.exp - Math.floor(Date.now() / 1000);
+    return remaining > 0 ? remaining : 0;
   }
 
   /**

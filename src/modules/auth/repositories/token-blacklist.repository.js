@@ -1,76 +1,78 @@
 /**
- * Token Blacklist Repository Implementation
- * Implements ITokenBlacklistRepository interface
- * Infrastructure layer - persistence
+ * Token Blacklist Repository — Redis Implementation
+ * Replaces the Mongoose-based store with pure Redis lookups.
+ * Access tokens are blacklisted by jti until their natural expiry.
  */
 
 const ITokenBlacklistRepository = require('./interfaces/ITokenBlacklistRepository');
-const TokenBlacklistSchema = require('../entities/TokenBlacklist.schema');
 const { TokenService } = require('../../common/services');
+const redisClient = require('../../../utils/redis');
 
 class TokenBlacklistRepository extends ITokenBlacklistRepository {
   /**
-   * Add token to blacklist
-   * @param {string} token - JWT token
-   * @param {Date} expiresAt - Token expiration date
-   * @returns {Promise<void>}
+   * Add an access token to the blacklist.
+   * TTL is derived from the token's own exp claim so Redis auto-evicts it.
+   * @param {string} token - JWT access token
+   * @param {Date} _expiresAt - Kept for interface compatibility (unused — derived from token)
    */
-  async add(token, expiresAt) {
-    const userId = TokenService.extractUserId(token);
+  async add(token, _expiresAt) {
+    const jti = TokenService.extractJti(token);
+    if (!jti) {
+      // Legacy tokens without jti — fall back to full-token hash key
+      const remaining = TokenService.getRemainingSeconds(token);
+      if (remaining > 0) {
+        await redisClient.set(`blacklist:token:${token.slice(-16)}`, '1', { EX: remaining });
+      }
+      return;
+    }
 
-    await TokenBlacklistSchema.create({
-      token,
-      userId,
-      expiresAt
-    });
+    const remaining = TokenService.getRemainingSeconds(token);
+    if (remaining > 0) {
+      await redisClient.set(`blacklist:${jti}`, '1', { EX: remaining });
+    }
   }
 
   /**
-   * Check if token is blacklisted
-   * @param {string} token - JWT token
+   * Check if a token is blacklisted.
+   * @param {string} token - JWT access token
    * @returns {Promise<boolean>}
    */
   async isBlacklisted(token) {
-    const count = await TokenBlacklistSchema.countDocuments({ token });
-    return count > 0;
+    const jti = TokenService.extractJti(token);
+    if (jti) {
+      const val = await redisClient.get(`blacklist:${jti}`);
+      return val !== null;
+    }
+
+    // Legacy fallback
+    const val = await redisClient.get(`blacklist:token:${token.slice(-16)}`);
+    return val !== null;
   }
 
   /**
-   * Remove expired tokens (cleanup)
-   * @returns {Promise<number>} Number of tokens removed
+   * No-op: Redis auto-evicts expired keys via TTL.
+   * @returns {Promise<number>} Always 0
    */
   async removeExpired() {
-    const now = new Date();
-    const result = await TokenBlacklistSchema.deleteMany({
-      expiresAt: { $lt: now }
-    });
-
-    return result.deletedCount;
+    return 0;
   }
 
   /**
-   * Get all blacklisted tokens for a user
-   * @param {string} userId - User ID
+   * Not applicable for this Redis implementation.
    * @returns {Promise<Array>}
    */
-  async findByUserId(userId) {
-    const tokens = await TokenBlacklistSchema.find({ userId });
-    return tokens.map(doc => doc.toObject());
+  async findByUserId(_userId) {
+    return [];
   }
 
   /**
-   * Blacklist all tokens for a user (for logout all devices)
-   * @param {string} userId - User ID
-   * @returns {Promise<void>}
+   * Blacklist all active refresh tokens for a user.
+   * Delegates to RedisAuthService.deleteAllRefreshTokens via caller.
+   * Access token blacklisting is handled per-token at logout.
    */
-  async blacklistAllForUser(userId) {
-    // This is a placeholder - in practice, you'd need to track all active tokens
-    // For now, we'll just mark a flag that all tokens before this timestamp are invalid
-    // You could implement this by adding a 'tokenVersion' field to User entity
-    // For simplicity, this implementation does nothing special
-    // The actual implementation would depend on your token invalidation strategy
+  async blacklistAllForUser(_userId) {
+    // Implemented at the use-case level via RedisAuthService.deleteAllRefreshTokens
   }
 }
 
 module.exports = TokenBlacklistRepository;
-

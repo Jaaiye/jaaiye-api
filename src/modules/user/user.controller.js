@@ -9,6 +9,7 @@ const { successResponse, formatUserResponse } = require('../../utils/response');
 const UpdateProfileDTO = require('./dto/UpdateProfileDTO');
 const ChangePasswordDTO = require('./dto/ChangePasswordDTO');
 const UpdateEmailDTO = require('./dto/UpdateEmailDTO');
+const { refreshToken } = require('firebase-admin/app');
 
 class UserController {
   constructor({
@@ -22,7 +23,7 @@ class UserController {
     addBankAccountUseCase,
     setDefaultBankAccountUseCase,
     getWithdrawalsUseCase,
-    flutterwaveAdapter
+    flutterwaveAdapter,
   }) {
     this.getProfileUseCase = getProfileUseCase;
     this.updateProfileUseCase = updateProfileUseCase;
@@ -341,7 +342,9 @@ class UserController {
    */
   logout = asyncHandler(async (req, res) => {
     try {
-      await this.logoutUseCase.execute(req.user.id);
+      const accessToken = req.headers.authorization.split(' ')[1];
+      const refreshToken = req.body.refreshToken;
+      await this.logoutUseCase.execute(accessToken, refreshToken);
       return successResponse(res, null, 200, 'Logged out successfully');
     } catch (error) {
       // If user already logged out, return success (legacy behavior)

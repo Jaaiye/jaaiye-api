@@ -50,12 +50,10 @@ class RegisterUseCase {
       emailVerified: false,
       role: 'user',
       isActive: true,
-      isBlocked: false,
-      verification: {
-        code: verificationCode,
-        expires: codeExpiry
-      }
+      isBlocked: false
     });
+
+    await this.redisAuthService.storeVerifyCode(user.id, verificationCode, 10 * 60);
 
     // Send verification email (async, non-blocking)
     this._sendVerificationEmail(user, verificationCode).catch(err => {

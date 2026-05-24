@@ -1,19 +1,21 @@
 /**
  * Login Use Case
- * Handles user login business logic
+ * Handles user authentication.
+ * Refresh tokens stored in Redis. lastLogin is fire-and-forget.
  */
 
 const { InvalidCredentialsError, EmailNotVerifiedError } = require('../errors');
 const { NotFoundError } = require('../../common/errors');
 const { PasswordService, TokenService } = require('../../common/services');
 const { UserEntity } = require('../../common/entities');
-const { addMinutesToNow, addDaysToNow } = require('../../../utils/dateUtils');
+const { addMinutesToNow } = require('../../../utils/dateUtils');
 
 class LoginUseCase {
-  constructor({ userRepository, firebaseAdapter, emailQueue }) {
+  constructor({ userRepository, firebaseAdapter, emailQueue, redisAuthService }) {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
     this.emailQueue = emailQueue;
+    this.redisAuthService = redisAuthService;
   }
 
   /**
@@ -46,19 +48,15 @@ class LoginUseCase {
       throw new InvalidCredentialsError('Invalid credentials');
     }
 
-    // Create user entity to check business rules
     const userEntity = new UserEntity(user);
 
-    // Check if email is verified - if not, send verification email before throwing error
+    // Check if email is verified — resend code before throwing
     if (!userEntity.emailVerified) {
-      // Generate new verification code
       const verificationCode = PasswordService.generateVerificationCode();
-      const codeExpiry = addMinutesToNow(10); // 10 minutes from now (UTC)
+      const codeExpiry = addMinutesToNow(10);
 
-      // Update verification code in database
-      await this.userRepository.setVerificationCode(userEntity.id, verificationCode, codeExpiry);
+      await this.redisAuthService.storeVerifyCode(userEntity.id, verificationCode, 10 * 60);
 
-      // Send verification email (async, don't wait for it)
       if (this.emailQueue) {
         this.emailQueue.sendVerificationEmailAsync(
           userEntity.email,
@@ -69,11 +67,9 @@ class LoginUseCase {
         });
       }
 
-      // Throw error after sending email
       throw new EmailNotVerifiedError('Please verify your email before logging in. A verification email has been sent.');
     }
 
-    // Check if user can login (will throw if blocked)
     userEntity.canLogin();
 
     // Generate tokens
@@ -83,14 +79,16 @@ class LoginUseCase {
       ? await this.firebaseAdapter.generateToken(userEntity.id)
       : null;
 
-    // Save refresh token to user
-    const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
-    await this.userRepository.updateRefreshData(userEntity.id, {
-      refreshToken,
-      firebaseToken,
-      refreshExpiry
-    });
+    // Decode refresh token to get jti
+    const decoded = TokenService.verifyRefreshToken(refreshToken);
 
+    // Store refresh session in Redis
+    await this.redisAuthService.storeRefreshToken(userEntity.id, decoded.jti);
+
+    // Record lastLogin (Redis immediately + fire-and-forget DB flush)
+    await this.redisAuthService.recordLastLogin(userEntity.id, (timestamp) =>
+      this.userRepository.updateLastLogin(userEntity.id, timestamp)
+    );
 
     return {
       user: userEntity,
@@ -102,4 +100,3 @@ class LoginUseCase {
 }
 
 module.exports = LoginUseCase;
-

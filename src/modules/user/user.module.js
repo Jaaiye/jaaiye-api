@@ -19,6 +19,9 @@ const { FlutterwaveAdapter } = require('../payment/services');
 // Wallet Domain (for GetWithdrawalsUseCase)
 const { GetWithdrawalsUseCase } = require('../wallet/use-cases');
 
+// Auth Domain (for LogoutUseCase)
+const { LogoutUseCase } = require('../auth/use-cases');
+
 // Application
 const {
   GetProfileUseCase,
@@ -26,7 +29,6 @@ const {
   ChangePasswordUseCase,
   UpdateEmailUseCase,
   GetFirebaseTokenUseCase,
-  LogoutUseCase,
   DeleteAccountUseCase,
   AddBankAccountUseCase,
   SetDefaultBankAccountUseCase

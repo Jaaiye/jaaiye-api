@@ -115,8 +115,7 @@ class UserRepository extends IUserRepository {
         $set: {
           'refresh.token': refreshToken,
           'refresh.firebaseToken': firebaseToken ?? null,
-          'refresh.expiresAt': refreshExpiry,
-          lastLogin: new Date()
+          'refresh.expiresAt': refreshExpiry
         }
       }
     );
@@ -133,10 +132,22 @@ class UserRepository extends IUserRepository {
       { _id: id },
       {
         $set: {
-          'refresh.firebaseToken': firebaseToken ?? null,
-          lastLogin: new Date()
+          'refresh.firebaseToken': firebaseToken ?? null
         }
       }
+    );
+  }
+
+  /**
+   * Persist last login timestamp to DB (called asynchronously after Redis write).
+   * @param {string} userId
+   * @param {string} timestamp - ISO string
+   * @returns {Promise<void>}
+   */
+  async updateLastLogin(userId, timestamp) {
+    await UserSchema.updateOne(
+      { _id: userId },
+      { $set: { lastLogin: new Date(timestamp) } }
     );
   }
 

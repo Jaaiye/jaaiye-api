@@ -1,24 +1,24 @@
 /**
  * Resend Use Case
- * Handles resending verification or reset codes
- * Combined endpoint matching legacy behavior
+ * Handles resending verification or reset codes.
+ * All codes written to Redis.
  */
 
 const { ValidationError } = require('../errors');
 const { NotFoundError, BadRequestError } = require('../../common/errors');
 const { PasswordService } = require('../../common/services');
-const { addMinutesToNow } = require('../../../utils/dateUtils');
 
 class ResendUseCase {
-  constructor({ userRepository, emailService, emailQueue, notificationQueue }) {
+  constructor({ userRepository, emailService, emailQueue, notificationQueue, redisAuthService }) {
     this.userRepository = userRepository;
     this.emailService = emailService;
     this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
+    this.redisAuthService = redisAuthService;
   }
 
   /**
-   * Execute resend (verification or reset)
+   * Execute resend
    * @param {string} email - User email
    * @param {string} type - "verification" or "reset"
    * @returns {Promise<Object>} { success, message, data }
@@ -42,10 +42,7 @@ class ResendUseCase {
     }
   }
 
-  /**
-   * Resend verification code
-   * @private
-   */
+  /** @private */
   async _resendVerification(email) {
     const user = await this.userRepository.findByEmail(email);
 
@@ -61,14 +58,11 @@ class ResendUseCase {
       };
     }
 
-    // Generate new verification code
     const verificationCode = PasswordService.generateVerificationCode();
-    const codeExpiry = addMinutesToNow(10); // 10 minutes from now (UTC)
 
-    // Update verification code
-    await this.userRepository.setVerificationCode(user.id, verificationCode, codeExpiry);
+    // Store in Redis — 10-minute TTL (overwrites any existing code)
+    await this.redisAuthService.storeVerifyCode(user.id, verificationCode, 10 * 60);
 
-    // Send verification email (async)
     this._sendVerificationEmail(user, verificationCode).catch(err => {
       console.error('Failed to send verification email:', err);
     });
@@ -83,14 +77,10 @@ class ResendUseCase {
     };
   }
 
-  /**
-   * Resend reset code
-   * @private
-   */
+  /** @private */
   async _resendReset(email) {
     const user = await this.userRepository.findByEmail(email);
 
-    // Don't reveal if user exists (security)
     if (!user) {
       return {
         success: true,
@@ -99,14 +89,11 @@ class ResendUseCase {
       };
     }
 
-    // Generate new reset code
     const resetCode = PasswordService.generateResetCode();
-    const codeExpiry = addMinutesToNow(10); // 10 minutes from now (UTC)
 
-    // Update reset code
-    await this.userRepository.setResetPasswordCode(user.id, resetCode, codeExpiry);
+    // Store in Redis — 1-hour TTL (overwrites any existing code)
+    await this.redisAuthService.storeResetCode(user.id, resetCode, 60 * 60);
 
-    // Send reset email (async)
     this._sendResetEmail(user, resetCode).catch(err => {
       console.error('Failed to send reset email:', err);
     });
@@ -118,10 +105,7 @@ class ResendUseCase {
     };
   }
 
-  /**
-   * Send verification email
-   * @private
-   */
+  /** @private */
   async _sendVerificationEmail(user, code) {
     if (this.emailQueue) {
       await this.emailQueue.sendVerificationEmailAsync(
@@ -138,10 +122,7 @@ class ResendUseCase {
     }
   }
 
-  /**
-   * Send reset email
-   * @private
-   */
+  /** @private */
   async _sendResetEmail(user, code) {
     if (this.emailQueue) {
       await this.emailQueue.sendPasswordResetEmailAsync(
@@ -160,4 +141,3 @@ class ResendUseCase {
 }
 
 module.exports = ResendUseCase;
-

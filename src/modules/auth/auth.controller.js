@@ -228,10 +228,9 @@ class AuthController {
    *         description: Email verified successfully
    */
   verifyEmail = asyncHandler(async (req, res) => {
-    const { code } = req.body;
-    const userId = req.user?.id; // Optional - can find by code alone
+    const { email, code } = req.body;
 
-    const result = await this.verifyEmailUseCase.execute(userId, code);
+    const result = await this.verifyEmailUseCase.execute(email, code);
 
     return successResponse(res, {
       accessToken: result.accessToken,
@@ -281,8 +280,8 @@ class AuthController {
    * Request: { code, password }
    */
   resetPassword = asyncHandler(async (req, res) => {
-    const { code, password } = req.body;
-    const result = await this.resetPasswordUseCase.execute(code, password);
+    const { email, code, password } = req.body;
+    const result = await this.resetPasswordUseCase.execute(email, code, password);
 
     return successResponse(res, result, 200, 'Password reset successfully');
   });

@@ -1,6 +1,7 @@
 /**
  * Apple OAuth Use Case
- * Handles Apple Sign In login/register
+ * Handles Apple Sign In login/register.
+ * Refresh tokens stored in Redis. lastLogin is fire-and-forget.
  */
 
 const { ValidationError } = require('../errors');
@@ -15,7 +16,8 @@ class AppleOAuthUseCase {
     emailService,
     emailQueue,
     notificationQueue,
-    calendarAdapter
+    calendarAdapter,
+    redisAuthService
   }) {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
@@ -23,6 +25,7 @@ class AppleOAuthUseCase {
     this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
     this.calendarAdapter = calendarAdapter;
+    this.redisAuthService = redisAuthService;
   }
 
   /**
@@ -31,54 +34,43 @@ class AppleOAuthUseCase {
    * @returns {Promise<Object>} { user, accessToken, refreshToken, firebaseToken, isNewUser }
    */
   async execute(dto) {
-    // Validate DTO
     const validation = dto.validate();
     if (!validation.valid) {
       throw new ValidationError(validation.errors.join(', '));
     }
 
-    // Verify Apple ID token
     const applePayload = await AppleOAuthService.verifyAppleIdToken(dto.identityToken);
-
-    // Extract user info
     const appleUserInfo = AppleOAuthService.extractAppleUserInfo(applePayload, dto.userData);
 
-    // Check if user exists by Apple ID
     let user = await this.userRepository.findByAppleId(appleUserInfo.appleId);
     let isNewUser = false;
 
     if (user) {
-      // Existing user with Apple ID - update email if changed
       if (appleUserInfo.email && user.email !== appleUserInfo.email) {
         await this.userRepository.update(user.id, {
           email: appleUserInfo.email,
           emailVerified: appleUserInfo.emailVerified
         });
-        // Refresh user data
         user = await this.userRepository.findById(user.id);
       }
     } else {
-      // Check if user exists with the same email
       if (appleUserInfo.email) {
         user = await this.userRepository.findByEmail(appleUserInfo.email);
       }
 
       if (user) {
-        // Link Apple account to existing user
         await this.userRepository.update(user.id, {
           appleId: appleUserInfo.appleId,
           emailVerified: appleUserInfo.emailVerified || user.emailVerified
         });
-        // Refresh user data
         user = await this.userRepository.findById(user.id);
       } else {
-        // New user - create account
         const username = await this._generateUniqueUsername(
           appleUserInfo.email || `apple_${appleUserInfo.appleId.substring(0, 8)}`
         );
 
         user = await this.userRepository.create({
-          email: appleUserInfo.email || null, // Apple may hide email
+          email: appleUserInfo.email || null,
           username,
           fullName: appleUserInfo.fullName,
           emailVerified: appleUserInfo.emailVerified,
@@ -96,42 +88,36 @@ class AppleOAuthUseCase {
       }
     }
 
-    // Send welcome email for new users (async, non-blocking)
     if (isNewUser) {
       this._sendWelcomeEmail(user).catch(err => {
         console.error('Failed to send welcome email:', err);
       });
     }
 
-    // Create default Jaaiye calendar for all users if they don't have one (async, non-blocking)
     if (this.calendarAdapter) {
       this.calendarAdapter.createOnRegistration(user).catch(err => {
         console.error('Failed to create default calendar:', err);
       });
     }
 
-    // Create user entity
     const userEntity = new UserEntity(user);
-
-    // Check if user can login
     userEntity.canLogin();
 
-    // Generate tokens
     const accessToken = TokenService.generateAccessToken(userEntity);
     const refreshToken = TokenService.generateRefreshToken(userEntity.id);
     const firebaseToken = this.firebaseAdapter
       ? await this.firebaseAdapter.generateToken(userEntity.id)
       : null;
 
-    // Save refresh token to user
-    const { addDaysToNow, now } = require('../../../utils/dateUtils');
-    const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
-    await this.userRepository.update(userEntity.id, {
-      'refresh.token': refreshToken,
-      'refresh.firebaseToken': firebaseToken,
-      'refresh.expiresAt': refreshExpiry,
-      lastLogin: now()
-    });
+    const decoded = TokenService.verifyRefreshToken(refreshToken);
+
+    // Store refresh session in Redis
+    await this.redisAuthService.storeRefreshToken(userEntity.id, decoded.jti);
+
+    // Record lastLogin fire-and-forget
+    await this.redisAuthService.recordLastLogin(userEntity.id, (timestamp) =>
+      this.userRepository.updateLastLogin(userEntity.id, timestamp)
+    );
 
     return {
       user: userEntity,
@@ -142,10 +128,7 @@ class AppleOAuthUseCase {
     };
   }
 
-  /**
-   * Send welcome email (private helper)
-   * @private
-   */
+  /** @private */
   async _sendWelcomeEmail(user) {
     if (this.emailQueue) {
       await this.emailQueue.sendWelcomeEmailAsync(
@@ -160,18 +143,14 @@ class AppleOAuthUseCase {
     }
   }
 
-  /**
-   * Generate unique username from email or Apple ID
-   * @private
-   */
+  /** @private */
   async _generateUniqueUsername(emailOrId) {
     let username = AppleOAuthService.generateUsernameFromEmail(emailOrId);
     let suffix = 0;
 
     while (await this.userRepository.usernameExists(username)) {
       suffix++;
-      const baseUsername = AppleOAuthService.generateUsernameFromEmail(emailOrId);
-      username = `${baseUsername}${suffix}`;
+      username = `${AppleOAuthService.generateUsernameFromEmail(emailOrId)}${suffix}`;
     }
 
     return username;
@@ -179,4 +158,3 @@ class AppleOAuthUseCase {
 }
 
 module.exports = AppleOAuthUseCase;
-

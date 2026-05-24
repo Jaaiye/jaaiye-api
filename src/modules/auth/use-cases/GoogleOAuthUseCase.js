@@ -1,6 +1,7 @@
 /**
  * Google OAuth Use Case
- * Handles Google OAuth login/register
+ * Handles Google OAuth login/register.
+ * Refresh tokens stored in Redis. lastLogin is fire-and-forget.
  */
 
 const { ValidationError } = require('../errors');
@@ -17,7 +18,8 @@ class GoogleOAuthUseCase {
     notificationQueue,
     calendarAdapter,
     googleCalendarAdapter,
-    calendarSyncAdapter
+    calendarSyncAdapter,
+    redisAuthService
   }) {
     this.userRepository = userRepository;
     this.firebaseAdapter = firebaseAdapter;
@@ -27,6 +29,7 @@ class GoogleOAuthUseCase {
     this.calendarAdapter = calendarAdapter;
     this.googleCalendarAdapter = googleCalendarAdapter;
     this.calendarSyncAdapter = calendarSyncAdapter;
+    this.redisAuthService = redisAuthService;
   }
 
   /**
@@ -35,31 +38,24 @@ class GoogleOAuthUseCase {
    * @returns {Promise<Object>} { user, accessToken, refreshToken, firebaseToken, isNewUser }
    */
   async execute(dto) {
-    // Validate DTO
     const validation = dto.validate();
     if (!validation.valid) {
       throw new ValidationError(validation.errors.join(', '));
     }
 
-    // Verify Google ID token
     const googlePayload = await OAuthService.verifyGoogleIdToken(dto.idToken);
-
-    // Extract user info
     const googleUserInfo = OAuthService.extractGoogleUserInfo(googlePayload);
 
-    // Check if user exists by email
-    let user = await this.userRepository.findByEmail(googleUserInfo.email); //
+    let user = await this.userRepository.findByEmail(googleUserInfo.email);
     let isNewUser = false;
 
     if (user) {
-      // Existing user - link Google account if not already linked
       if (!user.googleCalendar || !user.googleCalendar.googleId) {
         await this.userRepository.update(user.id, {
           'googleCalendar.googleId': googleUserInfo.googleId
         });
       }
     } else {
-      // New user - create account
       const username = await this._generateUniqueUsername(googleUserInfo.email);
 
       user = await this.userRepository.create({
@@ -79,52 +75,40 @@ class GoogleOAuthUseCase {
       isNewUser = true;
     }
 
-    // Send welcome email for new users (async, non-blocking)
     if (isNewUser) {
       this._sendWelcomeEmail(user).catch(err => {
         console.error('Failed to send welcome email:', err);
       });
     }
 
-    // Create default Jaaiye calendar for all users if they don't have one (async, non-blocking)
-    // This ensures every user who signs in with Google has a calendar
     if (this.calendarAdapter) {
       this.calendarAdapter.createOnRegistration(user).catch(err => {
         console.error('Failed to create default calendar:', err);
       });
     }
 
-    // Note: Firebase auth codes cannot be exchanged for Google Calendar tokens
-    // Users must use the separate Google Calendar OAuth flow:
-    // GET /api/v1/calendars/google/oauth/initiate
-    // This ensures proper refresh token handling and avoids invalid_grant errors
     if (dto.serverAuthCode) {
       console.log('Note: serverAuthCode provided but Calendar linking requires separate OAuth flow');
-      // Don't attempt to exchange Firebase codes for Calendar tokens
     }
 
-    // Create user entity (use refreshed user if calendar was linked)
     const userEntity = new UserEntity(user);
-
-    // Check if user can login
     userEntity.canLogin();
 
-    // Generate tokens
     const accessToken = TokenService.generateAccessToken(userEntity);
     const refreshToken = TokenService.generateRefreshToken(userEntity.id);
     const firebaseToken = this.firebaseAdapter
       ? await this.firebaseAdapter.generateToken(userEntity.id)
       : null;
 
-    // Save refresh token to user
-    const { addDaysToNow, now } = require('../../../utils/dateUtils');
-    const refreshExpiry = addDaysToNow(90); // 90 days from now (UTC)
-    await this.userRepository.update(userEntity.id, {
-      'refresh.token': refreshToken,
-      'refresh.firebaseToken': firebaseToken,
-      'refresh.expiresAt': refreshExpiry,
-      lastLogin: now()
-    });
+    const decoded = TokenService.verifyRefreshToken(refreshToken);
+
+    // Store refresh session in Redis
+    await this.redisAuthService.storeRefreshToken(userEntity.id, decoded.jti);
+
+    // Record lastLogin fire-and-forget
+    await this.redisAuthService.recordLastLogin(userEntity.id, (timestamp) =>
+      this.userRepository.updateLastLogin(userEntity.id, timestamp)
+    );
 
     return {
       user: userEntity,
@@ -135,10 +119,7 @@ class GoogleOAuthUseCase {
     };
   }
 
-  /**
-   * Send welcome email (private helper)
-   * @private
-   */
+  /** @private */
   async _sendWelcomeEmail(user) {
     if (this.notificationQueue) {
       await this.notificationQueue.add('send-welcome-email', {
@@ -154,10 +135,7 @@ class GoogleOAuthUseCase {
     }
   }
 
-  /**
-   * Generate unique username from email
-   * @private
-   */
+  /** @private */
   async _generateUniqueUsername(email) {
     let username = OAuthService.generateUsernameFromEmail(email);
     let suffix = 0;
@@ -172,4 +150,3 @@ class GoogleOAuthUseCase {
 }
 
 module.exports = GoogleOAuthUseCase;
-

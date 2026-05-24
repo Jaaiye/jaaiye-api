@@ -10,14 +10,14 @@ const express = require('express');
  * @param {Object} dependencies - { authController, authMiddleware }
  * @returns {express.Router}
  */
-function createAuthRoutes({ authController, authMiddleware }) {
+function createAuthRoutes({ authController, authMiddleware, loginRateLimiter }) {
   const router = express.Router();
 
   // POST /auth/register - Register new user
   router.post('/register', authController.register);
 
-  // POST /auth/login - Login user
-  router.post('/login', authController.login);
+  // POST /auth/login - Login user (rate limited)
+  router.post('/login', loginRateLimiter || [], authController.login);
 
   // POST /auth/google/signin - Google OAuth login/register
   router.post('/google/signin', authController.googleOAuth);

@@ -1,22 +1,21 @@
 /**
  * Authentication Middleware
- * Presentation layer - middleware
- * Validates JWT tokens and attaches user to request
+ * Validates JWT tokens and attaches user to request.
+ * Also maintains online presence heartbeat via Redis.
  */
 
 const { asyncHandler } = require('../../utils/asyncHandler');
 const { TokenService } = require('../common/services');
-const { UnauthorizedError } = require('../common/errors');
+const { UnauthorizedError, TooManyRequestsError } = require('../common/errors');
 const { UserEntity } = require('../common/entities');
 
 /**
  * Create authentication middleware
- * @param {Object} dependencies - { userRepository, tokenBlacklistRepository }
+ * @param {Object} dependencies
  * @returns {Function} Express middleware
  */
-function createAuthMiddleware({ userRepository, tokenBlacklistRepository }) {
+function createAuthMiddleware({ userRepository, tokenBlacklistRepository, redisAuthService }) {
   return asyncHandler(async (req, res, next) => {
-    // Extract token from header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,10 +24,10 @@ function createAuthMiddleware({ userRepository, tokenBlacklistRepository }) {
 
     const token = authHeader.split(' ')[1];
 
-    // Verify token
+    // Verify signature + expiry
     const decoded = TokenService.verifyAccessToken(token);
 
-    // Check if token is blacklisted
+    // Check blacklist (Redis — O(1), no DB)
     const isBlacklisted = await tokenBlacklistRepository.isBlacklisted(token);
     if (isBlacklisted) {
       throw new UnauthorizedError('Token is invalid');
@@ -37,27 +36,23 @@ function createAuthMiddleware({ userRepository, tokenBlacklistRepository }) {
     // Find user
     const user = await userRepository.findById(decoded.id);
     if (!user) {
-      console.error('[Auth Middleware] User lookup failed:', {
-        userId: decoded.id,
-        userIdType: typeof decoded.id,
-        path: req.path,
-        method: req.method
-      });
       throw new UnauthorizedError('User not found');
     }
 
-    // Create user entity
     const userEntity = new UserEntity(user);
-
-    // Check if user can login (will throw if blocked)
     userEntity.canLogin();
 
-    // Attach user to request
-    // Add _id for compatibility with controllers that use req.user._id
     const userObj = userEntity.toObject();
     userObj._id = userEntity.id;
     req.user = userObj;
     req.token = token;
+
+    // Online presence heartbeat — fire-and-forget (never block the request)
+    if (redisAuthService) {
+      redisAuthService.markOnline(userEntity.id).catch(err => {
+        console.error('[Auth] Online presence heartbeat failed:', err);
+      });
+    }
 
     next();
   });
@@ -65,16 +60,14 @@ function createAuthMiddleware({ userRepository, tokenBlacklistRepository }) {
 
 /**
  * Create optional authentication middleware
- * Tries to authenticate but doesn't fail if no token is provided
- * @param {Object} dependencies - { userRepository, tokenBlacklistRepository }
+ * Tries to authenticate but doesn't fail if no token is provided.
+ * @param {Object} dependencies
  * @returns {Function} Express middleware
  */
-function createOptionalAuthMiddleware({ userRepository, tokenBlacklistRepository }) {
+function createOptionalAuthMiddleware({ userRepository, tokenBlacklistRepository, redisAuthService }) {
   return asyncHandler(async (req, res, next) => {
-    // Extract token from header
     const authHeader = req.headers.authorization;
 
-    // If no token, continue without authentication
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       req.user = null;
       return next();
@@ -82,44 +75,38 @@ function createOptionalAuthMiddleware({ userRepository, tokenBlacklistRepository
 
     try {
       const token = authHeader.split(' ')[1];
-
-      // Verify token
       const decoded = TokenService.verifyAccessToken(token);
 
-      // Check if token is blacklisted
       const isBlacklisted = await tokenBlacklistRepository.isBlacklisted(token);
       if (isBlacklisted) {
         req.user = null;
         return next();
       }
 
-      // Find user
       const user = await userRepository.findById(decoded.id);
       if (!user) {
         req.user = null;
         return next();
       }
 
-      // Create user entity
       const userEntity = new UserEntity(user);
 
-      // Check if user can login (will throw if blocked)
       try {
         userEntity.canLogin();
-      } catch (error) {
-        // User is blocked or can't login, continue without auth
+      } catch {
         req.user = null;
         return next();
       }
 
-      // Attach user to request
-      // Add _id for compatibility with controllers that use req.user._id
       const userObj = userEntity.toObject();
       userObj._id = userEntity.id;
       req.user = userObj;
       req.token = token;
-    } catch (error) {
-      // Token invalid or any other error, continue without auth
+
+      if (redisAuthService) {
+        redisAuthService.markOnline(userEntity.id).catch(() => { });
+      }
+    } catch {
       req.user = null;
     }
 
@@ -127,6 +114,35 @@ function createOptionalAuthMiddleware({ userRepository, tokenBlacklistRepository
   });
 }
 
+/**
+ * Login rate limiting middleware.
+ * Applied to the login route; blocks IPs with too many failed attempts.
+ * @param {Object} redisAuthService
+ * @returns {Function} Express middleware
+ */
+function createLoginRateLimiter(redisAuthService) {
+  return asyncHandler(async (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const { allowed, retryAfterSeconds } = await redisAuthService.checkLoginRateLimit(ip);
+
+    if (!allowed) {
+      res.set('Retry-After', String(retryAfterSeconds));
+      throw new TooManyRequestsError(
+        `Too many login attempts. Please try again in ${Math.ceil(retryAfterSeconds / 60)} minute(s).`
+      );
+    }
+
+    // Clear rate limit on successful login
+    res.on('finish', () => {
+      if (res.statusCode === 200 || res.statusCode === 201) {
+        redisAuthService.clearLoginRateLimit(ip).catch(() => { });
+      }
+    });
+
+    next();
+  });
+}
+
 module.exports.createAuthMiddleware = createAuthMiddleware;
 module.exports.createOptionalAuthMiddleware = createOptionalAuthMiddleware;
-
+module.exports.createLoginRateLimiter = createLoginRateLimiter;

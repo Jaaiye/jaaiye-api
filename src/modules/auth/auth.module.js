@@ -40,7 +40,8 @@ const {
 
 // Presentation
 const AuthController = require('./auth.controller');
-const { createAuthMiddleware, createOptionalAuthMiddleware, createLoginRateLimiter } = require('./middleware');
+const { createAuthMiddleware, createOptionalAuthMiddleware } = require('./middleware');
+// const { createAuthMiddleware, createOptionalAuthMiddleware, createLoginRateLimiter } = require('./middleware');
 const createAuthRoutes = require('./auth.routes');
 
 class AuthModule {
@@ -367,16 +368,16 @@ class AuthModule {
     return createAuthRoutes({
       authController: this.getAuthController(),
       authMiddleware: this.getAuthMiddleware(),
-      loginRateLimiter: this.getLoginRateLimiter()
+      // loginRateLimiter: this.getLoginRateLimiter()
     });
   }
 
-  getLoginRateLimiter() {
-    if (!this._instances.loginRateLimiter) {
-      this._instances.loginRateLimiter = createLoginRateLimiter(this.getRedisAuthService());
-    }
-    return this._instances.loginRateLimiter;
-  }
+  // getLoginRateLimiter() {
+  //   if (!this._instances.loginRateLimiter) {
+  //     this._instances.loginRateLimiter = createLoginRateLimiter(this.getRedisAuthService());
+  //   }
+  //   return this._instances.loginRateLimiter;
+  // }
 
   /**
    * Get protect middleware (alias for getAuthMiddleware)

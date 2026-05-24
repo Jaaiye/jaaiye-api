@@ -6,7 +6,7 @@
 
 const jwt = require('jsonwebtoken');
 const { randomUUID } = require('crypto');
-const { TokenExpiredError, InvalidTokenError } = require('../errors');
+const { AccessTokenExpiredError, InvalidAccessTokenError, RefreshTokenExpiredError, InvalidRefreshTokenError } = require('../errors');
 
 class TokenService {
   /**
@@ -61,9 +61,9 @@ class TokenService {
       return decoded;
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
-        throw new TokenExpiredError('Access token has expired');
+        throw new AccessTokenExpiredError('Access token has expired');
       }
-      throw new InvalidTokenError('Invalid access token');
+      throw new InvalidAccessTokenError('Invalid access token');
     }
   }
 
@@ -80,9 +80,9 @@ class TokenService {
       return decoded;
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
-        throw new TokenExpiredError('Refresh token has expired');
+        throw new RefreshTokenExpiredError('Refresh token has expired');
       }
-      throw new InvalidTokenError('Invalid refresh token');
+      throw new InvalidRefreshTokenError('Invalid refresh token');
     }
   }
 

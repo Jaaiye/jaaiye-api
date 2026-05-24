@@ -26,17 +26,31 @@ class InvalidCredentialsError extends AppError {
   }
 }
 
-class TokenExpiredError extends AppError {
-  constructor(message = 'Token has expired') {
+class AccessTokenExpiredError extends AppError {
+  constructor(message = 'Access token has expired') {
     super(message, 401);
-    this.name = 'TokenExpiredError';
+    this.name = 'AccessTokenExpiredError';
   }
 }
 
-class InvalidTokenError extends AppError {
-  constructor(message = 'Invalid token') {
+class RefreshTokenExpiredError extends AppError {
+  constructor(message = 'Refresh token has expired') {
     super(message, 401);
-    this.name = 'InvalidTokenError';
+    this.name = 'RefreshTokenExpiredError';
+  }
+}
+
+class InvalidAccessTokenError extends AppError {
+  constructor(message = 'Invalid access token') {
+    super(message, 401);
+    this.name = 'InvalidAccessTokenError';
+  }
+}
+
+class InvalidRefreshTokenError extends AppError {
+  constructor(message = 'Invalid refresh token') {
+    super(message, 401);
+    this.name = 'InvalidRefreshTokenError';
   }
 }
 
@@ -135,8 +149,10 @@ module.exports = {
   EmailNotVerifiedError,
   AccountBlockedError,
   InvalidCredentialsError,
-  TokenExpiredError,
-  InvalidTokenError,
+  AccessTokenExpiredError,
+  RefreshTokenExpiredError,
+  InvalidAccessTokenError,
+  InvalidRefreshTokenError,
   VerificationCodeExpiredError,
   InvalidVerificationCodeError,
   ValidationError,

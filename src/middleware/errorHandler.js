@@ -211,6 +211,18 @@ const errorHandler = (error, req, res, next) => {
   } else if (error.name === 'TokenExpiredError') {
     status = 401;
     payload = { ...handleJWTExpiredError(error), traceId };
+  } else if (error.name === 'AccessTokenExpiredError') {
+    status = 401;
+    payload = { ...handleAccessTokenExpiredError(error), traceId };
+  } else if (error.name === 'RefreshTokenExpiredError') {
+    status = 401;
+    payload = { ...handleRefreshTokenExpiredError(error), traceId };
+  } else if (error.name === 'InvalidAccessTokenError') {
+    status = 401;
+    payload = { ...handleInvalidAccessTokenError(error), traceId };
+  } else if (error.name === 'InvalidRefreshTokenError') {
+    status = 401;
+    payload = { ...handleInvalidRefreshTokenError(error), traceId };
   } else if (error.code === 11000) {
     status = 409;
     payload = { ...handleDuplicateKeyError(error), traceId };

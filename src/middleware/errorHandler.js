@@ -104,6 +104,26 @@ const handleJWTExpiredError = (error) => {
   };
 };
 
+const handleAccessTokenExpiredError = (error) => {
+  logger.warn('Access Token Expired', sanitizeLogData({ errorMessage: error.message }));
+  return { success: false, error: error.message, code: 'ACCESS_TOKEN_EXPIRED' };
+};
+
+const handleAccessTokenInvalidError = (error) => {
+  logger.warn('Access Token Invalid', sanitizeLogData({ errorMessage: error.message }));
+  return { success: false, error: error.message, code: 'ACCESS_TOKEN_INVALID' };
+};
+
+const handleRefreshTokenExpiredError = (error) => {
+  logger.warn('Refresh Token Expired', sanitizeLogData({ errorMessage: error.message }));
+  return { success: false, error: error.message, code: 'REFRESH_TOKEN_EXPIRED' };
+};
+
+const handleRefreshTokenInvalidError = (error) => {
+  logger.warn('Refresh Token Invalid', sanitizeLogData({ errorMessage: error.message }));
+  return { success: false, error: error.message, code: 'REFRESH_TOKEN_INVALID' };
+};
+
 const handleDuplicateKeyError = (error) => {
   const field = Object.keys(error.keyValue)[0];
 
@@ -219,10 +239,10 @@ const errorHandler = (error, req, res, next) => {
     payload = { ...handleRefreshTokenExpiredError(error), traceId };
   } else if (error.name === 'InvalidAccessTokenError') {
     status = 401;
-    payload = { ...handleInvalidAccessTokenError(error), traceId };
+    payload = { ...handleAccessTokenInvalidError(error), traceId };
   } else if (error.name === 'InvalidRefreshTokenError') {
     status = 401;
-    payload = { ...handleInvalidRefreshTokenError(error), traceId };
+    payload = { ...handleRefreshTokenInvalidError(error), traceId };
   } else if (error.code === 11000) {
     status = 409;
     payload = { ...handleDuplicateKeyError(error), traceId };

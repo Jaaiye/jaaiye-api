@@ -71,6 +71,40 @@ class EmailAdapter {
   }
 
   /**
+   * Send influencer welcome email
+   * @param {Object} data - Email data { email, name, code }
+   */
+  async sendInfluencerWelcomeEmail({ email, name, code }) {
+    try {
+      await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: 'Your Influencer Referral Code - Jaaiye',
+        html: this._buildInfluencerWelcomeEmailHtml(name, code)
+      });
+    } catch (error) {
+      console.error('Failed to send influencer welcome email:', error);
+    }
+  }
+
+  /**
+   * Send referral success notification
+   * @param {Object} data - Email data { email, name, currentCount }
+   */
+  async sendReferralSuccessEmail({ email, name, currentCount }) {
+    try {
+      await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: 'New Referral Milestone! - Jaaiye',
+        html: this._buildReferralSuccessEmailHtml(name, currentCount)
+      });
+    } catch (error) {
+      console.error('Failed to send referral success email:', error);
+    }
+  }
+
+  /**
    * Build verification email HTML
    * @private
    */
@@ -160,6 +194,69 @@ class EmailAdapter {
             </div>
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center;">
               <p style="margin: 0;">© ${new Date().getFullYear()} Jaaiye. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Build influencer welcome email HTML
+   * @private
+   */
+  _buildInfluencerWelcomeEmailHtml(name, code) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f9f9f9; margin: 0; padding: 0;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+            <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #eee;">
+              <img src="${this.logoUrl}" alt="Jaaiye" style="max-width: 150px; height: auto; display: block; margin: 0 auto;" />
+            </div>
+            <div style="padding: 30px 20px;">
+              <h2 style="color: #333;">Welcome to the Jaaiye Influencer Program!</h2>
+              <p>Hi ${name},</p>
+              <p>We are excited to have you as a micro-influencer for Jaaiye. Here is your unique referral code:</p>
+              <div style="font-size: 32px; font-weight: bold; color: #6f42c1; text-align: center; padding: 20px; background: #f4f4f4; border-radius: 8px; margin: 20px 0;">${code}</div>
+              <p>You can share this code with your followers to track sign-ups. You will receive an email every time someone joins using your code!</p>
+            </div>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center;">
+              <p>© ${new Date().getFullYear()} Jaaiye. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Build referral success email HTML
+   * @private
+   */
+  _buildReferralSuccessEmailHtml(name, currentCount) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f9f9f9; margin: 0; padding: 0;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+            <div style="text-align: center; padding: 20px 0; border-bottom: 1px solid #eee;">
+              <img src="${this.logoUrl}" alt="Jaaiye" style="max-width: 150px; height: auto; display: block; margin: 0 auto;" />
+            </div>
+            <div style="padding: 30px 20px;">
+              <h2 style="color: #28a745;">New Referral Success! 🎉</h2>
+              <p>Hi ${name},</p>
+              <p>Great news! Someone just signed up using your referral code.</p>
+              <div style="text-align: center; padding: 20px; margin: 20px 0; background: #e9ecef; border-radius: 8px;">
+                <p style="font-size: 18px; margin: 0;">Total referrals to date:</p>
+                <h1 style="font-size: 48px; color: #28a745; margin: 10px 0;">${currentCount}</h1>
+              </div>
+              <p>Keep up the great work!</p>
+            </div>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center;">
+              <p>© ${new Date().getFullYear()} Jaaiye. All rights reserved.</p>
             </div>
           </div>
         </body>

@@ -4,11 +4,12 @@
  */
 
 class RegisterDTO {
-  constructor({ email, username, fullName, password }) {
+  constructor({ email, username, fullName, password, referralCode }) {
     this.email = email?.toLowerCase().trim();
     // this.username = username?.trim();
     // this.fullName = fullName?.trim();
     this.password = password;
+    this.referralCode = referralCode?.trim();
   }
 
   /**

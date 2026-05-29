@@ -56,7 +56,18 @@ class RegisterUseCase {
     await this.redisAuthService.storeVerifyCode(user.id, verificationCode, 10 * 60);
 
     // Send verification email (async, non-blocking)
-    this._sendVerificationEmail(user, verificationCode).catch(err => {
+    const appEventEmitter = require('../../../utils/events');
+    this._sendVerificationEmail(user, verificationCode).then(() => {
+      // Emit registration event for other modules (like Referral)
+      appEventEmitter.emit('auth.user.registered', {
+        userId: user.id,
+        referralCode: dto.referralCode,
+        metadata: {
+          email: user.email,
+          createdAt: user.createdAt
+        }
+      });
+    }).catch(err => {
       console.error('Failed to send verification email:', err);
     });
 

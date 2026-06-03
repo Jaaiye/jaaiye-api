@@ -279,6 +279,7 @@ app.use('/api/v1/tickets', require('./modules/ticket/ticket.module').getTicketRo
 app.use('/api/v1/transactions', require('./modules/payment/payment.module').getTransactionRoutes());
 app.use('/api/v1/payments', require('./modules/payment/payment.module').getPaymentRoutes());
 app.use('/api/v1/wallets', require('./modules/wallet/wallet.module').getWalletRoutes());
+app.use('/api/v1/referrals', require('./modules/referral/referral.module').getReferralRoutes());
 app.use('/api/v1/app-config', require('./modules/common/app-config.module').getAppConfigRoutes());
 app.use('/api/v1/webhook', require('./routes/webhookRoutes'));
 

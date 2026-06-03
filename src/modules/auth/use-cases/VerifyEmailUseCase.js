@@ -48,12 +48,12 @@ class VerifyEmailUseCase {
 
     if (storedCode !== code) {
       // Put the code back so the user can retry without requesting a new one
-      await this.redisAuthService.storeVerifyCode(userId, storedCode);
+      await this.redisAuthService.storeVerifyCode(user.id, storedCode);
       throw new BadRequestError('Invalid verification code');
     }
 
     // Mark email as verified in DB
-    await this.userRepository.markEmailVerified(userId);
+    await this.userRepository.markEmailVerified(user.id);
 
     // Send welcome email (async, non-blocking)
     this._sendWelcomeEmail(user).catch(err => {

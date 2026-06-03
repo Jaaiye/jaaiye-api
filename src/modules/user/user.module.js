@@ -124,10 +124,12 @@ class UserModule {
 
   getUpdateEmailUseCase() {
     if (!this._instances.updateEmailUseCase) {
+      const authModule = require('../auth/auth.module');
       this._instances.updateEmailUseCase = new UpdateEmailUseCase({
         userRepository: this.getUserRepository(),
         emailAdapter: this.getEmailAdapter(),
-        notificationAdapter: this.getNotificationAdapter()
+        notificationAdapter: this.getNotificationAdapter(),
+        redisAuthService: authModule.getRedisAuthService()
       });
     }
     return this._instances.updateEmailUseCase;
@@ -144,20 +146,15 @@ class UserModule {
   }
 
   getLogoutUseCase() {
-    if (!this._instances.logoutUseCase) {
-      this._instances.logoutUseCase = new LogoutUseCase({
-        userRepository: this.getUserRepository(),
-        notificationAdapter: this.getNotificationAdapter()
-      });
-    }
-    return this._instances.logoutUseCase;
+    const authModule = require('../auth/auth.module');
+    return authModule.getLogoutUseCase();
   }
 
   getDeleteAccountUseCase() {
     if (!this._instances.deleteAccountUseCase) {
       this._instances.deleteAccountUseCase = new DeleteAccountUseCase({
         userRepository: this.getUserRepository(),
-        notificationAdapter: this.getNotificationAdapter()
+        emailAdapter: this.getEmailAdapter()
       });
     }
     return this._instances.deleteAccountUseCase;

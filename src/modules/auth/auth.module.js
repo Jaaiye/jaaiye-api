@@ -154,7 +154,8 @@ class AuthModule {
         emailService: this.getEmailAdapter(),
         emailQueue: this.getEmailQueue(),
         notificationQueue: this.getNotificationQueue(),
-        calendarAdapter: this.getCalendarAdapter()
+        calendarAdapter: this.getCalendarAdapter(),
+        redisAuthService: this.getRedisAuthService()
       });
     }
     return this._instances.registerUseCase;

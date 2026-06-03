@@ -10,12 +10,13 @@ const { UserEntity } = require('../../common/entities');
 const { addDaysToNow } = require('../../../utils/dateUtils');
 
 class RegisterUseCase {
-  constructor({ userRepository, emailService, emailQueue, notificationQueue, calendarAdapter }) {
+  constructor({ userRepository, emailService, emailQueue, notificationQueue, calendarAdapter, redisAuthService }) {
     this.userRepository = userRepository;
     this.emailService = emailService;
     this.emailQueue = emailQueue;
     this.notificationQueue = notificationQueue;
     this.calendarAdapter = calendarAdapter;
+    this.redisAuthService = redisAuthService;
   }
 
   /**

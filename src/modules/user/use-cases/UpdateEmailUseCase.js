@@ -8,10 +8,11 @@ const { PasswordService } = require('../../common/services');
 const { EMAIL_CONSTANTS } = require('../../../../constants');
 
 class UpdateEmailUseCase {
-  constructor({ userRepository, emailAdapter, notificationAdapter }) {
+  constructor({ userRepository, emailAdapter, notificationAdapter, redisAuthService }) {
     this.userRepository = userRepository;
     this.emailAdapter = emailAdapter;
     this.notificationAdapter = notificationAdapter;
+    this.redisAuthService = redisAuthService;
   }
 
   /**
@@ -55,8 +56,8 @@ class UpdateEmailUseCase {
       emailVerified: false
     });
 
-    // Set verification code
-    await this.userRepository.setVerificationCode(userId, verificationCode, codeExpiry);
+    // Set verification code in Redis (10 minutes)
+    await this.redisAuthService.storeVerifyCode(userId, verificationCode, 10 * 60);
 
     // Send verification email in background
     if (this.emailAdapter) {

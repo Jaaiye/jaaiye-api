@@ -5,6 +5,8 @@
  * This service is framework-agnostic and delegates persistence to repositories.
  */
 
+const { SERVICE_FEE_RATE } = require('../../../constants/paymentConstants');
+
 class WalletService {
   constructor({ walletRepository, walletLedgerEntryRepository }) {
     this.walletRepository = walletRepository;
@@ -50,10 +52,10 @@ class WalletService {
       throw new Error('Invalid transaction amount for wallet funding');
     }
 
-    // Use stored feeAmount if available, otherwise calculate 5%
+    // Use stored feeAmount if available, otherwise calculate the platform fee
     const fee = Number(transactionEntity.feeAmount) !== undefined && transactionEntity.feeAmount !== null
       ? Number(transactionEntity.feeAmount)
-      : baseAmount * 0.05;
+      : baseAmount * SERVICE_FEE_RATE;
 
     const netAmountForUser = baseAmount; // The full ticket price before platform fee
 

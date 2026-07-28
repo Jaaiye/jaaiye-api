@@ -7,6 +7,7 @@
 const logger = require('../../../utils/logger');
 const CreateTicketDTO = require('../../ticket/dto/CreateTicketDTO');
 const authService = require('../../auth/services/auth.service');
+const { SERVICE_FEE_RATE } = require('../../../constants/paymentConstants');
 
 class PaymentService {
   constructor({
@@ -531,7 +532,7 @@ class PaymentService {
               const creator = await this.userRepository.findById(group.creator);
               if (creator && creator.email) {
                 const grossAmount = Number(transaction.amount);
-                const feeAmount = grossAmount * 0.05;
+                const feeAmount = grossAmount * SERVICE_FEE_RATE;
                 const netAmount = grossAmount - feeAmount;
                 const walletBalanceAfter = fundingResult.walletBalance;
 
@@ -575,7 +576,7 @@ class PaymentService {
               const owner = await this.userRepository.findById(event.creatorId);
               if (owner && owner.email) {
                 const grossAmount = Number(transaction.amount);
-                const feeAmount = grossAmount * 0.05;
+                const feeAmount = grossAmount * SERVICE_FEE_RATE;
                 const netAmount = grossAmount;
                 const walletBalanceAfter = fundingResult.walletBalance;
 

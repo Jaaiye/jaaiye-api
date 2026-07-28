@@ -105,7 +105,7 @@ class RequestWithdrawalWithPayoutUseCase {
         ownerId,
         requestedBy,
         requestedAmount: withdrawalAmount,
-        feeMode: 'EXCLUSIVE' // 5% service fee for EVENT withdrawals
+        feeMode: 'EXCLUSIVE' // platform service fee (see SERVICE_FEE_RATE) for EVENT withdrawals
       });
     } catch (error) {
       logger.error('Wallet withdrawal failed', {

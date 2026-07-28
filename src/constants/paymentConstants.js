@@ -26,10 +26,14 @@ const PAYMENT_PROVIDERS = {
 
 const DEFAULT_QUANTITY = 1;
 
+// Platform service fee charged on ticket revenue / event withdrawals
+const SERVICE_FEE_RATE = 0.075; // 7.5%
+
 module.exports = {
   ERROR_MESSAGES,
   WEBHOOK_RESPONSE,
   PAYMENT_PROVIDERS,
-  DEFAULT_QUANTITY
+  DEFAULT_QUANTITY,
+  SERVICE_FEE_RATE
 };
 

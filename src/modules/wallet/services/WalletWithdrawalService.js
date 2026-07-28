@@ -10,6 +10,8 @@
  * Fee behaviour is intentionally open-ended for now (fee = 0).
  */
 
+const { SERVICE_FEE_RATE } = require('../../../constants/paymentConstants');
+
 class WalletWithdrawalService {
   constructor({
     walletRepository,
@@ -99,10 +101,10 @@ class WalletWithdrawalService {
 
     const currentBalance = Number(wallet.balance || 0);
 
-    // Default fee logic: EVENT owners pay 5% service fee
+    // Default fee logic: EVENT owners pay the platform service fee
     let feeAmount = 0;
     if (ownerType === 'EVENT') {
-      feeAmount = amount * 0.05;
+      feeAmount = amount * SERVICE_FEE_RATE;
     }
 
     const totalDebit = amount; // The requested amount is the total debit from wallet

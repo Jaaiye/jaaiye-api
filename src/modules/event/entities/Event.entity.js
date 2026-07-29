@@ -202,7 +202,12 @@ class EventEntity {
       category: this.category,
       privacy: this.privacy,
       status: this.status,
-      ticketTypes: this.ticketTypes,
+      ticketTypes: this.ticketTypes.map(tt => ({
+        ...tt,
+        unsoldCount: tt.capacity !== null && tt.capacity !== undefined
+          ? Math.max(0, tt.capacity - (tt.soldCount || 0))
+          : null
+      })),
       ticketFee: this.ticketFee,
       attendeeCount: this.attendeeCount,
       image: this.image,

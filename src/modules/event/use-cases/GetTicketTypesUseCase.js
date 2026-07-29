@@ -18,20 +18,26 @@ class GetTicketTypesUseCase {
     }
 
     // Return all ticket types (not just available ones)
-    const ticketTypes = (event.ticketTypes || []).map(tt => ({
-      id: tt._id?.toString() || tt.id,
-      type: tt.type || 'custom',
-      name: tt.name,
-      description: tt.description,
-      price: Number(tt.price || 0),
-      admissionSize: Number(tt.admissionSize || 1),
-      capacity: tt.capacity !== null && tt.capacity !== undefined ? Number(tt.capacity) : null,
-      soldCount: Number(tt.soldCount || 0),
-      quantityLimit: tt.quantityLimit !== null && tt.quantityLimit !== undefined ? Number(tt.quantityLimit) : null,
-      isActive: tt.isActive !== undefined ? tt.isActive : true,
-      salesStartDate: tt.salesStartDate,
-      salesEndDate: tt.salesEndDate
-    }));
+    const ticketTypes = (event.ticketTypes || []).map(tt => {
+      const capacity = tt.capacity !== null && tt.capacity !== undefined ? Number(tt.capacity) : null;
+      const soldCount = Number(tt.soldCount || 0);
+
+      return {
+        id: tt._id?.toString() || tt.id,
+        type: tt.type || 'custom',
+        name: tt.name,
+        description: tt.description,
+        price: Number(tt.price || 0),
+        admissionSize: Number(tt.admissionSize || 1),
+        capacity,
+        soldCount,
+        unsoldCount: capacity !== null ? Math.max(0, capacity - soldCount) : null,
+        quantityLimit: tt.quantityLimit !== null && tt.quantityLimit !== undefined ? Number(tt.quantityLimit) : null,
+        isActive: tt.isActive !== undefined ? tt.isActive : true,
+        salesStartDate: tt.salesStartDate,
+        salesEndDate: tt.salesEndDate
+      };
+    });
 
     return {
       ticketTypes,

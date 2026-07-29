@@ -108,11 +108,10 @@ class GetEventUseCase {
         eventData.groupId = group.id;
       }
     }
+    eventData.url = `https://events.jaaiye.com/events/${event.slug}`;
 
-    // Add URL for creators and co-organizers
-    if (isCreator || (teamMember && teamMember.role === 'co_organizer')) {
-      eventData.url = `https://events.jaaiye.com/events/${event.slug}`;
-    }
+    // Creators and co-organizers cannot buy tickets to their own event
+    eventData.canBuyTicket = !(isCreator || (teamMember && teamMember.role === 'co_organizer'));
 
     return eventData;
   }

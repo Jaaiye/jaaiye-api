@@ -28,7 +28,7 @@ const Ticket = require('../modules/Ticket');
 const Event = require('../modules/Event');
 const { ValidationError, NotFoundError, ConflictError } = require('../middleware/errorHandler');
 
-async function createTicketInternal({ eventId, ticketTypeId = null, quantity = 1, userId, assignedTo = null, bypassCapacity = false }) {
+async function createTicketInternal({ eventId, ticketTypeId = null, quantity = 1, userId, assignedTo = null, bypassCapacity = false, referralCode = null }) {
   if (!eventId) {
     throw new ValidationError('Event ID is required');
   }
@@ -113,7 +113,8 @@ async function createTicketInternal({ eventId, ticketTypeId = null, quantity = 1
     ticketTypeName: ticketTypeNameForTracking,
     price: resolvedPrice,
     quantity,
-    assignedTo
+    assignedTo,
+    referralCode
   });
 
   // Ensure a human-readable publicId (e.g., jaaiye-XXXXXX)

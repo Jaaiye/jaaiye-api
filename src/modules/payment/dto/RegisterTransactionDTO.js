@@ -22,6 +22,7 @@ class RegisterTransactionDTO {
     this.ticketTypes = data.ticketTypes || [];
     this.metadata = data.metadata || {};
     this.userId = data.userId; // Optional, can come from req.user
+    this.referralCode = data.referralCode || null;
   }
 
   validate() {

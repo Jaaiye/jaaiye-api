@@ -55,7 +55,8 @@ class InitializeFlutterwavePaymentUseCase {
         eventId: dto.eventId,
         quantity: dto.quantity,
         userId: dto.userId,
-        ticketTypes: Array.isArray(dto.ticketTypes) ? JSON.stringify(dto.ticketTypes) : (dto.ticketTypes || '[]')
+        ticketTypes: Array.isArray(dto.ticketTypes) ? JSON.stringify(dto.ticketTypes) : (dto.ticketTypes || '[]'),
+        referralCode: dto.referralCode || null
       };
 
       const result = await this.flutterwaveAdapter.initializePayment({

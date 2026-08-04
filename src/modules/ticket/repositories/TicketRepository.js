@@ -38,6 +38,7 @@ class TicketRepository extends ITicketRepository {
       checkedInCount: data.checkedInCount,
       usedAt: data.usedAt,
       verifiedBy: verifiedBy,
+      referralCode: data.referralCode,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt
     });

@@ -18,6 +18,7 @@ class CreateTicketDTO {
     this.transactionId = data.transactionId || null;
     this.price = data.price || null;
     this.admissionSize = data.admissionSize || null;
+    this.referralCode = data.referralCode || null;
   }
 
   validate() {

@@ -67,7 +67,7 @@ async function addEventToUserCalendar(userId, eventId) {
 }
 
 async function handleSuccessfulPayment({ provider, reference, amount, currency, metadata, raw }) {
-  const { eventId, groupId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [] } = metadata || {};
+  const { eventId, groupId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [], referralCode } = metadata || {};
 
   // Parse metadata safely (Flutterwave sometimes stringifies arrays or objects in meta)
   let parsedTicketTypes = [];
@@ -144,7 +144,8 @@ async function handleSuccessfulPayment({ provider, reference, amount, currency, 
         eventId,
         userId,
         quantity: 1,
-        assignedTo: { name, email }
+        assignedTo: { name, email },
+        referralCode
       });
       createdTickets.push(ticket);
       const { emailQueue } = require('../modules/queue/queue.module');
@@ -175,7 +176,8 @@ async function handleSuccessfulPayment({ provider, reference, amount, currency, 
         eventId,
         ticketTypeId: currentTicketTypeId,
         userId,
-        quantity: admissionSize
+        quantity: admissionSize,
+        referralCode
       });
       createdTickets.push(ticket);
     }

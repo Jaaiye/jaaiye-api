@@ -52,7 +52,8 @@ class RegisterTransactionUseCase {
       ticketTypeId: dto.ticketTypeId,
       metadata: {
         ...(dto.metadata || {}),
-        ticketTypes: dto.ticketTypes || []
+        ticketTypes: dto.ticketTypes || [],
+        referralCode: dto.referralCode || null
       }
     });
 

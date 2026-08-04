@@ -20,6 +20,7 @@ class TicketEntity {
     checkedInCount,
     usedAt,
     verifiedBy,
+    referralCode = null,
     createdAt,
     updatedAt
   }) {
@@ -38,6 +39,7 @@ class TicketEntity {
     this.status = status || 'active';
     this.usedAt = usedAt;
     this.verifiedBy = verifiedBy;
+    this.referralCode = referralCode;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -110,6 +112,7 @@ class TicketEntity {
       publicId: this.publicId,
       status: this.status,
       usedAt: this.usedAt,
+      referralCode: this.referralCode,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     };

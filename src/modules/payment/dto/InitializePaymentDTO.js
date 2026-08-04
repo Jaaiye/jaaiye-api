@@ -14,6 +14,7 @@ class InitializePaymentDTO {
     this.amount = data.amount;
     this.reference = data.reference;
     this.userId = data.userId; // Optional, can come from req.user
+    this.referralCode = data.referralCode || null;
   }
 
   validate() {

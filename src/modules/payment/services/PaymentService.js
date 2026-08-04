@@ -39,7 +39,7 @@ class PaymentService {
    */
   async handleSuccessfulPayment({ provider, reference, amount, currency, metadata, raw }) {
     logger.debug('Payment metadata', metadata);
-    const { eventId, groupId, hangoutId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [] } = metadata || {};
+    const { eventId, groupId, hangoutId, ticketTypeId, ticketTypes, quantity = 1, userId, assignees = [], referralCode } = metadata || {};
 
     // Parse metadata safely (Flutterwave sometimes stringifies arrays or objects in meta)
     let parsedTicketTypes = [];
@@ -125,7 +125,8 @@ class PaymentService {
             quantity: 1,
             admissionSize,
             bypassCapacity: false,
-            transactionId: transaction.id || transaction._id
+            transactionId: transaction.id || transaction._id,
+            referralCode
           });
           const ticket = await this.createTicketUseCase.execute(ticketDTO);
           createdTickets.push(ticket);
@@ -258,7 +259,8 @@ class PaymentService {
             admissionSize: admissionSize, // Number of people this ticket admits
             bypassCapacity: false,
             skipEmail: true, // Prevent individual emails, we'll send one consolidated email
-            transactionId: transaction.id || transaction._id
+            transactionId: transaction.id || transaction._id,
+            referralCode
           });
           const ticket = await this.createTicketUseCase.execute(ticketDTO);
           createdTickets.push(ticket);

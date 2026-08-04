@@ -22,6 +22,11 @@ const ticketSchema = new mongoose.Schema({
   ticketTypeName: {
     type: String,
   },
+  referralCode: {
+    type: String,
+    default: null,
+    index: true
+  },
   price: {
     type: Number,
     required: true,

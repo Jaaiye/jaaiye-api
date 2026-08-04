@@ -56,7 +56,8 @@ class CreateTicketUseCase {
       resolvedPrice,
       admissionSize: resolvedAdmissionSize,
       quantity: 1, // Each record is a single physical ticket/QR code
-      transactionId: dto.transactionId
+      transactionId: dto.transactionId,
+      referralCode: dto.referralCode
     });
 
     const updatedTicket = await this._generateAndSavePublicId(ticket);
@@ -204,7 +205,7 @@ class CreateTicketUseCase {
     return chosenType;
   }
 
-  async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, admissionSize, quantity, transactionId }) {
+  async _createTicket({ targetUserId, eventId, ticketTypeIdForTracking, ticketTypeNameForTracking, resolvedPrice, admissionSize, quantity, transactionId, referralCode }) {
     logger.debug('[CreateTicketUseCase] Creating ticket', {
       userId: targetUserId,
       eventId,
@@ -212,7 +213,8 @@ class CreateTicketUseCase {
       ticketTypeName: ticketTypeNameForTracking,
       price: resolvedPrice,
       admissionSize,
-      quantity
+      quantity,
+      referralCode
     });
 
     const ticket = await this.ticketRepository.create({
@@ -223,7 +225,8 @@ class CreateTicketUseCase {
       transactionId,
       price: resolvedPrice,
       admissionSize,
-      quantity
+      quantity,
+      referralCode
     });
 
     logger.debug('[CreateTicketUseCase] Ticket created', {

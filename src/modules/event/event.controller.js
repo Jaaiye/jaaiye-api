@@ -220,7 +220,8 @@ class EventController {
     }
 
     const userId = req.user?.id || null;
-    const result = await this.listEventsUseCase.execute(userId, dto);
+    const isAdmin = !!req.user && ['admin', 'superadmin'].includes(req.user.role);
+    const result = await this.listEventsUseCase.execute(userId, dto, isAdmin);
 
     return successResponse(res, result);
   });

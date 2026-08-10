@@ -11,9 +11,26 @@ class ListEventsUseCase {
     this.userRepository = userRepository;
   }
 
-  async execute(userId, dto) {
+  async execute(userId, dto, isAdmin = false) {
     const filters = dto.getFilters();
     const options = dto.getOptions();
+
+    if (isAdmin) {
+      // Admins get unrestricted visibility across all creators/participants and
+      // categories (event + hangout, past + upcoming). Only explicit filters the
+      // caller supplied via the DTO (category, calendarId, date range) apply.
+      const { events, total } = await this.eventRepository.find(filters, options);
+
+      return {
+        events: events.map(e => e.toJSON()),
+        pagination: {
+          page: dto.page,
+          limit: dto.limit,
+          total,
+          pages: Math.ceil(total / dto.limit)
+        }
+      };
+    }
 
     filters.startTime = { $gte: new Date() };
 

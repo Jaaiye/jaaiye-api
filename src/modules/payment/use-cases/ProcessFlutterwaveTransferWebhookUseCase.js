@@ -83,11 +83,11 @@ class ProcessFlutterwaveTransferWebhookUseCase {
     // If withdrawal failed, credit the wallet back
     if (!ok) {
       try {
-        const currentBalance = Number(wallet.balance || 0);
         const creditBackAmount = withdrawal.amount + (withdrawal.feeAmount || 0);
-        const newBalance = currentBalance + creditBackAmount;
-
-        await this.walletRepository.updateBalance(wallet.id, newBalance);
+        // Atomic credit - avoids clobbering a concurrent balance change
+        // with a stale read-then-$set.
+        const updatedWallet = await this.walletRepository.credit(wallet.id, creditBackAmount);
+        const newBalance = Number(updatedWallet.balance);
 
         // Create ledger entry for credit-back
         await this.walletLedgerEntryRepository.create({

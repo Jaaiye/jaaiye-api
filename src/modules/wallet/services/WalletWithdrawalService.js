@@ -99,8 +99,6 @@ class WalletWithdrawalService {
       throw new Error('Wallet not found for owner');
     }
 
-    const currentBalance = Number(wallet.balance || 0);
-
     // Default fee logic: EVENT owners pay the platform service fee
     let feeAmount = 0;
     if (ownerType === 'EVENT') {
@@ -110,14 +108,17 @@ class WalletWithdrawalService {
     const totalDebit = amount; // The requested amount is the total debit from wallet
     const payoutAmount = amount - feeAmount; // Remaining is remitted
 
-    if (currentBalance < totalDebit) {
+    // Atomic conditional debit: the balance check and the decrement happen
+    // in one operation, so two concurrent withdrawal requests (or a
+    // withdrawal racing a ticket-sale credit) on the same wallet cannot
+    // both succeed against funds that only cover one of them. Returns null
+    // if the wallet does not currently have enough balance.
+    const updatedWallet = await this.walletRepository.debit(wallet.id, totalDebit);
+    if (!updatedWallet) {
       throw new Error('Insufficient wallet balance for withdrawal');
     }
 
-    const walletBalanceAfter = currentBalance - totalDebit;
-
-    // Update wallet balance
-    const updatedWallet = await this.walletRepository.updateBalance(wallet.id, walletBalanceAfter);
+    const walletBalanceAfter = Number(updatedWallet.balance);
 
     // Create ledger entry for withdrawal
     await this.walletLedgerEntryRepository.create({
@@ -144,7 +145,7 @@ class WalletWithdrawalService {
       feeAmount,
       totalDebit,
       payoutAmount,
-      walletBalanceAfter: Number(updatedWallet.balance || walletBalanceAfter)
+      walletBalanceAfter
     };
   }
 }

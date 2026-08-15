@@ -65,10 +65,11 @@ class AdjustWalletBalanceUseCase {
     }
 
     const balanceBefore = Number(wallet.balance || 0);
-    const balanceAfter = balanceBefore + adjustmentAmount;
 
-    // Update wallet balance
-    await this.walletRepository.updateBalance(wallet.id, balanceAfter);
+    // Atomic increment - avoids clobbering a concurrent credit/debit on
+    // this wallet with a stale read-then-$set.
+    const updatedWallet = await this.walletRepository.incrementBalance(wallet.id, adjustmentAmount);
+    const balanceAfter = Number(updatedWallet.balance);
 
     // Create ledger entry
     await this.walletLedgerEntryRepository.create({

@@ -355,6 +355,8 @@ class PaymentModule {
         updateTransactionUseCase: this.getUpdateTransactionUseCase(),
         processPaystackWebhookUseCase: this.getProcessPaystackWebhookUseCase(),
         processFlutterwaveWebhookUseCase: this.getProcessFlutterwaveWebhookUseCase(),
+        paystackAdapter: this.getPaystackAdapter(),
+        flutterwaveAdapter: this.getFlutterwaveAdapter(),
         getMyTransactionsUseCase: this.getGetMyTransactionsUseCase(),
         listTransactionsUseCase: this.getListTransactionsUseCase()
       });

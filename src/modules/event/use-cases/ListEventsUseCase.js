@@ -32,7 +32,21 @@ class ListEventsUseCase {
       };
     }
 
-    filters.startTime = { $gte: new Date() };
+    // Exclude events that have *ended*, not events that have *started* -
+    // an event that started 10 minutes ago but runs for another 2 hours is
+    // still relevant and must stay visible (this used to filter on
+    // startTime >= now, which silently dropped any currently-ongoing event
+    // for non-admin/unauthenticated callers).
+    const now = new Date();
+    filters.$and = [
+      {
+        $or: [
+          { endTime: { $gte: now } },
+          { endTime: null, startTime: { $gte: now } },
+          { endTime: { $exists: false }, startTime: { $gte: now } }
+        ]
+      }
+    ];
 
     // Check if user is a guest
     const user = userId ? await this.userRepository.findById(userId) : null;

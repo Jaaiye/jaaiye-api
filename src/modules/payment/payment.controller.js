@@ -34,6 +34,8 @@ class PaymentController {
     updateTransactionUseCase,
     processPaystackWebhookUseCase,
     processFlutterwaveWebhookUseCase,
+    paystackAdapter,
+    flutterwaveAdapter,
     getMyTransactionsUseCase,
     listTransactionsUseCase
   }) {
@@ -135,12 +137,22 @@ class PaymentController {
     });
 
     this.handlePaystackWebhook = asyncHandler(async (req, res) => {
+      // Verify the signature *before* acknowledging the request. An invalid
+      // signature must never get a 200 - that would train an attacker (or
+      // a misbehaving retry) that unsigned requests are accepted.
+      if (!paystackAdapter.isValidSignature(req.headers, req.body, req.rawBody)) {
+        logger.warn('Rejected Paystack webhook with invalid signature');
+        return res.status(401).json({ received: false, error: 'invalid_signature' });
+      }
+
       res.status(200).json({ received: true });
 
-      // Process webhook asynchronously
+      // The rest (verifying with Paystack's API, creating tickets, sending
+      // email) can take a while - do it after responding so Paystack's
+      // retry timeout isn't a factor.
       (async () => {
         try {
-          const result = await processPaystackWebhookUseCase.execute(req.headers, req.body);
+          const result = await processPaystackWebhookUseCase.execute(req.headers, req.body, req.rawBody);
           if (result && result.ok) {
             logger.info('Paystack webhook processed successfully');
           } else {
@@ -153,12 +165,19 @@ class PaymentController {
     });
 
     this.handleFlutterwaveWebhook = asyncHandler(async (req, res) => {
+      // Verify the signature *before* acknowledging the request - see note
+      // in handlePaystackWebhook above.
+      if (!flutterwaveAdapter.isValidSignature(req.headers, req.body, req.rawBody)) {
+        logger.warn('Rejected Flutterwave webhook with invalid signature');
+        return res.status(401).json({ received: false, error: 'invalid_signature' });
+      }
+
       res.status(200).json({ received: true });
 
       // Process webhook asynchronously
       (async () => {
         try {
-          const result = await processFlutterwaveWebhookUseCase.execute(req.headers, req.body);
+          const result = await processFlutterwaveWebhookUseCase.execute(req.headers, req.body, req.rawBody);
           if (result && result.ok) {
             logger.info('Flutterwave webhook processed successfully');
           } else {

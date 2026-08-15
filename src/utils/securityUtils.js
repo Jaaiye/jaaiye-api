@@ -38,8 +38,34 @@ function rateLimitKey(req) {
   return `${ip}-${deviceFingerprint}`;
 }
 
+/**
+ * Constant-time comparison of two strings, safe against timing attacks.
+ * Use for comparing secrets/signatures (e.g. webhook HMAC signatures).
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function timingSafeEqualStr(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+
+  // crypto.timingSafeEqual requires equal-length buffers. Comparing against
+  // a hash of `a` when lengths differ still avoids leaking the real length
+  // of `b` via early-exit timing while never returning true for mismatched
+  // input.
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(crypto.createHash('sha256').update(bufA).digest(), crypto.createHash('sha256').update(bufB).digest());
+    return false;
+  }
+
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 module.exports = {
   generateDeviceFingerprint,
-  rateLimitKey
+  rateLimitKey,
+  timingSafeEqualStr
 };
 

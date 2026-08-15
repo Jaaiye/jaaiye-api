@@ -146,9 +146,10 @@ class RequestWithdrawalWithPayoutUseCase {
       try {
         const wallet = await this.walletRepository.findByOwner(ownerType, ownerId);
         if (wallet) {
-          const currentBalance = Number(wallet.balance || 0);
-          const rollbackBalance = currentBalance + withdrawalAmount;
-          await this.walletRepository.updateBalance(wallet.id, rollbackBalance);
+          // Atomic credit - avoids clobbering a concurrent balance change
+          // with a stale read-then-set.
+          const rolledBackWallet = await this.walletRepository.credit(wallet.id, withdrawalAmount);
+          const rollbackBalance = Number(rolledBackWallet.balance);
 
           // Create reversal ledger entry
           await this.walletLedgerEntryRepository.create({

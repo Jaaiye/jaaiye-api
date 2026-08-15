@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const { timingSafeEqualStr } = require('../../../utils/securityUtils');
 
 // const API_BASE = 'https://developersandbox-api.flutterwave.com';
 const API_BASE = 'https://api.flutterwave.com/v3';
@@ -94,30 +95,38 @@ class FlutterwaveAdapter {
   /**
    * Validate webhook signature
    * @param {Object} headers
-   * @param {Object} body
+   * @param {Object} body - parsed body, used as a fallback only
+   * @param {Buffer} [rawBody] - exact bytes Flutterwave signed; preferred over `body`
    * @returns {boolean}
    */
-  isValidSignature(headers, body) {
+  isValidSignature(headers, body, rawBody) {
     const secretHash = this.webhookSecret;
     const verifHash = headers['verif-hash'];
     const flwSignature = headers['flutterwave-signature'];
 
     if (!secretHash) {
-      console.warn('Flutterwave webhook secret not configured');
-      return true; // Allow in dev if not set
+      if (process.env.NODE_ENV === 'production') {
+        // Never accept unsigned/unverifiable webhooks in production - a
+        // missing secret must fail closed, not silently disable the check.
+        console.error('FLW_WEBHOOK_SECRET is not configured - rejecting webhook');
+        return false;
+      }
+      console.warn('Flutterwave webhook secret not configured - allowing unverified webhook (non-production only)');
+      return true;
     }
 
     // 1. Standard Payment Webhook uses a plain secret string in verif-hash
     if (verifHash) {
-      return verifHash === secretHash;
+      return timingSafeEqualStr(verifHash, secretHash);
     }
 
     // 2. Payout/Transfer webhooks use HMAC SHA256 in flutterwave-signature
     if (flwSignature) {
+      const payload = Buffer.isBuffer(rawBody) ? rawBody : JSON.stringify(body);
       const hash = crypto.createHmac('sha256', secretHash)
-        .update(JSON.stringify(body))
+        .update(payload)
         .digest('hex');
-      return hash === flwSignature;
+      return timingSafeEqualStr(hash, flwSignature);
     }
 
     // If neither is present, it's an invalid or unauthenticated request
@@ -129,10 +138,11 @@ class FlutterwaveAdapter {
    * Process webhook
    * @param {Object} headers
    * @param {Object} body
+   * @param {Buffer} [rawBody]
    * @returns {Promise<Object>}
    */
-  async processWebhook(headers, body) {
-    if (!this.isValidSignature(headers, body)) {
+  async processWebhook(headers, body, rawBody) {
+    if (!this.isValidSignature(headers, body, rawBody)) {
       console.error('Invalid Flutterwave webhook signature');
       return { ok: false, reason: 'invalid_signature' };
     }

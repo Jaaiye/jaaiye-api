@@ -5,6 +5,8 @@
 
 const crypto = require('crypto');
 const axios = require('axios');
+const { timingSafeEqualStr } = require('../../../utils/securityUtils');
+const logger = require('../../../utils/logger');
 
 const API_BASE = 'https://api.paystack.co';
 
@@ -61,28 +63,44 @@ class PaystackAdapter {
   /**
    * Validate webhook signature
    * @param {Object} headers
-   * @param {Object} body
+   * @param {Object} body - parsed body, used as a fallback only
+   * @param {Buffer} [rawBody] - exact bytes Paystack signed; preferred over `body`
    * @returns {boolean}
    */
-  isValidSignature(headers, body) {
+  isValidSignature(headers, body, rawBody) {
     const signature = headers['x-paystack-signature'];
-    if (!signature || !this.secretKey) {
-      return true; // Allow in dev if no key
+
+    if (!this.secretKey) {
+      if (process.env.NODE_ENV === 'production') {
+        // Never accept unsigned/unverifiable webhooks in production - a
+        // missing secret must fail closed, not silently disable the check.
+        logger.error('PAYSTACK_SECRET_KEY is not configured - rejecting webhook');
+        return false;
+      }
+      logger.warn('PAYSTACK_SECRET_KEY not set - allowing unverified webhook (non-production only)');
+      return true;
     }
+
+    if (!signature) {
+      return false;
+    }
+
+    const payload = Buffer.isBuffer(rawBody) ? rawBody : JSON.stringify(body);
     const hash = crypto.createHmac('sha512', this.secretKey)
-      .update(JSON.stringify(body))
+      .update(payload)
       .digest('hex');
-    return hash === signature;
+    return timingSafeEqualStr(hash, signature);
   }
 
   /**
    * Process webhook
    * @param {Object} headers
    * @param {Object} body
+   * @param {Buffer} [rawBody]
    * @returns {Promise<Object>}
    */
-  async processWebhook(headers, body) {
-    if (!this.isValidSignature(headers, body)) {
+  async processWebhook(headers, body, rawBody) {
+    if (!this.isValidSignature(headers, body, rawBody)) {
       return { ok: false, reason: 'invalid_signature' };
     }
 

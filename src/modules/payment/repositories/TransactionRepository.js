@@ -83,6 +83,52 @@ class TransactionRepository extends ITransactionRepository {
     return this._toEntityArray(transactions);
   }
 
+  /**
+   * Atomically claim a transaction for processing so that only one caller
+   * (a webhook delivery, a retry of that webhook, or the pending-transaction
+   * poller) proceeds to create tickets for a given provider+reference at a
+   * time. Returns { transaction, claimed }. When claimed is false, the
+   * caller must not do any processing work - the transaction is either
+   * already successful or already being processed elsewhere right now.
+   */
+  async claimForProcessing({ provider, reference, defaults = {} }) {
+    const claimed = await TransactionSchema.findOneAndUpdate(
+      { provider, reference, status: { $nin: ['successful', 'processing'] } },
+      { $set: { status: 'processing', updatedAt: new Date() } },
+      { new: true }
+    );
+
+    if (claimed) {
+      return { transaction: this._toEntity(claimed), claimed: true };
+    }
+
+    // Nothing claimable: either it doesn't exist yet, or it's already
+    // successful / already being processed by another caller right now.
+    const existing = await TransactionSchema.findOne({ provider, reference });
+    if (existing) {
+      return { transaction: this._toEntity(existing), claimed: false };
+    }
+
+    // Doesn't exist yet - create it directly in 'processing' state. The
+    // unique (provider, reference) index guarantees only one concurrent
+    // caller wins this insert; the loser falls back to the existing doc.
+    try {
+      const created = await TransactionSchema.create({
+        ...defaults,
+        provider,
+        reference,
+        status: 'processing'
+      });
+      return { transaction: this._toEntity(created), claimed: true };
+    } catch (err) {
+      if (err.code === 11000) {
+        const raced = await TransactionSchema.findOne({ provider, reference });
+        return { transaction: this._toEntity(raced), claimed: false };
+      }
+      throw err;
+    }
+  }
+
   async update(id, updates) {
     const transaction = await TransactionSchema.findByIdAndUpdate(
       id,

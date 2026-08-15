@@ -22,7 +22,7 @@ class PaymentRoutes {
 
   getRoutes() {
     // Initialize Paystack payment
-    router.post('/paystack/init', protect, ...initializePaymentValidator, validate, this.paymentController.initializePaystack);
+    router.post('/paystack/init', protect, idempotencyMiddleware, ...initializePaymentValidator, validate, this.paymentController.initializePaystack);
 
     // Initialize Flutterwave payment
     router.post('/flutterwave/init', protect, idempotencyMiddleware, ...initializePaymentValidator, validate, this.paymentController.initializeFlutterwave);
@@ -32,7 +32,7 @@ class PaymentRoutes {
     router.post('/flutterwave/verify', ...verifyPaymentValidator, validate, this.paymentController.verifyFlutterwave);
 
     // Register transaction for polling backup (mobile SDK usage)
-    router.post('/register', protect, ...registerTransactionValidator, validate, this.paymentController.registerTransaction);
+    router.post('/register', protect, idempotencyMiddleware, ...registerTransactionValidator, validate, this.paymentController.registerTransaction);
 
     // Update transaction with payment gateway details
     router.put('/update', protect, ...updateTransactionValidator, validate, this.paymentController.updateTransaction);

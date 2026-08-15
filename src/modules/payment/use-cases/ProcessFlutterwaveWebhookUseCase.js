@@ -18,8 +18,8 @@ class ProcessFlutterwaveWebhookUseCase {
     this.processRefundWebhookUseCase = processRefundWebhookUseCase;
   }
 
-  async execute(headers, body) {
-    const result = await this.flutterwaveAdapter.processWebhook(headers, body);
+  async execute(headers, body, rawBody) {
+    const result = await this.flutterwaveAdapter.processWebhook(headers, body, rawBody);
 
     if (!result.ok) {
       return result;

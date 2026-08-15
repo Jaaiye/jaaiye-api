@@ -11,8 +11,8 @@ class ProcessPaystackWebhookUseCase {
     this.paymentService = paymentService;
   }
 
-  async execute(headers, body) {
-    const result = await this.paystackAdapter.processWebhook(headers, body);
+  async execute(headers, body, rawBody) {
+    const result = await this.paystackAdapter.processWebhook(headers, body, rawBody);
 
     if (!result.ok) {
       return result;

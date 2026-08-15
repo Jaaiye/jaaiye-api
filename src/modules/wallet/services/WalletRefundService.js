@@ -66,24 +66,25 @@ class WalletRefundService {
       throw new Error('Platform wallet not found');
     }
 
-    // Compute new balances
-    const walletBalanceBefore = Number(wallet.balance || 0);
-    const platformBalanceBefore = Number(platformWallet.balance || 0);
+    // Apply balance changes atomically. A refund can legitimately push a
+    // wallet negative (e.g. the organizer already withdrew the funds being
+    // refunded) - that's an accepted business edge case here, so this uses
+    // the no-floor atomic increment rather than debit()'s insufficient-funds
+    // guard. It's still atomic, so it no longer loses updates to a
+    // concurrent credit/debit on the same wallet the way a stale
+    // read-then-$set would.
+    const updatedWallet = await this.walletRepository.incrementBalance(wallet.id, -netToDebit);
+    const updatedPlatformWallet = await this.walletRepository.incrementBalance(platformWallet.id, -feeToRefund);
 
-    const walletBalanceAfter = walletBalanceBefore - netToDebit;
-    const platformBalanceAfter = platformBalanceBefore - feeToRefund;
+    const walletBalanceAfter = Number(updatedWallet.balance);
+    const platformBalanceAfter = Number(updatedPlatformWallet.balance);
 
-    // Validate balances (shouldn't go negative, but allow for edge cases)
     if (walletBalanceAfter < 0) {
-      console.warn(`Wallet balance would go negative after refund: ${walletBalanceAfter}`);
+      console.warn(`Wallet balance went negative after refund: ${walletBalanceAfter}`);
     }
     if (platformBalanceAfter < 0) {
-      console.warn(`Platform wallet balance would go negative after refund: ${platformBalanceAfter}`);
+      console.warn(`Platform wallet balance went negative after refund: ${platformBalanceAfter}`);
     }
-
-    // Update balances
-    await this.walletRepository.updateBalance(wallet.id, Math.max(0, walletBalanceAfter));
-    await this.walletRepository.updateBalance(platformWallet.id, Math.max(0, platformBalanceAfter));
 
     // Create ledger entries
     await this.walletLedgerEntryRepository.create({
@@ -91,7 +92,7 @@ class WalletRefundService {
       type: 'ADJUSTMENT',
       direction: 'DEBIT',
       amount: netToDebit,
-      balanceAfter: Math.max(0, walletBalanceAfter),
+      balanceAfter: walletBalanceAfter,
       ownerType,
       ownerId,
       transactionId: transactionEntity.id,
@@ -110,7 +111,7 @@ class WalletRefundService {
       type: 'ADJUSTMENT',
       direction: 'DEBIT',
       amount: feeToRefund,
-      balanceAfter: Math.max(0, platformBalanceAfter),
+      balanceAfter: platformBalanceAfter,
       ownerType: 'PLATFORM',
       ownerId: null,
       transactionId: transactionEntity.id,
@@ -126,8 +127,8 @@ class WalletRefundService {
     });
 
     return {
-      walletBalanceAfter: Math.max(0, walletBalanceAfter),
-      platformBalanceAfter: Math.max(0, platformBalanceAfter),
+      walletBalanceAfter,
+      platformBalanceAfter,
       netDebited: netToDebit,
       feeRefunded: feeToRefund
     };

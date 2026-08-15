@@ -9,7 +9,11 @@ const transactionSchema = new mongoose.Schema({
   feeAmount: { type: Number, required: true }, // Platform fee (5%)
   gatewayFee: { type: Number, default: 0 }, // Fee charged by payment provider (e.g. Flutterwave)
   currency: { type: String, default: 'NGN' },
-  status: { type: String, enum: ['pending', 'successful', 'failed', 'cancelled', 'completed', 'created'], default: 'created' },
+  // 'processing' is a short-lived lock state: claimed by whichever caller
+  // (webhook or polling job) is currently turning this payment into tickets,
+  // so a concurrent caller for the same provider+reference backs off instead
+  // of creating duplicate tickets. See TransactionRepository#claimForProcessing.
+  status: { type: String, enum: ['pending', 'processing', 'successful', 'failed', 'cancelled', 'completed', 'created'], default: 'created' },
   transId: { type: Number },
   sessionId: { type: String },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

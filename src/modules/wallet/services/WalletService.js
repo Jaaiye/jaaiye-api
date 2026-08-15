@@ -73,23 +73,29 @@ class WalletService {
     // Get platform wallet
     const platformWallet = await this.getOrCreatePlatformWallet();
 
-    // Compute new balances (string amounts, but we operate as numbers here)
-    const walletBalanceBefore = Number(wallet.balance || 0);
-    const platformBalanceBefore = Number(platformWallet.balance || 0);
+    // Persist balance changes via atomic $inc operations rather than a
+    // read-balance-then-$set - this wallet can be credited by many
+    // concurrent ticket sales at once for a popular event, and a blind
+    // $set from a stale read would silently lose other concurrent credits.
+    // Note: in Mongo this won't be a true SQL transaction across the two
+    // wallets; for now we rely on the order of operations and idempotent
+    // transaction handling upstream.
 
-    const walletBalanceAfterFunding = walletBalanceBefore + netAmountForUser;
-    const walletBalanceAfterFee = walletBalanceAfterFunding - fee;
-    const platformBalanceAfterFee = platformBalanceBefore + fee;
+    // Credit owner wallet with the full ticket price, then debit the
+    // platform fee back out - two atomic ops, each producing its own
+    // ledger-accurate balanceAfter snapshot.
+    wallet = await this.walletRepository.credit(wallet.id, netAmountForUser);
+    const walletBalanceAfterFunding = Number(wallet.balance);
 
-    // Persist balance changes and ledger entries
-    // Note: in Mongo this won't be a true SQL transaction; for now we rely on
-    // the order of operations and idempotent transaction handling upstream.
+    wallet = await this.walletRepository.debit(wallet.id, fee);
+    if (!wallet) {
+      throw new Error('Failed to debit platform fee from wallet after funding');
+    }
+    const walletBalanceAfterFee = Number(wallet.balance);
 
-    // Update wallet balance
-    wallet = await this.walletRepository.updateBalance(wallet.id, walletBalanceAfterFee);
-
-    // Update platform wallet balance
-    await this.walletRepository.updateBalance(platformWallet.id, platformBalanceAfterFee);
+    // Credit platform wallet with the fee
+    const updatedPlatformWallet = await this.walletRepository.credit(platformWallet.id, fee);
+    const platformBalanceAfterFee = Number(updatedPlatformWallet.balance);
 
     // Create ledger entries
     await this.walletLedgerEntryRepository.create({

@@ -72,6 +72,20 @@ class ITransactionRepository {
   }
 
   /**
+   * Atomically claim a transaction for processing, creating it if it
+   * doesn't exist yet. Used to prevent concurrent webhook/poller callers
+   * from double-processing the same payment.
+   * @param {Object} params
+   * @param {string} params.provider
+   * @param {string} params.reference
+   * @param {Object} [params.defaults] - fields to use if the transaction needs to be created
+   * @returns {Promise<{ transaction: TransactionEntity, claimed: boolean }>}
+   */
+  async claimForProcessing({ provider, reference, defaults = {} }) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
    * Find transactions with filters
    * @param {Object} filters
    * @param {Object} options - limit, skip, sort

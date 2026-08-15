@@ -65,13 +65,6 @@ class PaymentService {
       return { ok: false, reason: 'missing_metadata' };
     }
 
-    // Check for existing transaction
-    let transaction = await this.transactionRepository.findByProviderAndReference(provider, reference);
-
-    if (transaction && transaction.isSuccessful()) {
-      return { ok: true, alreadyProcessed: true, transaction: transaction.toJSON() };
-    }
-
     // Extract gateway fee from raw provider data if available
     let gatewayFee = 0;
     if (raw) {
@@ -82,11 +75,17 @@ class PaymentService {
       }
     }
 
-    // Create or update transaction
-    if (!transaction) {
-      transaction = await this.transactionRepository.create({
-        provider,
-        reference,
+    // Atomically claim this transaction for processing. This is the guard
+    // against duplicate ticket issuance: a webhook retry, a duplicate
+    // webhook delivery, and PollPendingTransactionsUseCase can all call
+    // handleSuccessfulPayment for the same provider+reference concurrently.
+    // Without an atomic claim, two callers can both observe "not yet
+    // successful" and both create tickets. Only the caller that wins the
+    // claim proceeds; everyone else backs off here.
+    const { transaction: claimedTransaction, claimed } = await this.transactionRepository.claimForProcessing({
+      provider,
+      reference,
+      defaults: {
         amount,
         currency,
         userId,
@@ -94,12 +93,24 @@ class PaymentService {
         ticketTypeId: ticketTypeId || null,
         quantity,
         raw,
-        gatewayFee,
-        status: 'pending'
-      });
+        gatewayFee
+      }
+    });
+
+    let transaction = claimedTransaction;
+
+    if (!claimed) {
+      if (transaction && transaction.isSuccessful()) {
+        return { ok: true, alreadyProcessed: true, transaction: transaction.toJSON() };
+      }
+      // Already being processed by another caller right now - do not
+      // duplicate the work, and do not touch its status.
+      return { ok: true, alreadyProcessing: true, transaction: transaction ? transaction.toJSON() : null };
     }
 
     const createdTickets = [];
+
+    try {
 
     // Fetch event to get ticket type details (for admission size/names)
     const event = eventId ? await this.eventRepository.findById(eventId) : null;
@@ -604,14 +615,29 @@ class PaymentService {
       }
     }
 
-    // TODO: Add Google Calendar integration here if needed
-    // This can be done via the Calendar domain's use cases
+      // TODO: Add Google Calendar integration here if needed
+      // This can be done via the Calendar domain's use cases
 
-    return {
-      ok: true,
-      tickets: createdTickets.map(t => t.toJSON ? t.toJSON() : t),
-      transaction: transaction.toJSON()
-    };
+      return {
+        ok: true,
+        tickets: createdTickets.map(t => t.toJSON ? t.toJSON() : t),
+        transaction: transaction.toJSON()
+      };
+    } catch (error) {
+      // Release the processing claim so a retry (webhook redelivery or the
+      // next poll) can attempt this transaction again instead of it being
+      // stuck in 'processing' forever.
+      try {
+        await this.transactionRepository.update(transaction.id, { status: 'pending' });
+      } catch (revertError) {
+        logger.error('Failed to release processing lock after error', {
+          reference,
+          provider,
+          error: revertError.message
+        });
+      }
+      throw error;
+    }
   }
 }
 

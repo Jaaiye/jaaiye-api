@@ -17,11 +17,7 @@ exports.apiLimiter = rateLimit({
       return authHeader.substring(7); // Return the token part
     }
 
-    // 3. API Key
-    const apiKey = req.headers['x-api-key'];
-    if (apiKey) return apiKey;
-
-    // 4. Fallback to IP
+    // 3. Fallback to IP
     return req.ip || req.connection.remoteAddress || 'unknown';
   },
   message: 'Too many requests, please try again later',
@@ -30,49 +26,6 @@ exports.apiLimiter = rateLimit({
     return req.path === '/health' || req.path.startsWith('/api/v1/health');
   }
 });
-
-// API Key validation
-// Note: ApiKey is a separate model, not a User field
-// This middleware uses the legacy ApiKey model for now
-// TODO: Migrate to ApiKeyRepository when ApiKey domain is created
-exports.validateApiKey = async (req, res, next) => {
-  const ApiKey = require('../modules/ApiKey');
-  const apiKey = req.headers['x-api-key'];
-
-  if (!apiKey) {
-    return res.status(401).json({
-      success: false,
-      error: 'API key is required'
-    });
-  }
-
-  try {
-    const validKey = await ApiKey.findOne({
-      key: apiKey,
-      isActive: true,
-      expiresAt: { $gt: new Date() }
-    });
-
-    if (!validKey) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid or expired API key'
-      });
-    }
-
-    // Update last used timestamp
-    validKey.lastUsed = new Date();
-    await validKey.save();
-
-    req.apiKey = validKey;
-    next();
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Error validating API key'
-    });
-  }
-};
 
 // Device fingerprint validation
 exports.validateDevice = (req, res, next) => {

@@ -13,7 +13,6 @@ const specs = require('./config/swagger');
 const { initSocket } = require('./utils/socket');
 
 const connectDB = require('./config/database');
-const { validateMobileApiKey } = require('./middleware/mobileAuthMiddleware');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./utils/asyncHandler');
 const logger = require('./utils/logger');
@@ -127,7 +126,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-idempotency-key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-idempotency-key'],
   exposedHeaders: ['Content-Type']
 };
 
@@ -144,7 +143,15 @@ app.use((req, res, next) => {
     return next();
   }
   // Only parse JSON for non-multipart requests
-  express.json()(req, res, (err) => {
+  // Capture the exact raw bytes as they were received - payment provider
+  // webhook signatures (Paystack/Flutterwave) are computed over these exact
+  // bytes, and re-serializing the parsed body with JSON.stringify() later is
+  // not guaranteed to reproduce them byte-for-byte.
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    }
+  })(req, res, (err) => {
     // If JSON parsing fails, check if it might be multipart (fallback)
     if (err && err instanceof SyntaxError && err.message.includes('JSON') && err.message.includes('------')) {
       // This looks like multipart data that was incorrectly parsed as JSON
@@ -237,7 +244,7 @@ app.use('/webhooks/test', require('./routes/webhookTestRoutes'));
 
 app.use('/webhooks', require('./routes/webhookRoutes'));
 
-// Public OAuth redirect endpoints (must be before API key validation)
+// Public OAuth redirect endpoints
 // Google redirects here without auth token
 const handleOAuthRedirect = (req, res, next) => {
   const controller = require('./modules/calendar/calendar.module').getCalendarController();
@@ -250,8 +257,11 @@ app.get('/oauth/redirect', handleOAuthRedirect);
 // Legacy endpoint (for backward compatibility - redirects to same handler)
 app.get('/api/v1/calendars/google/oauth/callback', handleOAuthRedirect);
 
-// Apply API key validation to all other routes
-// app.use(validateMobileApiKey);
+// Populate req.user (if a valid Bearer token is present) before any middleware
+// that needs to inspect it. restrictGuest below relies on req.user being set here -
+// without this, req.user is always undefined at this point in the chain and
+// restrictGuest silently never restricts anything.
+app.use(require('./modules/auth/auth.module').getOptionalAuthMiddleware());
 
 // Guest Restriction Middleware
 const { restrictGuest } = require('./middleware/guestRestrictionMiddleware');

@@ -56,7 +56,7 @@ class SearchUsersUseCase {
           ...formatUserResponse(user),
           friendshipStatus: friendship ? friendship.status : null,
           friendRequestStatus: friendRequest ? friendRequest.status : null,
-          isFriend: friendship && friendship.isActive()
+          isFriend: !!(friendship && friendship.isActive())
         };
       })
     );

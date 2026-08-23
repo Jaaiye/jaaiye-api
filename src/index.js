@@ -337,7 +337,7 @@ const ticketModule = require('./modules/ticket/ticket.module');
 
 queueModule.getPaymentPollingQueue().start();
 queueModule.getWithdrawalPollingQueue().start();
-queueModule.getPayoutSchedulerQueue().start();
+// queueModule.getPayoutSchedulerQueue().start();
 
 // Initialize and start uptime monitor
 const uptimeMonitor = queueModule.getUptimeMonitor();

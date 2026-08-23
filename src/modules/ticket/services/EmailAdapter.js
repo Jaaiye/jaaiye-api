@@ -193,6 +193,59 @@ class EmailAdapter {
       logger.error('Failed to send system alert email:', error.message);
     }
   }
+
+  /**
+   * Send a detailed alert email for an unhandled/programming server error.
+   * @param {Error} error - The error object (name, message, stack)
+   * @param {Object} context - Sanitized request/process context (method, url, userId, statusCode, traceId)
+   * @returns {Promise<void>}
+   */
+  async sendErrorAlert(error, context = {}) {
+    try {
+      const alertEmail = process.env.ERROR_ALERT_EMAIL || 'jaaiyedev@gmail.com';
+
+      const {
+        method = 'N/A',
+        url = 'N/A',
+        userId = 'unauthenticated',
+        statusCode = 500,
+        traceId = 'no-trace-id'
+      } = context;
+
+      const escapedStack = (error.stack || 'No stack trace available').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cooldownMinutes = Math.round((parseInt(process.env.ERROR_ALERT_COOLDOWN_MS, 10) || 600000) / 60000);
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: alertEmail,
+        subject: `🔥 Server Error: ${error.name || 'Error'} - ${error.message}`.slice(0, 150),
+        html: `
+          <div style="font-family: monospace, sans-serif; padding: 20px; border: 1px solid #ff4444; border-radius: 8px; max-width: 700px;">
+            <h2 style="color: #ff4444; margin-top: 0;">🔥 Unhandled Server Error</h2>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Error</td><td style="padding: 4px 8px;">${error.name || 'Error'}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Message</td><td style="padding: 4px 8px;">${error.message}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Status Code</td><td style="padding: 4px 8px;">${statusCode}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Method</td><td style="padding: 4px 8px;">${method}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">URL</td><td style="padding: 4px 8px;">${url}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">User ID</td><td style="padding: 4px 8px;">${userId}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Trace ID</td><td style="padding: 4px 8px;">${traceId}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Environment</td><td style="padding: 4px 8px;">${process.env.NODE_ENV || 'development'}</td></tr>
+              <tr><td style="padding: 4px 8px; font-weight: bold;">Time (WAT)</td><td style="padding: 4px 8px;">${new Date().toLocaleString('en-GB', { timeZone: 'Africa/Lagos' })}</td></tr>
+            </table>
+            <h3 style="margin-bottom: 4px;">Stack Trace</h3>
+            <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; font-size: 12px;">${escapedStack}</pre>
+            <hr />
+            <p style="font-size: 12px; color: #666;">Automated alert from the Jaaiye error monitoring system. Repeats of the same error are throttled to at most once every ${cooldownMinutes} minutes.</p>
+          </div>
+        `
+      });
+
+      return result;
+    } catch (sendError) {
+      logger.error('Failed to send error alert email:', sendError.message);
+    }
+  }
 }
 
 module.exports = EmailAdapter;

@@ -16,6 +16,7 @@ const connectDB = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./utils/asyncHandler');
 const logger = require('./utils/logger');
+const { notifyServerError } = require('./utils/errorAlert');
 
 
 // Initialize Express app
@@ -306,22 +307,24 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', async (err) => {
   logger.error('UNHANDLED REJECTION! 💥 Shutting down...', {
     name: err.name,
     message: err.message,
     stack: err.stack
   });
+  await notifyServerError(err, { path: 'process:unhandledRejection' }).catch(() => {});
   process.exit(1);
 });
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
   logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...', {
     name: err.name,
     message: err.message,
     stack: err.stack
   });
+  await notifyServerError(err, { path: 'process:uncaughtException' }).catch(() => {});
   process.exit(1);
 });
 
@@ -334,6 +337,7 @@ const ticketModule = require('./modules/ticket/ticket.module');
 
 queueModule.getPaymentPollingQueue().start();
 queueModule.getWithdrawalPollingQueue().start();
+queueModule.getPayoutSchedulerQueue().start();
 
 // Initialize and start uptime monitor
 const uptimeMonitor = queueModule.getUptimeMonitor();

@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const { sanitizeLogData } = require('../utils/logSanitizer');
+const { notifyServerError } = require('../utils/errorAlert');
 
 // Custom error classes (DRY)
 class AppError extends Error {
@@ -258,6 +259,7 @@ const errorHandler = (error, req, res, next) => {
     // Programming or unknown errors
     status = 500;
     payload = { ...handleDefaultError(error), traceId };
+    notifyServerError(error, context); // fire-and-forget, never blocks the response
   }
 
   return res.status(status).json(payload);

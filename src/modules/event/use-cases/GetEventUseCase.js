@@ -108,7 +108,21 @@ class GetEventUseCase {
         eventData.groupId = group.id;
       }
     }
+    // Public event page — used for sharing, safe for every viewer.
     eventData.url = `https://events.jaaiye.com/events/${event.slug}`;
+
+    // consoleUrl is the same URL as the public page — the web app
+    // itself decides what to show (management options vs. the plain
+    // public view) based on the viewer's role once they land there.
+    // What matters here is *whether this field is present at all*:
+    // only creators and co-organizer team members get it. The mobile
+    // "Visit Console" button was previously reading eventData.url (the
+    // public link, unconditionally present for every viewer) instead
+    // of this gated field, which made the button show up for every
+    // viewer, not just event managers.
+    if (isCreator || (teamMember && teamMember.role === 'co_organizer')) {
+      eventData.consoleUrl = `https://events.jaaiye.com/events/${event.slug}`;
+    }
 
     // Creators and co-organizers cannot buy tickets to their own event
     eventData.canBuyTicket = !(isCreator || (teamMember && teamMember.role === 'co_organizer'));

@@ -15,7 +15,7 @@ const WalletRefundService = require('../wallet/services/WalletRefundService');
 const WalletNotificationService = require('../wallet/services/WalletNotificationService');
 const WalletEmailAdapter = require('../wallet/services/WalletEmailAdapter');
 const { FirebaseAdapter } = require('../common/services');
-const { GoogleCalendarAdapter, CloudinaryAdapter } = require('./services');
+const { GoogleCalendarAdapter, R2Adapter } = require('./services');
 const { GoogleCalendarAdapter: CalendarGoogleCalendarAdapter } = require('../calendar/services');
 const { NotificationAdapter } = require('./services');
 const CalendarSyncService = require('./services/CalendarSyncService');
@@ -150,11 +150,11 @@ class EventModule {
     return this._instances.googleCalendarAdapter;
   }
 
-  getCloudinaryAdapter() {
-    if (!this._instances.cloudinaryAdapter) {
-      this._instances.cloudinaryAdapter = new CloudinaryAdapter();
+  getStorageAdapter() {
+    if (!this._instances.storageAdapter) {
+      this._instances.storageAdapter = new R2Adapter();
     }
-    return this._instances.cloudinaryAdapter;
+    return this._instances.storageAdapter;
   }
 
   getCalendarSyncService() {
@@ -185,7 +185,7 @@ class EventModule {
         calendarRepository: this.getCalendarRepository(),
         userRepository: this.getUserRepository(),
         eventParticipantRepository: this.getEventParticipantRepository(),
-        cloudinaryAdapter: this.getCloudinaryAdapter(),
+        storageAdapter: this.getStorageAdapter(),
         googleCalendarAdapter: this.getGoogleCalendarAdapter(),
         notificationAdapter: this.getNotificationAdapter(),
         groupRepository: this.getGroupRepository(),
@@ -217,7 +217,7 @@ class EventModule {
         calendarRepository: this.getCalendarRepository(),
         userRepository: this.getUserRepository(),
         googleCalendarAdapter: this.getGoogleCalendarAdapter(),
-        cloudinaryAdapter: this.getCloudinaryAdapter()
+        storageAdapter: this.getStorageAdapter()
       });
     }
     return this._instances.updateEventUseCase;

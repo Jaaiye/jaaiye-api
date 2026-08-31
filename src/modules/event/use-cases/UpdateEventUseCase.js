@@ -11,13 +11,13 @@ class UpdateEventUseCase {
     calendarRepository,
     userRepository,
     googleCalendarAdapter,
-    cloudinaryAdapter
+    storageAdapter
   }) {
     this.eventRepository = eventRepository;
     this.calendarRepository = calendarRepository;
     this.userRepository = userRepository;
     this.googleCalendarAdapter = googleCalendarAdapter;
-    this.cloudinaryAdapter = cloudinaryAdapter;
+    this.storageAdapter = storageAdapter;
   }
 
   async execute(eventId, userId, dto, file = null) {
@@ -52,9 +52,12 @@ class UpdateEventUseCase {
     if (dto.ticketFee !== undefined) updateData.ticketFee = dto.ticketFee;
 
     // Upload image if provided
-    if (file && this.cloudinaryAdapter) {
+    if (file && this.storageAdapter) {
       try {
-        const imageUrl = await this.cloudinaryAdapter.uploadImage(file.buffer);
+        const imageUrl = await this.storageAdapter.uploadImage(file.buffer, {
+          folder: 'events',
+          contentType: file.mimetype
+        });
         updateData.image = imageUrl;
       } catch (error) {
         console.error('Failed to upload image during event update:', error);

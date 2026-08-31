@@ -1,6 +1,6 @@
 module.exports = {
   NotificationAdapter: require('./NotificationAdapter'),
   GoogleCalendarAdapter: require('./GoogleCalendarAdapter'),
-  CloudinaryAdapter: require('./CloudinaryAdapter')
+  R2Adapter: require('./R2Adapter')
 };
 

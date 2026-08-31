@@ -13,7 +13,7 @@ class CreateEventUseCase {
     calendarRepository,
     userRepository,
     eventParticipantRepository,
-    cloudinaryAdapter,
+    storageAdapter,
     googleCalendarAdapter,
     notificationAdapter,
     groupRepository,
@@ -25,7 +25,7 @@ class CreateEventUseCase {
     this.calendarRepository = calendarRepository;
     this.userRepository = userRepository;
     this.eventParticipantRepository = eventParticipantRepository;
-    this.cloudinaryAdapter = cloudinaryAdapter;
+    this.storageAdapter = storageAdapter;
     this.googleCalendarAdapter = googleCalendarAdapter;
     this.notificationAdapter = notificationAdapter;
     this.groupRepository = groupRepository;
@@ -138,7 +138,10 @@ class CreateEventUseCase {
     let imageUrl = null;
     if (file) {
       try {
-        imageUrl = await this.cloudinaryAdapter.uploadImage(file.buffer);
+        imageUrl = await this.storageAdapter.uploadImage(file.buffer, {
+          folder: 'events',
+          contentType: file.mimetype
+        });
       } catch (error) {
         throw new ValidationError(`Failed to upload image: ${error.message}`);
       }

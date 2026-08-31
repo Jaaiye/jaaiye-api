@@ -330,7 +330,7 @@ class EventController {
   updateEventImage = asyncHandler(async (req, res) => {
     const container = require('./event.module');
     const eventRepository = container.getEventRepository();
-    const cloudinaryAdapter = container.getCloudinaryAdapter();
+    const storageAdapter = container.getStorageAdapter();
 
     const event = await eventRepository.findById(req.params.id);
     if (!event) {
@@ -341,7 +341,10 @@ class EventController {
       return res.status(400).json({ success: false, error: 'Image file is required' });
     }
 
-    const imageUrl = await cloudinaryAdapter.uploadImage(req.file.buffer);
+    const imageUrl = await storageAdapter.uploadImage(req.file.buffer, {
+      folder: 'events',
+      contentType: req.file.mimetype
+    });
     const updatedEvent = await eventRepository.update(req.params.id, { image: imageUrl });
 
     return successResponse(res, { event: updatedEvent }, 200, 'Event image updated successfully');

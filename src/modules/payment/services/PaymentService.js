@@ -7,7 +7,7 @@
 const logger = require('../../../utils/logger');
 const CreateTicketDTO = require('../../ticket/dto/CreateTicketDTO');
 const authService = require('../../auth/services/auth.service');
-const { SERVICE_FEE_RATE } = require('../../../constants/paymentConstants');
+const { splitTotalIntoBaseAndFee } = require('./PricingService');
 
 class PaymentService {
   constructor({
@@ -526,7 +526,9 @@ class PaymentService {
       gatewayFee: gatewayFee || transaction.gatewayFee
     });
 
-    // Fund wallets with 5% exclusive fee
+    // Fund the owner wallet with the ticket price; the service fee the
+    // buyer also paid is split out of transaction.amount and routed to the
+    // platform wallet inside fundWalletFromTransaction.
     if (this.walletService) {
       try {
         // Handle group funding
@@ -545,8 +547,7 @@ class PaymentService {
               const creator = await this.userRepository.findById(group.creator);
               if (creator && creator.email) {
                 const grossAmount = Number(transaction.amount);
-                const feeAmount = grossAmount * SERVICE_FEE_RATE;
-                const netAmount = grossAmount - feeAmount;
+                const { baseAmount: netAmount, feeAmount } = splitTotalIntoBaseAndFee(grossAmount);
                 const walletBalanceAfter = fundingResult.walletBalance;
 
                 // Get hangout title if hangoutId provided
@@ -589,8 +590,7 @@ class PaymentService {
               const owner = await this.userRepository.findById(event.creatorId);
               if (owner && owner.email) {
                 const grossAmount = Number(transaction.amount);
-                const feeAmount = grossAmount * SERVICE_FEE_RATE;
-                const netAmount = grossAmount;
+                const { baseAmount: netAmount, feeAmount } = splitTotalIntoBaseAndFee(grossAmount);
                 const walletBalanceAfter = fundingResult.walletBalance;
 
                 await this.walletNotificationService.sendEventWalletCreditedEmail({

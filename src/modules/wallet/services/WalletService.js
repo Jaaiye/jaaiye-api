@@ -5,7 +5,7 @@
  * This service is framework-agnostic and delegates persistence to repositories.
  */
 
-const { SERVICE_FEE_RATE } = require('../../../constants/paymentConstants');
+const { splitTotalIntoBaseAndFee } = require('../../payment/services/PricingService');
 
 class WalletService {
   constructor({ walletRepository, walletLedgerEntryRepository }) {
@@ -31,10 +31,14 @@ class WalletService {
   }
 
   /**
-   * Fund a wallet from a successful transaction with a 5% exclusive fee.
+   * Fund a wallet from a successful transaction.
    *
-   * - Wallet receives the netAmount (transaction.amount assumed to be net).
-   * - Platform wallet receives 5% of netAmount as fee.
+   * The buyer pays ticketPrice + serviceFee at checkout, so
+   * transactionEntity.amount (the gateway-confirmed total) already
+   * includes the fee. The fee never touches the owner's wallet - it's
+   * split out of that confirmed total and routed straight to the
+   * platform wallet, while the owner's wallet receives the full ticket
+   * price.
    *
    * @param {Object} params
    * @param {string} params.ownerType - 'EVENT' | 'GROUP'
@@ -47,17 +51,12 @@ class WalletService {
       throw new Error('transactionEntity with id is required');
     }
 
-    const baseAmount = Number(transactionEntity.baseAmount || transactionEntity.amount || 0);
-    if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
+    const totalAmount = Number(transactionEntity.amount || 0);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
       throw new Error('Invalid transaction amount for wallet funding');
     }
 
-    // Use stored feeAmount if available, otherwise calculate the platform fee
-    const fee = Number(transactionEntity.feeAmount) !== undefined && transactionEntity.feeAmount !== null
-      ? Number(transactionEntity.feeAmount)
-      : baseAmount * SERVICE_FEE_RATE;
-
-    const netAmountForUser = baseAmount; // The full ticket price before platform fee
+    const { baseAmount, feeAmount } = splitTotalIntoBaseAndFee(totalAmount);
 
     // Get or create owner wallet
     let wallet = await this.walletRepository.findByOwner(ownerType, ownerId);
@@ -81,20 +80,13 @@ class WalletService {
     // wallets; for now we rely on the order of operations and idempotent
     // transaction handling upstream.
 
-    // Credit owner wallet with the full ticket price, then debit the
-    // platform fee back out - two atomic ops, each producing its own
-    // ledger-accurate balanceAfter snapshot.
-    wallet = await this.walletRepository.credit(wallet.id, netAmountForUser);
+    // Credit owner wallet with the full ticket price - no fee deduction,
+    // the fee was already collected from the buyer separately.
+    wallet = await this.walletRepository.credit(wallet.id, baseAmount);
     const walletBalanceAfterFunding = Number(wallet.balance);
 
-    wallet = await this.walletRepository.debit(wallet.id, fee);
-    if (!wallet) {
-      throw new Error('Failed to debit platform fee from wallet after funding');
-    }
-    const walletBalanceAfterFee = Number(wallet.balance);
-
-    // Credit platform wallet with the fee
-    const updatedPlatformWallet = await this.walletRepository.credit(platformWallet.id, fee);
+    // Credit platform wallet with the fee portion of what the buyer paid.
+    const updatedPlatformWallet = await this.walletRepository.credit(platformWallet.id, feeAmount);
     const platformBalanceAfterFee = Number(updatedPlatformWallet.balance);
 
     // Create ledger entries
@@ -102,7 +94,7 @@ class WalletService {
       walletId: wallet.id,
       type: 'FUNDING',
       direction: 'CREDIT',
-      amount: netAmountForUser,
+      amount: baseAmount,
       balanceAfter: walletBalanceAfterFunding,
       ownerType,
       ownerId,
@@ -115,25 +107,10 @@ class WalletService {
     });
 
     await this.walletLedgerEntryRepository.create({
-      walletId: wallet.id,
-      type: 'FEE',
-      direction: 'DEBIT',
-      amount: fee,
-      balanceAfter: walletBalanceAfterFee,
-      ownerType,
-      ownerId,
-      transactionId: transactionEntity.id,
-      externalReference: transactionEntity.reference,
-      metadata: {
-        provider: transactionEntity.provider
-      }
-    });
-
-    await this.walletLedgerEntryRepository.create({
       walletId: platformWallet.id,
       type: 'FEE',
       direction: 'CREDIT',
-      amount: fee,
+      amount: feeAmount,
       balanceAfter: platformBalanceAfterFee,
       ownerType: 'PLATFORM',
       ownerId: null,
@@ -147,7 +124,7 @@ class WalletService {
     });
 
     return {
-      walletBalance: walletBalanceAfterFee,
+      walletBalance: walletBalanceAfterFunding,
       platformBalance: platformBalanceAfterFee
     };
   }

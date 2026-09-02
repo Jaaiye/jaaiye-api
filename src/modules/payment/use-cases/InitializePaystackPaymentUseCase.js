@@ -5,6 +5,7 @@
 
 const { InitializePaymentDTO } = require('../dto');
 const { PaymentInitializationError } = require('../errors');
+const { calculateTicketBaseAmount, calculateChargeFromBase } = require('../services/PricingService');
 
 class InitializePaystackPaymentUseCase {
   constructor({ paystackAdapter, eventRepository }) {
@@ -15,12 +16,23 @@ class InitializePaystackPaymentUseCase {
   async execute(dto) {
     dto.validate();
 
+    let event = null;
     if (dto.eventId) {
-      const event = await this.eventRepository.findByIdOrSlug(dto.eventId);
+      event = await this.eventRepository.findByIdOrSlug(dto.eventId);
       if (event) {
         dto.eventId = event.id;
       }
     }
+
+    // The amount actually charged is always computed server-side from the
+    // event's real ticket prices - dto.amount is accepted for backward
+    // compatibility but never used to decide what the buyer pays.
+    const baseAmount = calculateTicketBaseAmount({
+      event,
+      ticketTypeIds: dto.ticketTypes,
+      quantity: dto.quantity
+    });
+    const { totalAmount } = calculateChargeFromBase(baseAmount);
 
     try {
       const metadata = {
@@ -30,7 +42,7 @@ class InitializePaystackPaymentUseCase {
       };
 
       const result = await this.paystackAdapter.initializePayment({
-        amount: dto.amount,
+        amount: totalAmount,
         email: dto.email,
         metadata
       });

@@ -26,14 +26,24 @@ const PAYMENT_PROVIDERS = {
 
 const DEFAULT_QUANTITY = 1;
 
-// Platform service fee charged on ticket revenue / event withdrawals
-const SERVICE_FEE_RATE = 0.075; // 7.5%
+// Platform service fee charged on ticket sales / wallet funding.
+// Added on top of the ticket price at checkout - the buyer pays
+// ticketPrice + (ticketPrice * SERVICE_FEE_PERCENT) + SERVICE_FEE_FLAT.
+const SERVICE_FEE_PERCENT = 0.08; // 8%
+const SERVICE_FEE_FLAT = 100; // ₦100
+
+// Flat fee charged when an organizer withdraws from their wallet to their
+// bank account. Unrelated to the funding-time fee above - deducted from
+// the payout amount, not added on top (there's no buyer to pass it to).
+const WITHDRAWAL_FEE_FLAT = 50; // ₦50
 
 module.exports = {
   ERROR_MESSAGES,
   WEBHOOK_RESPONSE,
   PAYMENT_PROVIDERS,
   DEFAULT_QUANTITY,
-  SERVICE_FEE_RATE
+  SERVICE_FEE_PERCENT,
+  SERVICE_FEE_FLAT,
+  WITHDRAWAL_FEE_FLAT
 };
 

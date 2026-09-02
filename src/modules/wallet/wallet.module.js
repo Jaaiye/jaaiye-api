@@ -10,7 +10,9 @@ const {
   RequestWithdrawalWithPayoutUseCase,
   GetWithdrawalsUseCase,
   GetWithdrawalDetailsUseCase,
-  PollPendingWithdrawalsUseCase
+  PollPendingWithdrawalsUseCase,
+  HoldWalletsForPayoutUseCase,
+  ProcessScheduledPayoutsUseCase
 } = require('./use-cases');
 const WalletController = require('./wallet.controller');
 const createWalletRoutes = require('./wallet.routes');
@@ -104,7 +106,8 @@ class WalletModule {
         withdrawalRepository: new WithdrawalRepository(),
         flutterwaveAdapter: new FlutterwaveAdapter(),
         walletEmailAdapter: new WalletEmailAdapter(),
-        eventRepository: new EventRepository()
+        eventRepository: new EventRepository(),
+        groupRepository: new GroupRepository()
       });
     }
     return this._instances.requestWithdrawalWithPayoutUseCase;
@@ -161,6 +164,32 @@ class WalletModule {
       });
     }
     return this._instances.pollPendingWithdrawalsUseCase;
+  }
+
+  getHoldWalletsForPayoutUseCase() {
+    if (!this._instances.holdWalletsForPayoutUseCase) {
+      this._instances.holdWalletsForPayoutUseCase = new HoldWalletsForPayoutUseCase({
+        walletRepository: this.getWalletRepository(),
+        walletLedgerEntryRepository: this.getWalletLedgerEntryRepository()
+      });
+    }
+    return this._instances.holdWalletsForPayoutUseCase;
+  }
+
+  getProcessScheduledPayoutsUseCase() {
+    if (!this._instances.processScheduledPayoutsUseCase) {
+      this._instances.processScheduledPayoutsUseCase = new ProcessScheduledPayoutsUseCase({
+        walletRepository: this.getWalletRepository(),
+        walletLedgerEntryRepository: this.getWalletLedgerEntryRepository(),
+        withdrawalRepository: this.getWithdrawalRepository(),
+        bankAccountRepository: new BankAccountRepository(),
+        flutterwaveAdapter: new FlutterwaveAdapter(),
+        eventRepository: new EventRepository(),
+        groupRepository: new GroupRepository(),
+        walletEmailAdapter: new WalletEmailAdapter()
+      });
+    }
+    return this._instances.processScheduledPayoutsUseCase;
   }
 
   // ============================================================================

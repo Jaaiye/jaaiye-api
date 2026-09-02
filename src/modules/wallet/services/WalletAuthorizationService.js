@@ -112,19 +112,20 @@ class WalletAuthorizationService {
 
     /**
      * Check if user can withdraw from wallet
-     * 
+     *
      * Rules (stricter than viewing):
-     * - EVENT: only creator of user-origin events
-     * - GROUP: only group creator
+     * - EVENT: only creator of user-origin events, or an admin (manual override)
+     * - GROUP: only group creator, or an admin (manual override)
      * - PLATFORM: no one (withdrawals not supported)
-     * 
+     *
      * @param {Object} params
      * @param {'EVENT'|'GROUP'} params.ownerType
      * @param {string} params.ownerId
      * @param {string} params.userId
+     * @param {boolean} [params.isAdmin] - Manual override, bypasses ownership
      * @returns {Promise<{allowed: boolean, reason?: string}>}
      */
-    async canWithdrawFromWallet({ ownerType, ownerId, userId }) {
+    async canWithdrawFromWallet({ ownerType, ownerId, userId, isAdmin = false }) {
         if (ownerType === 'PLATFORM') {
             return {
                 allowed: false,
@@ -136,6 +137,10 @@ class WalletAuthorizationService {
             const event = await this.eventRepository.findByIdOrSlug(ownerId);
             if (!event) {
                 return { allowed: false, reason: 'Event not found' };
+            }
+
+            if (isAdmin) {
+                return { allowed: true, resolvedOwnerId: event.id };
             }
 
             // Allow withdrawal for any event type as long as user is the creator
@@ -155,6 +160,10 @@ class WalletAuthorizationService {
             const group = await this.groupRepository.findById(ownerId);
             if (!group) {
                 return { allowed: false, reason: 'Group not found' };
+            }
+
+            if (isAdmin) {
+                return { allowed: true, resolvedOwnerId: group.id };
             }
 
             // Only group creator can withdraw

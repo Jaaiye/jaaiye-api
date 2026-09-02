@@ -67,11 +67,14 @@ function createWalletRoutes(walletController) {
     }
   );
 
-  // Request withdrawal with payout
+  // Admin-only: manually trigger a withdrawal (support/edge-case override).
+  // Organizers no longer trigger this themselves - payouts run automatically
+  // on a weekly schedule (see PayoutSchedulerQueue).
   router.post(
     '/:ownerType/:ownerId/withdraw',
     apiLimiter,
     protect,
+    admin,
     validate,
     walletController.requestWithdrawal
   );

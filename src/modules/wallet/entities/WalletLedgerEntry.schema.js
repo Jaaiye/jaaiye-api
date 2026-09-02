@@ -14,7 +14,7 @@ const walletLedgerEntrySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['FUNDING', 'WITHDRAWAL', 'FEE', 'ADJUSTMENT'],
+    enum: ['FUNDING', 'WITHDRAWAL', 'FEE', 'ADJUSTMENT', 'PAYOUT_HOLD'],
     required: true,
     index: true
   },

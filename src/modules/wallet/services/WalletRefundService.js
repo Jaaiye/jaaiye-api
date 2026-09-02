@@ -8,6 +8,8 @@
  * - Create ADJUSTMENT ledger entries
  */
 
+const { splitTotalIntoBaseAndFee } = require('../../payment/services/PricingService');
+
 class WalletRefundService {
   constructor({ walletRepository, walletLedgerEntryRepository }) {
     this.walletRepository = walletRepository;
@@ -42,10 +44,10 @@ class WalletRefundService {
       throw new Error('Refund amount cannot exceed original transaction amount');
     }
 
-    // Calculate fee that was originally charged (5% of original amount if not stored)
-    const originalFee = Number(transactionEntity.feeAmount) !== undefined && transactionEntity.feeAmount !== null
-      ? Number(transactionEntity.feeAmount)
-      : originalAmount * 0.05;
+    // Recover the fee that was originally charged from the confirmed total -
+    // the same derivation used at funding time, so refunds always net out
+    // against what was actually credited (never a stale/untrusted stored field).
+    const { feeAmount: originalFee } = splitTotalIntoBaseAndFee(originalAmount);
     const originalNet = originalAmount - originalFee;
 
     // For refunds, we debit proportionally:

@@ -7,10 +7,10 @@
  * - Validate balances
  * - Write withdrawal ledger entries
  *
- * Fee behaviour is intentionally open-ended for now (fee = 0).
+ * A flat WITHDRAWAL_FEE_FLAT is deducted from every withdrawal payout.
  */
 
-const { SERVICE_FEE_RATE } = require('../../../constants/paymentConstants');
+const { WITHDRAWAL_FEE_FLAT } = require('../../../constants/paymentConstants');
 
 class WalletWithdrawalService {
   constructor({
@@ -75,7 +75,8 @@ class WalletWithdrawalService {
     ownerId,
     requestedBy,
     requestedAmount,
-    feeMode = 'NONE'
+    feeMode = 'NONE',
+    isAdmin = false
   }) {
     if (!ownerType || !ownerId) {
       throw new Error('ownerType and ownerId are required');
@@ -89,7 +90,10 @@ class WalletWithdrawalService {
       throw new Error('requestedAmount must be a positive number');
     }
 
-    const allowed = await this.canUserWithdraw({ ownerType, ownerId, userId: requestedBy });
+    // Admin-triggered requests are a manual override (see
+    // RequestWithdrawalWithPayoutUseCase) - ownership doesn't apply since
+    // the caller is acting on behalf of the wallet owner, not as them.
+    const allowed = isAdmin || await this.canUserWithdraw({ ownerType, ownerId, userId: requestedBy });
     if (!allowed) {
       throw new Error('You are not allowed to withdraw from this wallet');
     }
@@ -99,14 +103,16 @@ class WalletWithdrawalService {
       throw new Error('Wallet not found for owner');
     }
 
-    // Default fee logic: EVENT owners pay the platform service fee
-    let feeAmount = 0;
-    if (ownerType === 'EVENT') {
-      feeAmount = amount * SERVICE_FEE_RATE;
-    }
+    // Flat withdrawal fee, deducted from the payout - applies to every
+    // withdrawal regardless of owner type.
+    const feeAmount = WITHDRAWAL_FEE_FLAT;
 
     const totalDebit = amount; // The requested amount is the total debit from wallet
     const payoutAmount = amount - feeAmount; // Remaining is remitted
+
+    if (payoutAmount <= 0) {
+      throw new Error(`Withdrawal amount must be greater than the ₦${WITHDRAWAL_FEE_FLAT} withdrawal fee`);
+    }
 
     // Atomic conditional debit: the balance check and the decrement happen
     // in one operation, so two concurrent withdrawal requests (or a

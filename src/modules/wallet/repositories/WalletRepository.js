@@ -3,6 +3,7 @@
  * Mongoose implementation of IWalletRepository.
  */
 
+const mongoose = require('mongoose');
 const WalletSchema = require('../entities/Wallet.schema');
 const WalletEntity = require('../entities/Wallet.entity');
 const { IWalletRepository } = require('./interfaces');
@@ -16,6 +17,7 @@ class WalletRepository extends IWalletRepository {
       ownerType: data.ownerType,
       ownerId: data.ownerId ? data.ownerId.toString() : null,
       balance: data.balance ? data.balance.toString() : '0.00',
+      heldForPayout: data.heldForPayout ? data.heldForPayout.toString() : '0.00',
       currency: data.currency,
       isActive: data.isActive !== undefined ? data.isActive : true,
       createdAt: data.createdAt,
@@ -129,6 +131,107 @@ class WalletRepository extends IWalletRepository {
     const doc = await WalletSchema.findByIdAndUpdate(
       id,
       { $set: updateData },
+      { new: true }
+    );
+    return this._toEntity(doc);
+  }
+
+  /**
+   * List all active wallets of a given owner type whose live balance
+   * exceeds minBalance. Used by the weekly hold job to find wallets
+   * eligible to have funds locked in for the next payout run.
+   * @param {'EVENT'|'GROUP'} ownerType
+   * @param {number} minBalance
+   * @returns {Promise<WalletEntity[]>}
+   */
+  async findAllByOwnerTypeWithBalance(ownerType, minBalance = 0) {
+    const docs = await WalletSchema.find({
+      ownerType,
+      isActive: true,
+      balance: { $gt: mongoose.Types.Decimal128.fromString(String(minBalance)) }
+    });
+    return docs.map(doc => this._toEntity(doc));
+  }
+
+  /**
+   * List all active wallets of a given owner type that currently have an
+   * amount held for payout. Used by the weekly payout job.
+   * @param {'EVENT'|'GROUP'} ownerType
+   * @returns {Promise<WalletEntity[]>}
+   */
+  async findAllByOwnerTypeWithHeldBalance(ownerType) {
+    const docs = await WalletSchema.find({
+      ownerType,
+      isActive: true,
+      heldForPayout: { $gt: mongoose.Types.Decimal128.fromString('0') }
+    });
+    return docs.map(doc => this._toEntity(doc));
+  }
+
+  /**
+   * Atomically move a wallet's entire current balance into heldForPayout,
+   * but only if the balance currently exceeds minHoldAmount. Uses a
+   * pipeline update so "set heldForPayout to whatever balance currently
+   * is" happens as a single atomic operation - no read-then-write window
+   * where a concurrent credit could be lost or double-counted.
+   * @param {string} id
+   * @param {number} minHoldAmount
+   * @returns {Promise<WalletEntity|null>} null if nothing was eligible to hold
+   */
+  async holdBalanceForPayout(id, minHoldAmount = 0) {
+    const doc = await WalletSchema.findOneAndUpdate(
+      {
+        _id: id,
+        balance: { $gt: mongoose.Types.Decimal128.fromString(String(minHoldAmount)) }
+      },
+      [
+        { $set: { heldForPayout: { $add: ['$heldForPayout', '$balance'] } } },
+        { $set: { balance: mongoose.Types.Decimal128.fromString('0') } }
+      ],
+      { new: true }
+    );
+    return doc ? this._toEntity(doc) : null;
+  }
+
+  /**
+   * Atomically decrease heldForPayout, but only if it currently holds
+   * enough. Mirrors debit() but operates on heldForPayout instead of
+   * balance - used when a scheduled payout actually executes.
+   * @param {string} id
+   * @param {number} amount
+   * @returns {Promise<WalletEntity|null>} null means insufficient held balance
+   */
+  async debitHeldBalance(id, amount) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      throw new Error('debit amount must be a positive number');
+    }
+
+    const doc = await WalletSchema.findOneAndUpdate(
+      { _id: id, heldForPayout: { $gte: numericAmount } },
+      { $inc: { heldForPayout: -numericAmount } },
+      { new: true }
+    );
+    return doc ? this._toEntity(doc) : null;
+  }
+
+  /**
+   * Atomically credit heldForPayout back - used to roll back a hold when
+   * a scheduled payout's transfer fails, so the amount is retried on the
+   * next payout run without waiting for another hold cycle.
+   * @param {string} id
+   * @param {number} amount
+   * @returns {Promise<WalletEntity>}
+   */
+  async creditHeldBalance(id, amount) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      throw new Error('credit amount must be a positive number');
+    }
+
+    const doc = await WalletSchema.findByIdAndUpdate(
+      id,
+      { $inc: { heldForPayout: numericAmount } },
       { new: true }
     );
     return this._toEntity(doc);

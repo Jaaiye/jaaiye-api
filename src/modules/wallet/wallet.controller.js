@@ -286,6 +286,10 @@ class WalletController {
     const { ownerType, ownerId } = req.params;
     const { amount, bankAccountId } = req.body;
     const requestedBy = req.user.id || req.user._id;
+    // This route is admin-gated (see wallet.routes.js) - every caller here
+    // is already an admin, using this as a manual override. Ownership is
+    // not required in that case.
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
     // Normalize ownerType to uppercase
     const normalizedOwnerType = ownerType.toUpperCase();
@@ -300,7 +304,8 @@ class WalletController {
     const authResult = await this.walletAuthorizationService.canWithdrawFromWallet({
       ownerType: normalizedOwnerType,
       ownerId,
-      userId: requestedBy
+      userId: requestedBy,
+      isAdmin
     });
 
     if (!authResult.allowed) {
@@ -315,7 +320,8 @@ class WalletController {
       ownerId: authResult.resolvedOwnerId || ownerId,
       requestedBy,
       amount: Number(amount),
-      bankAccountId: bankAccountId || null
+      bankAccountId: bankAccountId || null,
+      isAdmin
     });
 
     return successResponse(res, result, 200, 'Withdrawal request submitted successfully');

@@ -9,6 +9,7 @@ class WalletEntity {
     ownerType,
     ownerId,
     balance,
+    heldForPayout = '0.00',
     currency = 'NGN',
     isActive = true,
     createdAt,
@@ -18,6 +19,7 @@ class WalletEntity {
     this.ownerType = ownerType; // 'EVENT' | 'GROUP' | 'PLATFORM'
     this.ownerId = ownerId; // stringified ObjectId or null for PLATFORM
     this.balance = balance; // string or number representing DECIMAL(18,2)
+    this.heldForPayout = heldForPayout; // amount locked in for the next scheduled payout run
     this.currency = currency;
     this.isActive = isActive !== undefined ? isActive : true;
     this.createdAt = createdAt;
@@ -34,6 +36,7 @@ class WalletEntity {
       ownerType: this.ownerType,
       ownerId: this.ownerId,
       balance: this.balance,
+      heldForPayout: this.heldForPayout,
       currency: this.currency,
       isActive: this.isActive,
       createdAt: this.createdAt,

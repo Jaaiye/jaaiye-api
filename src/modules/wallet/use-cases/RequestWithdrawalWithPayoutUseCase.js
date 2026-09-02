@@ -22,7 +22,8 @@ class RequestWithdrawalWithPayoutUseCase {
     withdrawalRepository,
     flutterwaveAdapter,
     walletEmailAdapter,
-    eventRepository
+    eventRepository,
+    groupRepository
   }) {
     this.walletWithdrawalService = walletWithdrawalService;
     this.walletRepository = walletRepository;
@@ -32,6 +33,7 @@ class RequestWithdrawalWithPayoutUseCase {
     this.flutterwaveAdapter = flutterwaveAdapter;
     this.walletEmailAdapter = walletEmailAdapter;
     this.eventRepository = eventRepository;
+    this.groupRepository = groupRepository;
   }
 
   /**
@@ -44,7 +46,7 @@ class RequestWithdrawalWithPayoutUseCase {
    * @param {number} params.amount
    * @param {string} [params.bankAccountId] - Optional, uses default if not provided
    */
-  async execute({ ownerType, ownerId, requestedBy, amount, bankAccountId }) {
+  async execute({ ownerType, ownerId, requestedBy, amount, bankAccountId, isAdmin = false }) {
     // Validation: Amount range
     const MIN_AMOUNT = 10000; // ₦10,000
     const MAX_AMOUNT = 500000; // ₦500,000
@@ -62,13 +64,35 @@ class RequestWithdrawalWithPayoutUseCase {
       throw new Error(`Maximum withdrawal amount is ₦${MAX_AMOUNT.toLocaleString()}`);
     }
 
-    // Validation: Rate limiting (2 withdrawals per day)
+    // Who actually gets paid: normally the caller, but when an admin is
+    // using this as a manual override, it's the wallet owner's creator -
+    // not the admin's own bank account.
+    let payeeUserId = requestedBy;
+    if (isAdmin) {
+      if (ownerType === 'EVENT') {
+        const event = await this.eventRepository.findByIdOrSlug(ownerId);
+        if (!event || !event.creatorId) {
+          throw new Error('Could not resolve a payee for this event');
+        }
+        payeeUserId = event.creatorId;
+      } else {
+        const group = await this.groupRepository.findById(ownerId);
+        if (!group || !group.creator) {
+          throw new Error('Could not resolve a payee for this group');
+        }
+        payeeUserId = group.creator;
+      }
+    }
+
+    // Validation: Rate limiting (2 withdrawals per day) - keyed to the
+    // payee, so admin overrides across many different organizers in one
+    // day don't hit a cap meant to apply per-organizer.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const recentWithdrawals = await this.withdrawalRepository.findByUser(requestedBy, {
+    const recentWithdrawals = await this.withdrawalRepository.findByUser(payeeUserId, {
       limit: 10,
       skip: 0,
       sort: { createdAt: -1 }
@@ -80,20 +104,20 @@ class RequestWithdrawalWithPayoutUseCase {
     });
 
     if (todayWithdrawals.length >= 2) {
-      throw new Error('You have reached the daily withdrawal limit (2 withdrawals per day)');
+      throw new Error('The daily withdrawal limit (2 withdrawals per day) has been reached for this payee');
     }
 
     // Get bank account (default or specified)
     let bankAccount;
     if (bankAccountId) {
-      bankAccount = await this.bankAccountRepository.findByIdForUser(bankAccountId, requestedBy);
+      bankAccount = await this.bankAccountRepository.findByIdForUser(bankAccountId, payeeUserId);
       if (!bankAccount) {
-        throw new Error('Bank account not found or does not belong to you');
+        throw new Error('Bank account not found or does not belong to the payee');
       }
     } else {
-      bankAccount = await this.bankAccountRepository.findDefaultByUser(requestedBy);
+      bankAccount = await this.bankAccountRepository.findDefaultByUser(payeeUserId);
       if (!bankAccount) {
-        throw new Error('No default bank account found. Please add a bank account first.');
+        throw new Error('No default bank account found for the payee. Please add a bank account first.');
       }
     }
 
@@ -105,7 +129,8 @@ class RequestWithdrawalWithPayoutUseCase {
         ownerId,
         requestedBy,
         requestedAmount: withdrawalAmount,
-        feeMode: 'EXCLUSIVE' // platform service fee (see SERVICE_FEE_RATE) for EVENT withdrawals
+        feeMode: 'EXCLUSIVE', // flat WITHDRAWAL_FEE_FLAT, deducted from the payout
+        isAdmin
       });
     } catch (error) {
       logger.error('Wallet withdrawal failed', {
@@ -190,7 +215,7 @@ class RequestWithdrawalWithPayoutUseCase {
       wallet: wallet.id,
       ownerType,
       ownerId,
-      user: requestedBy,
+      user: payeeUserId,
       amount: withdrawalAmount,
       feeAmount: withdrawalResult.feeAmount || 0,
       status: 'pending',
@@ -199,6 +224,8 @@ class RequestWithdrawalWithPayoutUseCase {
       metadata: {
         flutterwaveTransferId: transferResult.id,
         transferStatus: transferResult.status,
+        adminOverride: isAdmin,
+        triggeredBy: isAdmin ? requestedBy : undefined,
         createdAt: new Date()
       }
     });

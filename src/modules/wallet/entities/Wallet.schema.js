@@ -25,6 +25,16 @@ const walletSchema = new mongoose.Schema({
     required: true,
     default: 0.0
   },
+  // Amount locked in by the weekly payout hold job (Tuesday) and paid out
+  // to the bank (Thursday). Kept separate from `balance` so money that
+  // arrives after the hold cutoff doesn't get swept into a payout that's
+  // already been committed - it just sits in `balance` until next week's
+  // hold.
+  heldForPayout: {
+    type: mongoose.Schema.Types.Decimal128,
+    required: true,
+    default: 0.0
+  },
   currency: {
     type: String,
     default: 'NGN'

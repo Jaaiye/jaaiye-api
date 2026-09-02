@@ -7,6 +7,7 @@ const EmailQueue = require('./email.queue');
 const NotificationQueue = require('./notification.queue');
 const PaymentPollingQueue = require('./payment-polling.queue');
 const WithdrawalPollingQueue = require('./withdrawal-polling.queue');
+const PayoutSchedulerQueue = require('./payout-scheduler.queue');
 const UptimeMonitor = require('./uptime.monitor');
 
 class QueueModule {
@@ -40,6 +41,13 @@ class QueueModule {
       this._instances.withdrawalPollingQueue = WithdrawalPollingQueue;
     }
     return this._instances.withdrawalPollingQueue;
+  }
+
+  getPayoutSchedulerQueue() {
+    if (!this._instances.payoutSchedulerQueue) {
+      this._instances.payoutSchedulerQueue = PayoutSchedulerQueue;
+    }
+    return this._instances.payoutSchedulerQueue;
   }
 
   getUptimeMonitor() {

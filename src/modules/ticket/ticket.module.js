@@ -203,6 +203,7 @@ class TicketModule {
       this._scanAndVerifyTicketUseCase = new ScanAndVerifyTicketUseCase({
         ticketRepository: this.getTicketRepository(),
         eventRepository: this.getEventRepository(),
+        eventTeamRepository: this.getEventTeamRepository(),
         qrCodeAdapter: this.getQRCodeAdapter()
       });
     }

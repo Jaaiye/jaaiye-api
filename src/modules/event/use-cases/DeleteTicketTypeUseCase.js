@@ -5,10 +5,12 @@
 
 const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
 const EventSchema = require('../entities/Event.schema');
+const { canUserManageTicketTypes } = require('../services/EventOwnershipService');
 
 class DeleteTicketTypeUseCase {
-  constructor({ eventRepository }) {
+  constructor({ eventRepository, eventTeamRepository }) {
     this.eventRepository = eventRepository;
+    this.eventTeamRepository = eventTeamRepository;
   }
 
   async execute(eventId, ticketTypeId, userId) {
@@ -18,9 +20,15 @@ class DeleteTicketTypeUseCase {
       throw new EventNotFoundError();
     }
 
-    // Only event creator can delete ticket types
-    if (event.origin === 'user' && event.creatorId && String(event.creatorId) !== String(userId)) {
-      throw new EventAccessDeniedError('Only the event creator can delete ticket types');
+    // See UpdateTicketTypeUseCase for why this uses the shared
+    // EventOwnershipService check instead of a raw creatorId comparison.
+    const isCreator = event.creatorId && String(event.creatorId) === String(userId);
+    const teamMember = isCreator
+      ? null
+      : await this.eventTeamRepository.findByEventAndUser(event.id, userId);
+
+    if (!canUserManageTicketTypes({ eventEntity: event, userId, teamMember })) {
+      throw new EventAccessDeniedError('You do not have permission to delete ticket types for this event');
     }
 
     // Only events can have ticket types

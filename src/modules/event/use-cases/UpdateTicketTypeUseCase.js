@@ -5,10 +5,12 @@
 
 const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
 const EventSchema = require('../entities/Event.schema');
+const { canUserManageTicketTypes } = require('../services/EventOwnershipService');
 
 class UpdateTicketTypeUseCase {
-  constructor({ eventRepository }) {
+  constructor({ eventRepository, eventTeamRepository }) {
     this.eventRepository = eventRepository;
+    this.eventTeamRepository = eventTeamRepository;
   }
 
   async execute(eventId, ticketTypeId, userId, updateData) {
@@ -18,9 +20,19 @@ class UpdateTicketTypeUseCase {
       throw new EventNotFoundError();
     }
 
-    // Only event creator can update ticket types
-    if (event.origin === 'user' && event.creatorId && String(event.creatorId) !== String(userId)) {
-      throw new EventAccessDeniedError('Only the event creator can update ticket types');
+    // Creator or an accepted co-organizer/creator team member with the
+    // manageTickets permission can update ticket types - same rule the
+    // issueTicket flow uses, via the shared EventOwnershipService helper.
+    // The previous check here only compared creatorId and silently
+    // allowed ANY authenticated user through for non-'user'-origin events
+    // or events missing a creatorId - this closes that gap.
+    const isCreator = event.creatorId && String(event.creatorId) === String(userId);
+    const teamMember = isCreator
+      ? null
+      : await this.eventTeamRepository.findByEventAndUser(event.id, userId);
+
+    if (!canUserManageTicketTypes({ eventEntity: event, userId, teamMember })) {
+      throw new EventAccessDeniedError('You do not have permission to update ticket types for this event');
     }
 
     // Only events can have ticket types

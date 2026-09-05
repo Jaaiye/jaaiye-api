@@ -4,12 +4,14 @@
  * Handles both token and publicId scanning with verification
  */
 
-const { TicketNotFoundError, TicketAlreadyUsedError } = require('../errors');
+const { TicketNotFoundError, TicketAlreadyUsedError, TicketAccessDeniedError } = require('../errors');
+const { canUserCheckInTickets } = require('../../event/services/EventOwnershipService');
 
 class ScanAndVerifyTicketUseCase {
-  constructor({ ticketRepository, eventRepository, qrCodeAdapter }) {
+  constructor({ ticketRepository, eventRepository, eventTeamRepository, qrCodeAdapter }) {
     this.ticketRepository = ticketRepository;
     this.eventRepository = eventRepository;
+    this.eventTeamRepository = eventTeamRepository;
     this.qrCodeAdapter = qrCodeAdapter;
   }
 
@@ -55,7 +57,7 @@ class ScanAndVerifyTicketUseCase {
     };
   }
 
-  async execute(identifier, scannerUserId, eventId = null, checkInCount = 1) {
+  async execute(identifier, scannerUserId, eventId = null, checkInCount = 1, scannerRole = null) {
     let ticket;
 
     // Detect if identifier is publicId or token
@@ -106,6 +108,33 @@ class ScanAndVerifyTicketUseCase {
 
       if (!ticket) {
         throw new TicketNotFoundError('Ticket not found');
+      }
+    }
+
+    // Authorize: the previous implementation had no per-event authorization
+    // at all - a user with the platform-wide 'scanner'/'admin'/'superadmin'
+    // role (route-level gate) could check in tickets for ANY event, and a
+    // team member added to an event with the per-event 'ticket_scanner'
+    // role had no way to actually scan since that role never touched the
+    // global user.role field the route gate checks. This closes both gaps:
+    // admin/superadmin keep their platform-wide override, everyone else
+    // must be the event creator or an accepted team member with the
+    // checkInTickets permission for the ticket's own event.
+    if (scannerRole !== 'admin' && scannerRole !== 'superadmin') {
+      const ticketEventId = ticket.eventId?._id?.toString() || ticket.eventId?.toString() || ticket.eventId;
+      const event = await this.eventRepository.findById(ticketEventId);
+
+      if (!event) {
+        throw new TicketNotFoundError('Event not found');
+      }
+
+      const isCreator = event.creatorId && String(event.creatorId) === String(scannerUserId);
+      const teamMember = isCreator
+        ? null
+        : await this.eventTeamRepository.findByEventAndUser(event.id, scannerUserId);
+
+      if (!canUserCheckInTickets({ eventEntity: event, userId: scannerUserId, teamMember })) {
+        throw new TicketAccessDeniedError('You do not have permission to check in tickets for this event');
       }
     }
 

@@ -31,7 +31,8 @@ const {
   GetFirebaseTokenUseCase,
   DeleteAccountUseCase,
   AddBankAccountUseCase,
-  SetDefaultBankAccountUseCase
+  SetDefaultBankAccountUseCase,
+  DeleteBankAccountUseCase
 } = require('./use-cases');
 
 // Presentation
@@ -179,6 +180,15 @@ class UserModule {
     return this._instances.setDefaultBankAccountUseCase;
   }
 
+  getDeleteBankAccountUseCase() {
+    if (!this._instances.deleteBankAccountUseCase) {
+      this._instances.deleteBankAccountUseCase = new DeleteBankAccountUseCase({
+        bankAccountRepository: this.getBankAccountRepository()
+      });
+    }
+    return this._instances.deleteBankAccountUseCase;
+  }
+
   getGetWithdrawalsUseCase() {
     if (!this._instances.getWithdrawalsUseCase) {
       const { WithdrawalRepository, WalletRepository } = require('../wallet/repositories');
@@ -203,6 +213,7 @@ class UserModule {
         deleteAccountUseCase: this.getDeleteAccountUseCase(),
         addBankAccountUseCase: this.getAddBankAccountUseCase(),
         setDefaultBankAccountUseCase: this.getSetDefaultBankAccountUseCase(),
+        deleteBankAccountUseCase: this.getDeleteBankAccountUseCase(),
         getWithdrawalsUseCase: this.getGetWithdrawalsUseCase(),
         flutterwaveAdapter: new FlutterwaveAdapter()
       });

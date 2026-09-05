@@ -343,7 +343,8 @@ class EventModule {
   getUpdateTicketTypeUseCase() {
     if (!this._instances.updateTicketTypeUseCase) {
       this._instances.updateTicketTypeUseCase = new UpdateTicketTypeUseCase({
-        eventRepository: this.getEventRepository()
+        eventRepository: this.getEventRepository(),
+        eventTeamRepository: this.getEventTeamRepository()
       });
     }
     return this._instances.updateTicketTypeUseCase;
@@ -352,7 +353,8 @@ class EventModule {
   getDeleteTicketTypeUseCase() {
     if (!this._instances.deleteTicketTypeUseCase) {
       this._instances.deleteTicketTypeUseCase = new DeleteTicketTypeUseCase({
-        eventRepository: this.getEventRepository()
+        eventRepository: this.getEventRepository(),
+        eventTeamRepository: this.getEventTeamRepository()
       });
     }
     return this._instances.deleteTicketTypeUseCase;

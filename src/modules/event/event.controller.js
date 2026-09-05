@@ -258,24 +258,36 @@ class EventController {
 
   addTicketType = asyncHandler(async (req, res) => {
     const container = require('./event.module');
+    const { canUserManageTicketTypes } = require('./services/EventOwnershipService');
     const eventRepository = container.getEventRepository();
+    const eventTeamRepository = container.getEventTeamRepository();
 
-    // Validate event exists
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
-    let eventId;
+    const event = await eventRepository.findByIdOrSlug(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+    const eventId = event.id;
 
-    if (isObjectId) {
-      eventId = req.params.id;
-      const event = await eventRepository.findById(eventId);
-      if (!event) {
-        return res.status(404).json({ success: false, error: 'Event not found' });
-      }
-    } else {
-      const event = await eventRepository.findBySlug(req.params.id);
-      if (!event) {
-        return res.status(404).json({ success: false, error: 'Event not found' });
-      }
-      eventId = event.id;
+    // This endpoint previously had no ownership check at all - any
+    // authenticated user could add a ticket type to any event. Uses the
+    // same creator-or-authorized-team-member rule as update/delete.
+    const userId = req.user.id;
+    const isCreator = event.creatorId && String(event.creatorId) === String(userId);
+    const teamMember = isCreator
+      ? null
+      : await eventTeamRepository.findByEventAndUser(eventId, userId);
+
+    if (!canUserManageTicketTypes({ eventEntity: event, userId, teamMember })) {
+      return res.status(403).json({
+        success: false,
+        error: 'You do not have permission to add ticket types for this event'
+      });
+    }
+
+    // Only events can have ticket types - same rule enforced in
+    // UpdateTicketTypeUseCase/DeleteTicketTypeUseCase, previously missing here.
+    if (event.category !== 'event') {
+      return res.status(400).json({ success: false, error: 'Only events can have ticket types' });
     }
 
     const ticketTypeData = {

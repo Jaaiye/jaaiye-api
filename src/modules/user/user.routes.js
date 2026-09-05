@@ -37,6 +37,7 @@ function createUserRoutes({ userController }) {
   router.get('/banks', userController.getBanks);
   router.post('/bank-accounts', userController.addBankAccount);
   router.post('/bank-accounts/default', userController.setDefaultBankAccount);
+  router.delete('/bank-accounts/:id', userController.deleteBankAccount);
 
   // Withdrawal routes
   router.get('/withdrawals', userController.getUserWithdrawals);

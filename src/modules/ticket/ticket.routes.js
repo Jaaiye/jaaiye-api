@@ -23,8 +23,14 @@ class TicketRoutes {
 
   getRoutes() {
     // Unified scan and verify endpoint (authenticated scanner)
-    // Accepts either token or publicId in request body
-    router.post('/scan', protect, scanner, ...scanAndVerifyTicketValidator, validate, this.ticketController.scanAndVerify);
+    // Accepts either token or publicId in request body.
+    // Authorization is per-event, handled inside ScanAndVerifyTicketUseCase
+    // (event creator, or an accepted team member with the checkInTickets
+    // permission - admin/superadmin still bypass via req.user.role). The
+    // platform-wide 'scanner' role gate previously used here blocked any
+    // event-team ticket_scanner from ever reaching this endpoint, since
+    // that per-event team role never touches the global user.role field.
+    router.post('/scan', protect, ...scanAndVerifyTicketValidator, validate, this.ticketController.scanAndVerify);
 
     // Ticket management routes
     router.post('/', protect, admin, ...createTicketValidator, validate, this.ticketController.createTicket);

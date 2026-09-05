@@ -12,6 +12,7 @@ const LogoutUseCase = require('./LogoutUseCase');
 const GetFirebaseTokenUseCase = require('./GetFirebaseTokenUseCase');
 const AddBankAccountUseCase = require('./AddBankAccountUseCase');
 const SetDefaultBankAccountUseCase = require('./SetDefaultBankAccountUseCase');
+const DeleteBankAccountUseCase = require('./DeleteBankAccountUseCase');
 
 module.exports = {
   GetProfileUseCase,
@@ -22,6 +23,7 @@ module.exports = {
   LogoutUseCase,
   GetFirebaseTokenUseCase,
   AddBankAccountUseCase,
-  SetDefaultBankAccountUseCase
+  SetDefaultBankAccountUseCase,
+  DeleteBankAccountUseCase
 };
 

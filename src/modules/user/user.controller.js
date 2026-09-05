@@ -22,6 +22,7 @@ class UserController {
     getFirebaseTokenUseCase,
     addBankAccountUseCase,
     setDefaultBankAccountUseCase,
+    deleteBankAccountUseCase,
     getWithdrawalsUseCase,
     flutterwaveAdapter,
   }) {
@@ -34,6 +35,7 @@ class UserController {
     this.getFirebaseTokenUseCase = getFirebaseTokenUseCase;
     this.addBankAccountUseCase = addBankAccountUseCase;
     this.setDefaultBankAccountUseCase = setDefaultBankAccountUseCase;
+    this.deleteBankAccountUseCase = deleteBankAccountUseCase;
     this.getWithdrawalsUseCase = getWithdrawalsUseCase;
     this.flutterwaveAdapter = flutterwaveAdapter;
   }
@@ -137,6 +139,29 @@ class UserController {
     const { bankAccountId } = req.body;
     const bankAccount = await this.setDefaultBankAccountUseCase.execute(req.user.id, bankAccountId);
     return successResponse(res, { bankAccount });
+  });
+
+  /**
+   * @swagger
+   * /users/bank-accounts/{id}:
+   *   delete:
+   *     summary: Delete a bank account
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Bank account deleted
+   */
+  deleteBankAccount = asyncHandler(async (req, res) => {
+    const result = await this.deleteBankAccountUseCase.execute(req.user.id, req.params.id);
+    return successResponse(res, result);
   });
 
   /**

@@ -1,6 +1,7 @@
 /**
  * Get Team Events Use Case
- * Application layer - get events where user is a co-organizer
+ * Application layer - get events where the user is an accepted team member
+ * (co-organizer or ticket scanner)
  */
 
 const { ValidationError } = require('../errors');
@@ -17,13 +18,16 @@ class GetTeamEventsUseCase {
       throw new ValidationError('Invalid status. Must be scheduled, cancelled, or completed');
     }
 
-    // Find all team memberships where user is co-organizer and accepted
+    // Find all accepted co-organizer/ticket-scanner team memberships.
+    // This previously only included 'co_organizer', which meant a
+    // ticket_scanner team member had no way to discover which events they
+    // were added to - the mobile scanner UI has nothing to route them to.
     const teamMemberships = await this.eventTeamRepository.findByUser(userId);
-    const coOrganizerMemberships = teamMemberships.filter(
-      tm => tm.role === 'co_organizer' && tm.status === 'accepted'
+    const teamEventMemberships = teamMemberships.filter(
+      tm => ['co_organizer', 'ticket_scanner'].includes(tm.role) && tm.status === 'accepted'
     );
 
-    if (coOrganizerMemberships.length === 0) {
+    if (teamEventMemberships.length === 0) {
       return {
         events: [],
         pagination: {
@@ -36,7 +40,7 @@ class GetTeamEventsUseCase {
     }
 
     // Get event IDs - ensure they're strings/ObjectIds
-    const eventIds = coOrganizerMemberships.map(tm => {
+    const eventIds = teamEventMemberships.map(tm => {
       const eventId = tm.event;
       // If event is an object (populated), extract the ID
       if (eventId && typeof eventId === 'object' && eventId.id) {
@@ -71,9 +75,9 @@ class GetTeamEventsUseCase {
 
     // Map events and include team member info
     const eventsWithRole = result.events.map(event => {
-      const teamMember = coOrganizerMemberships.find(tm => String(tm.event) === String(event.id));
+      const teamMember = teamEventMemberships.find(tm => String(tm.event) === String(event.id));
       const eventData = event.toJSON();
-      eventData.teamRole = 'co_organizer';
+      eventData.teamRole = teamMember?.role || 'co_organizer';
       eventData.teamPermissions = teamMember?.permissions || {};
       return eventData;
     });

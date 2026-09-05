@@ -197,13 +197,15 @@ class TicketController {
      *         description: Ticket verified
      */
     this.scanAndVerify = asyncHandler(async (req, res) => {
-      const { identifier, eventId } = req.body;
+      const { identifier, eventId, checkInCount } = req.body;
       const userId = req.user._id || req.user.id;
 
       const result = await scanAndVerifyTicketUseCase.execute(
         identifier,
         userId,
-        eventId || null
+        eventId || null,
+        checkInCount || 1,
+        req.user.role
       );
 
       // If ticket is already used, return 400 with standardized format

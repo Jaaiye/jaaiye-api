@@ -49,6 +49,11 @@ class BankAccountRepository {
 
     return doc ? doc.toObject() : null;
   }
+
+  async delete(id, userId) {
+    const result = await BankAccount.deleteOne({ _id: id, user: userId });
+    return result.deletedCount > 0;
+  }
 }
 
 module.exports = BankAccountRepository;

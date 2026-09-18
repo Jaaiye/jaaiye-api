@@ -13,7 +13,8 @@ class WalletController {
     requestWithdrawalWithPayoutUseCase,
     getWithdrawalsUseCase,
     getWithdrawalDetailsUseCase,
-    walletAuthorizationService
+    walletAuthorizationService,
+    payoutSchedulerQueue
   }) {
     this.getWalletDetailsUseCase = getWalletDetailsUseCase;
     this.adjustWalletBalanceUseCase = adjustWalletBalanceUseCase;
@@ -21,7 +22,58 @@ class WalletController {
     this.getWithdrawalsUseCase = getWithdrawalsUseCase;
     this.getWithdrawalDetailsUseCase = getWithdrawalDetailsUseCase;
     this.walletAuthorizationService = walletAuthorizationService;
+    this.payoutSchedulerQueue = payoutSchedulerQueue;
   }
+
+  /**
+   * @swagger
+   * /wallets/admin/payout-scheduler/status:
+   *   get:
+   *     summary: Get the payout scheduler's running state
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Scheduler status
+   */
+  getPayoutSchedulerStatus = asyncHandler(async (req, res) => {
+    return successResponse(res, this.payoutSchedulerQueue.getStatus());
+  });
+
+  /**
+   * @swagger
+   * /wallets/admin/payout-scheduler/run-hold:
+   *   post:
+   *     summary: Manually trigger the weekly payout hold step (admin override, off-cycle testing)
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Hold run outcome
+   */
+  runPayoutSchedulerHold = asyncHandler(async (req, res) => {
+    const outcome = await this.payoutSchedulerQueue.runHold();
+    return successResponse(res, outcome);
+  });
+
+  /**
+   * @swagger
+   * /wallets/admin/payout-scheduler/run-payout:
+   *   post:
+   *     summary: Manually trigger the weekly scheduled payout step (admin override, off-cycle testing). Moves real money via Flutterwave.
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Payout run outcome
+   */
+  runPayoutSchedulerPayout = asyncHandler(async (req, res) => {
+    const outcome = await this.payoutSchedulerQueue.runPayout();
+    return successResponse(res, outcome);
+  });
 
   /**
    * @swagger

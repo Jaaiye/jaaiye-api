@@ -198,13 +198,19 @@ class WalletModule {
 
   getWalletController() {
     if (!this._instances.walletController) {
+      // Required lazily (not at top-of-file) - payout-scheduler.queue.js
+      // requires this module back to resolve its use-cases, so a top-level
+      // require here would be circular.
+      const payoutSchedulerQueue = require('../queue/payout-scheduler.queue');
+
       this._instances.walletController = new WalletController({
         getWalletDetailsUseCase: this.getGetWalletDetailsUseCase(),
         adjustWalletBalanceUseCase: this.getAdjustWalletBalanceUseCase(),
         requestWithdrawalWithPayoutUseCase: this.getRequestWithdrawalWithPayoutUseCase(),
         getWithdrawalsUseCase: this.getGetWithdrawalsUseCase(),
         getWithdrawalDetailsUseCase: this.getGetWithdrawalDetailsUseCase(),
-        walletAuthorizationService: this.getWalletAuthorizationService()
+        walletAuthorizationService: this.getWalletAuthorizationService(),
+        payoutSchedulerQueue
       });
     }
     return this._instances.walletController;

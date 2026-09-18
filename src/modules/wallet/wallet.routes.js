@@ -11,6 +11,46 @@ const { protect, admin } = require('../../middleware/authMiddleware');
 const { validate } = require('../../middleware/validationMiddleware');
 
 function createWalletRoutes(walletController) {
+  // Admin-only: payout scheduler manual controls (off-cycle testing/ops
+  // override - the scheduler otherwise only runs Tue/Thu on its own cron).
+  // Static paths, registered before the /:ownerType/:ownerId routes below
+  // so they're never shadowed by the param routes.
+  router.get(
+    '/admin/payout-scheduler/status',
+    apiLimiter,
+    protect,
+    admin,
+    walletController.getPayoutSchedulerStatus
+  );
+
+  router.post(
+    '/admin/payout-scheduler/run-hold',
+    apiLimiter,
+    protect,
+    admin,
+    walletController.runPayoutSchedulerHold
+  );
+
+  router.post(
+    '/admin/payout-scheduler/run-payout',
+    apiLimiter,
+    protect,
+    admin,
+    walletController.runPayoutSchedulerPayout
+  );
+
+  // Get withdrawal details - static path, must be registered before the
+  // /:ownerType/:ownerId param route below, which would otherwise greedily
+  // match '/withdrawals/:withdrawalId' as ownerType='withdrawals' and make
+  // this route unreachable.
+  router.get(
+    '/withdrawals/:withdrawalId',
+    apiLimiter,
+    protect,
+    validate,
+    walletController.getWithdrawalDetails
+  );
+
   // Get wallet details (balance + ledger)
   router.get(
     '/:ownerType/:ownerId',
@@ -86,15 +126,6 @@ function createWalletRoutes(walletController) {
     protect,
     validate,
     walletController.getWalletWithdrawals
-  );
-
-  // Get withdrawal details
-  router.get(
-    '/withdrawals/:withdrawalId',
-    apiLimiter,
-    protect,
-    validate,
-    walletController.getWithdrawalDetails
   );
 
   return router;

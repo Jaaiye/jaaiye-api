@@ -51,7 +51,7 @@ class WalletAuthorizationService {
             }
 
             // Check if user is an accepted co-organizer
-            const EventTeam = require('../../../models/EventTeam');
+            const EventTeam = require('../../event/entities/EventTeam.schema');
             const teamMember = await EventTeam.findOne({
                 event: ownerId,
                 user: userId,

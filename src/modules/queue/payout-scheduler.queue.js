@@ -10,10 +10,17 @@
 
 const cron = require('node-cron');
 const logger = require('../../utils/logger');
+const { withLock } = require('../../utils/distributedLock');
 
 const TIMEZONE = 'Africa/Lagos';
 const HOLD_CRON = '0 15 * * 2';   // Tuesday 15:00
 const PAYOUT_CRON = '0 15 * * 4'; // Thursday 15:00
+
+// Redis-backed - guards against this job running twice if the backend is
+// ever scaled to more than one instance. The in-memory _holdInProgress /
+// _payoutInProgress flags above only protect within a single process.
+const HOLD_LOCK_TTL_MS = 30 * 60 * 1000;   // 30 minutes
+const PAYOUT_LOCK_TTL_MS = 60 * 60 * 1000; // 60 minutes - one Flutterwave transfer call per wallet
 
 class PayoutSchedulerQueue {
   constructor() {
@@ -79,16 +86,23 @@ class PayoutSchedulerQueue {
   async runHold() {
     if (this._holdInProgress) {
       logger.warn('Payout hold job already in progress, skipping this trigger');
-      return;
+      return { ran: false, reason: 'already_in_progress' };
     }
 
     this._holdInProgress = true;
     try {
       logger.info('Payout hold job started');
-      const summary = await this._getHoldUseCase().execute();
-      logger.info('Payout hold job completed', summary);
+      const outcome = await withLock('payout-scheduler:hold', HOLD_LOCK_TTL_MS, () =>
+        this._getHoldUseCase().execute()
+      );
+      if (outcome.ran) {
+        logger.info('Payout hold job completed', outcome.result);
+        return { ran: true, summary: outcome.result };
+      }
+      return { ran: false, reason: 'lock_not_acquired' };
     } catch (error) {
       logger.error('Payout hold job failed', { error: error.message, stack: error.stack });
+      return { ran: false, reason: 'error', error: error.message };
     } finally {
       this._holdInProgress = false;
     }
@@ -97,16 +111,23 @@ class PayoutSchedulerQueue {
   async runPayout() {
     if (this._payoutInProgress) {
       logger.warn('Scheduled payout job already in progress, skipping this trigger');
-      return;
+      return { ran: false, reason: 'already_in_progress' };
     }
 
     this._payoutInProgress = true;
     try {
       logger.info('Scheduled payout job started');
-      const summary = await this._getPayoutUseCase().execute();
-      logger.info('Scheduled payout job completed', summary);
+      const outcome = await withLock('payout-scheduler:payout', PAYOUT_LOCK_TTL_MS, () =>
+        this._getPayoutUseCase().execute()
+      );
+      if (outcome.ran) {
+        logger.info('Scheduled payout job completed', outcome.result);
+        return { ran: true, summary: outcome.result };
+      }
+      return { ran: false, reason: 'lock_not_acquired' };
     } catch (error) {
       logger.error('Scheduled payout job failed', { error: error.message, stack: error.stack });
+      return { ran: false, reason: 'error', error: error.message };
     } finally {
       this._payoutInProgress = false;
     }

@@ -83,7 +83,15 @@ class ProcessFlutterwaveTransferWebhookUseCase {
     // If withdrawal failed, credit the wallet back
     if (!ok) {
       try {
-        const creditBackAmount = withdrawal.amount + (withdrawal.feeAmount || 0);
+        // Credit back only the original held amount - the fee is not the
+        // organizer's money to begin with, so it never belongs in their
+        // credit-back. (Previously this credited amount + feeAmount here
+        // AND left the platform wallet's fee credit from
+        // ProcessScheduledPayoutsUseCase untouched, which minted the fee
+        // out of thin air on every failed transfer: organizer got amount +
+        // fee back while the platform also kept the fee it was credited
+        // at initiation time, for a service that was never rendered.)
+        const creditBackAmount = withdrawal.amount;
         // Atomic credit - avoids clobbering a concurrent balance change
         // with a stale read-then-$set.
         const updatedWallet = await this.walletRepository.credit(wallet.id, creditBackAmount);
@@ -117,6 +125,45 @@ class ProcessFlutterwaveTransferWebhookUseCase {
           error: creditBackError.message
         });
         // Continue with email notification even if credit-back fails
+      }
+
+      // Reverse the platform's fee credit - ProcessScheduledPayoutsUseCase
+      // credits the platform wallet the fee as soon as Flutterwave accepts
+      // the transfer request, before settlement is confirmed. If it later
+      // fails, the platform never actually rendered the payout service and
+      // must not keep the fee.
+      if (withdrawal.feeAmount > 0) {
+        try {
+          const platformWallet = await this.walletRepository.findByOwner('PLATFORM', null);
+          if (platformWallet) {
+            const debitedPlatformWallet = await this.walletRepository.debit(platformWallet.id, withdrawal.feeAmount);
+            if (debitedPlatformWallet) {
+              await this.walletLedgerEntryRepository.create({
+                walletId: platformWallet.id,
+                type: 'ADJUSTMENT',
+                direction: 'DEBIT',
+                amount: withdrawal.feeAmount,
+                balanceAfter: Number(debitedPlatformWallet.balance),
+                ownerType: 'PLATFORM',
+                ownerId: null,
+                metadata: {
+                  reason: 'withdrawal_failed_fee_reversal',
+                  withdrawalId: withdrawal._id || withdrawal.id
+                }
+              });
+            } else {
+              logger.error('Platform wallet had insufficient balance to reverse fee - needs manual reconciliation', {
+                withdrawalId: withdrawal._id,
+                feeAmount: withdrawal.feeAmount
+              });
+            }
+          }
+        } catch (feeReversalError) {
+          logger.error('Failed to reverse platform fee after failed withdrawal', {
+            withdrawalId: withdrawal._id,
+            error: feeReversalError.message
+          });
+        }
       }
     }
 

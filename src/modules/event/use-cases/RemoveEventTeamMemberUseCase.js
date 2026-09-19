@@ -3,7 +3,11 @@
  * Application layer - remove a team member from an event
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 
 class RemoveEventTeamMemberUseCase {
   constructor({ eventRepository, eventTeamRepository }) {
@@ -33,12 +37,12 @@ class RemoveEventTeamMemberUseCase {
     // Find team member
     const teamMember = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, teamMemberUserId);
     if (!teamMember) {
-      throw new ValidationError('Team member not found');
+      throw new BadRequestError('Team member not found');
     }
 
     // Cannot remove creator
     if (teamMember.role === 'creator') {
-      throw new ValidationError('Cannot remove creator');
+      throw new BadRequestError('Cannot remove creator');
     }
 
     // Remove team member

@@ -3,7 +3,11 @@
  * Application layer - update a ticket type for an event
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError, TicketTypeNotFoundError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 const EventSchema = require('../entities/Event.schema');
 const { canUserManageTicketTypes } = require('../services/EventOwnershipService');
 
@@ -37,7 +41,7 @@ class UpdateTicketTypeUseCase {
 
     // Only events can have ticket types
     if (event.category !== 'event') {
-      throw new ValidationError('Only events can have ticket types');
+      throw new BadRequestError('Only events can have ticket types');
     }
 
     // Get event as Mongoose document to use schema methods
@@ -48,7 +52,7 @@ class UpdateTicketTypeUseCase {
 
     const ticketType = eventDoc.ticketTypes.id(ticketTypeId);
     if (!ticketType) {
-      throw new ValidationError('Ticket type not found');
+      throw new TicketTypeNotFoundError();
     }
 
     const predefinedTypes = ['regular', 'early_bird', 'couples', 'group_3', 'group_5', 'complimentary'];
@@ -56,7 +60,7 @@ class UpdateTicketTypeUseCase {
     // Validate: Cannot change predefined type to another predefined type
     if (ticketType.type && updateData.type) {
       if (predefinedTypes.includes(ticketType.type) && predefinedTypes.includes(updateData.type) && ticketType.type !== updateData.type) {
-        throw new ValidationError('Cannot change predefined ticket type to another predefined type');
+        throw new BadRequestError('Cannot change predefined ticket type to another predefined type');
       }
     }
 
@@ -64,7 +68,7 @@ class UpdateTicketTypeUseCase {
     if (updateData.capacity !== undefined && updateData.capacity !== null) {
       const newCapacity = Number(updateData.capacity);
       if (newCapacity < ticketType.soldCount) {
-        throw new ValidationError(`Cannot set capacity below sold count (${ticketType.soldCount})`);
+        throw new BadRequestError(`Cannot set capacity below sold count (${ticketType.soldCount})`);
       }
     }
 
@@ -73,7 +77,7 @@ class UpdateTicketTypeUseCase {
       const newPrice = Number(updateData.price);
       const currentPrice = Number(ticketType.price);
       if (newPrice < currentPrice) {
-        throw new ValidationError('Cannot reduce price for ticket type with sold tickets');
+        throw new BadRequestError('Cannot reduce price for ticket type with sold tickets');
       }
     }
 
@@ -83,7 +87,7 @@ class UpdateTicketTypeUseCase {
         tt => tt.type === updateData.type && tt._id.toString() !== ticketTypeId.toString()
       );
       if (existingType) {
-        throw new ValidationError(`A ticket type of type '${updateData.type}' already exists`);
+        throw new BadRequestError(`A ticket type of type '${updateData.type}' already exists`);
       }
     }
 

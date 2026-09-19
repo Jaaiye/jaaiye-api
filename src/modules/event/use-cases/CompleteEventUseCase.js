@@ -3,7 +3,11 @@
  * Application layer - mark event as completed and deactivate wallet
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 
 class CompleteEventUseCase {
   constructor({ eventRepository, walletRepository }) {
@@ -32,10 +36,10 @@ class CompleteEventUseCase {
 
     // Cannot complete already completed or cancelled events
     if (event.status === 'completed') {
-      throw new ValidationError('Event is already completed');
+      throw new BadRequestError('Event is already completed');
     }
     if (event.status === 'cancelled') {
-      throw new ValidationError('Cannot complete a cancelled event');
+      throw new BadRequestError('Cannot complete a cancelled event');
     }
 
     // Update event status to completed

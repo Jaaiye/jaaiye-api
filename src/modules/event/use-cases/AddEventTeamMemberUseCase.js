@@ -3,8 +3,8 @@
  * Application layer - add a team member (co-organizer or ticket scanner) to an event
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
-const { UserNotFoundError } = require('../../common/errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+const { UserNotFoundError, BadRequestError } = require('../../common/errors');
 
 class AddEventTeamMemberUseCase {
   constructor({ eventRepository, eventTeamRepository, userRepository, notificationAdapter }) {
@@ -30,7 +30,7 @@ class AddEventTeamMemberUseCase {
 
     // Only events (not hangouts) can have team members
     if (event.category !== 'event') {
-      throw new ValidationError('Only ticketed events can have team members');
+      throw new BadRequestError('Only ticketed events can have team members');
     }
 
     // Only event creator can add team members
@@ -40,12 +40,12 @@ class AddEventTeamMemberUseCase {
 
     // Validate role
     if (!['co_organizer', 'ticket_scanner'].includes(role)) {
-      throw new ValidationError('Invalid role. Must be co_organizer or ticket_scanner');
+      throw new BadRequestError('Invalid role. Must be co_organizer or ticket_scanner');
     }
 
     // Validate that either username or email is provided
     if (!username && !email) {
-      throw new ValidationError('Either username or email is required');
+      throw new BadRequestError('Either username or email is required');
     }
 
     // Find user by username or email
@@ -65,13 +65,13 @@ class AddEventTeamMemberUseCase {
 
     // Cannot add yourself
     if (String(teamMemberUserId) === String(userId)) {
-      throw new ValidationError('Cannot add yourself as a team member');
+      throw new BadRequestError('Cannot add yourself as a team member');
     }
 
     // Check if already a team member
     const existing = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, teamMemberUserId);
     if (existing) {
-      throw new ValidationError('User is already a team member');
+      throw new BadRequestError('User is already a team member');
     }
 
     // Create team member

@@ -3,7 +3,11 @@
  * Application layer - update a team member's role or status
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 
 class UpdateEventTeamMemberUseCase {
   constructor({ eventRepository, eventTeamRepository }) {
@@ -39,12 +43,12 @@ class UpdateEventTeamMemberUseCase {
     // Find team member
     const teamMember = await this.eventTeamRepository.findByEventAndUser(event._id || event.id, targetUserId);
     if (!teamMember) {
-      throw new ValidationError('Team member not found');
+      throw new BadRequestError('Team member not found');
     }
 
     // Cannot change creator role or status
     if (teamMember.role === 'creator') {
-      throw new ValidationError('Cannot modify creator role or status');
+      throw new BadRequestError('Cannot modify creator role or status');
     }
 
     // Validate and prepare update data
@@ -52,20 +56,20 @@ class UpdateEventTeamMemberUseCase {
 
     if (status) {
       if (!['accepted', 'declined'].includes(status)) {
-        throw new ValidationError('Invalid status. Must be accepted or declined');
+        throw new BadRequestError('Invalid status. Must be accepted or declined');
       }
       updates.status = status;
     }
 
     if (role) {
       if (!['co_organizer', 'ticket_scanner'].includes(role)) {
-        throw new ValidationError('Invalid role. Must be co_organizer or ticket_scanner');
+        throw new BadRequestError('Invalid role. Must be co_organizer or ticket_scanner');
       }
       updates.role = role;
     }
 
     if (Object.keys(updates).length === 0) {
-      throw new ValidationError('No update data provided');
+      throw new BadRequestError('No update data provided');
     }
 
     // If user is accepting/declining their own invitation, allow it immediately

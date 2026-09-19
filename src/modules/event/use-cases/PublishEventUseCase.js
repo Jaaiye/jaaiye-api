@@ -3,7 +3,11 @@
  * Application layer - publish a draft event (makes it available for ticket sales)
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 
 class PublishEventUseCase {
   constructor({ eventRepository, walletRepository, notificationAdapter }) {
@@ -26,12 +30,12 @@ class PublishEventUseCase {
 
     // Only draft events can be published
     if (event.status !== 'draft') {
-      throw new ValidationError(`Cannot publish event with status: ${event.status}. Only draft events can be published.`);
+      throw new BadRequestError(`Cannot publish event with status: ${event.status}. Only draft events can be published.`);
     }
 
     // Events must have at least one ticket type
     if (event.category === 'event' && (!event.ticketTypes || event.ticketTypes.length === 0)) {
-      throw new ValidationError('Events must have at least one ticket type before publishing');
+      throw new BadRequestError('Events must have at least one ticket type before publishing');
     }
 
     // Update status to published

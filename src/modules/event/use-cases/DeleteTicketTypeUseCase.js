@@ -3,7 +3,11 @@
  * Application layer - delete a ticket type from an event
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError, TicketTypeNotFoundError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 const EventSchema = require('../entities/Event.schema');
 const { canUserManageTicketTypes } = require('../services/EventOwnershipService');
 
@@ -33,7 +37,7 @@ class DeleteTicketTypeUseCase {
 
     // Only events can have ticket types
     if (event.category !== 'event') {
-      throw new ValidationError('Only events can have ticket types');
+      throw new BadRequestError('Only events can have ticket types');
     }
 
     // Get event as Mongoose document to use schema methods
@@ -44,17 +48,17 @@ class DeleteTicketTypeUseCase {
 
     const ticketType = eventDoc.ticketTypes.id(ticketTypeId);
     if (!ticketType) {
-      throw new ValidationError('Ticket type not found');
+      throw new TicketTypeNotFoundError();
     }
 
     // Cannot delete if tickets have been sold
     if (ticketType.soldCount > 0) {
-      throw new ValidationError('Cannot delete ticket type with sold tickets. Deactivate it instead.');
+      throw new BadRequestError('Cannot delete ticket type with sold tickets. Deactivate it instead.');
     }
 
     // Cannot delete if it's the only ticket type
     if (eventDoc.ticketTypes.length === 1) {
-      throw new ValidationError('Cannot delete the only ticket type. Events must have at least one ticket type.');
+      throw new BadRequestError('Cannot delete the only ticket type. Events must have at least one ticket type.');
     }
 
     // Remove ticket type

@@ -3,7 +3,7 @@
  * Application layer - use case
  */
 
-const { ValidationError, NotFoundError } = require('../../common/errors');
+const { BadRequestError, NotFoundError } = require('../../common/errors');
 const { EventNotFoundError } = require('../errors');
 const logger = require('../../../utils/logger');
 
@@ -73,27 +73,27 @@ class CreateEventUseCase {
     // Normalize dates
     const startTime = new Date(dto.startTime);
     if (isNaN(startTime.getTime())) {
-      throw new ValidationError('Start time must be a valid date');
+      throw new BadRequestError('Start time must be a valid date');
     }
 
     const endTime = dto.endTime ? new Date(dto.endTime) : new Date(startTime.getTime() + 8 * 60 * 60 * 1000);
     if (isNaN(endTime.getTime())) {
-      throw new ValidationError('End time must be a valid date');
+      throw new BadRequestError('End time must be a valid date');
     }
 
     if (endTime < startTime) {
-      throw new ValidationError('End time must be after start time');
+      throw new BadRequestError('End time must be after start time');
     }
 
     const now = new Date();
     if (startTime < now) {
-      throw new ValidationError('Start time cannot be in the past');
+      throw new BadRequestError('Start time cannot be in the past');
     }
 
     // Normalize category
     const category = dto.category ? String(dto.category).toLowerCase() : 'hangout';
     if (!['hangout', 'event'].includes(category)) {
-      throw new ValidationError('Category must be either "hangout" or "event"');
+      throw new BadRequestError('Category must be either "hangout" or "event"');
     }
 
     // Normalize ticket types
@@ -117,18 +117,18 @@ class CreateEventUseCase {
     let ticketFee = null;
     if (category === 'hangout') {
       if (dto.ticketFee || ticketTypes.length > 0) {
-        throw new ValidationError('Hangouts cannot include tickets');
+        throw new BadRequestError('Hangouts cannot include tickets');
       }
     } else {
       if (!dto.ticketFee && ticketTypes.length === 0) {
-        throw new ValidationError('Events require ticket information');
+        throw new BadRequestError('Events require ticket information');
       }
       if (dto.ticketFee === 'free') {
         ticketFee = 'free';
       } else if (dto.ticketFee !== undefined && dto.ticketFee !== null && dto.ticketFee !== '') {
         const numericFee = Number(dto.ticketFee);
         if (isNaN(numericFee) || numericFee < 0) {
-          throw new ValidationError('ticketFee must be a non-negative number or "free"');
+          throw new BadRequestError('ticketFee must be a non-negative number or "free"');
         }
         ticketFee = numericFee;
       }
@@ -143,7 +143,7 @@ class CreateEventUseCase {
           contentType: file.mimetype
         });
       } catch (error) {
-        throw new ValidationError(`Failed to upload image: ${error.message}`);
+        throw new BadRequestError(`Failed to upload image: ${error.message}`);
       }
     }
 
@@ -261,7 +261,7 @@ class CreateEventUseCase {
     if (category === 'hangout') {
       // Hangouts require participants
       if (!Array.isArray(dto.participants) || dto.participants.length === 0) {
-        throw new ValidationError('Hangouts require at least one participant');
+        throw new BadRequestError('Hangouts require at least one participant');
       }
 
       // Normalize participants
@@ -390,7 +390,7 @@ class CreateEventUseCase {
               if (dto.groupId) {
                 group = await this.groupRepository.findById(dto.groupId);
                 if (!group) {
-                  throw new ValidationError('Group not found');
+                  throw new BadRequestError('Group not found');
                 }
 
                 // Get existing group members (ensure they are strings)

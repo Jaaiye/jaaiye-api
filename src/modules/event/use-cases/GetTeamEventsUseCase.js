@@ -4,7 +4,7 @@
  * (co-organizer or ticket scanner)
  */
 
-const { ValidationError } = require('../errors');
+const { BadRequestError } = require('../../common/errors');
 
 class GetTeamEventsUseCase {
   constructor({ eventRepository, eventTeamRepository }) {
@@ -15,7 +15,7 @@ class GetTeamEventsUseCase {
   async execute(userId, { status, page = 1, limit = 12 }) {
     // Validate status filter if provided
     if (status && !['scheduled', 'cancelled', 'completed'].includes(status)) {
-      throw new ValidationError('Invalid status. Must be scheduled, cancelled, or completed');
+      throw new BadRequestError('Invalid status. Must be scheduled, cancelled, or completed');
     }
 
     // Find all accepted co-organizer/ticket-scanner team memberships.

@@ -3,7 +3,11 @@
  * Application layer - unpublish a published event (changes status back to draft)
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 
 class UnpublishEventUseCase {
   constructor({ eventRepository }) {
@@ -24,12 +28,12 @@ class UnpublishEventUseCase {
 
     // Only published events can be unpublished
     if (event.status !== 'published' && event.status !== 'scheduled') {
-      throw new ValidationError(`Cannot unpublish event with status: ${event.status}. Only published/scheduled events can be unpublished.`);
+      throw new BadRequestError(`Cannot unpublish event with status: ${event.status}. Only published/scheduled events can be unpublished.`);
     }
 
     // Check if tickets have been sold
     if (event.attendeeCount > 0) {
-      throw new ValidationError('Cannot unpublish event with sold tickets. Please cancel the event instead to process refunds.');
+      throw new BadRequestError('Cannot unpublish event with sold tickets. Please cancel the event instead to process refunds.');
     }
 
     // Update status to draft

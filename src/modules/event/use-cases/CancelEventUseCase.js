@@ -3,7 +3,11 @@
  * Application layer - cancel an event and process refunds for all ticket holders
  */
 
-const { EventNotFoundError, EventAccessDeniedError, ValidationError } = require('../errors');
+const { EventNotFoundError, EventAccessDeniedError } = require('../errors');
+// Not common/errors' ValidationError: its .name collides with Mongoose's
+// ValidationError, which errorHandler.js special-cases and hijacks with a
+// hardcoded generic message, discarding whatever we throw here.
+const { BadRequestError } = require('../../common/errors');
 
 class CancelEventUseCase {
   constructor({
@@ -38,10 +42,10 @@ class CancelEventUseCase {
 
     // Cannot cancel already cancelled or completed events
     if (event.status === 'cancelled') {
-      throw new ValidationError('Event is already cancelled');
+      throw new BadRequestError('Event is already cancelled');
     }
     if (event.status === 'completed') {
-      throw new ValidationError('Cannot cancel a completed event');
+      throw new BadRequestError('Cannot cancel a completed event');
     }
 
     // Update event status to cancelled

@@ -43,9 +43,11 @@ const {
   GetEventTeamUseCase,
   GetEventAnalyticsUseCase,
   GetTeamEventsUseCase,
-  ListTeamInvitationsUseCase
+  ListTeamInvitationsUseCase,
+  IssueTicketUseCase
 } = require('./use-cases');
 const { ResendEventTicketsUseCase } = require('../ticket/use-cases');
+const WalletService = require('../wallet/services/WalletService');
 const EventController = require('./event.controller');
 const createEventRoutes = require('./event.routes');
 
@@ -105,6 +107,23 @@ class EventModule {
       this._instances.walletRepository = new WalletRepository();
     }
     return this._instances.walletRepository;
+  }
+
+  getWalletLedgerEntryRepository() {
+    if (!this._instances.walletLedgerEntryRepository) {
+      this._instances.walletLedgerEntryRepository = new WalletLedgerEntryRepository();
+    }
+    return this._instances.walletLedgerEntryRepository;
+  }
+
+  getWalletService() {
+    if (!this._instances.walletService) {
+      this._instances.walletService = new WalletService({
+        walletRepository: this.getWalletRepository(),
+        walletLedgerEntryRepository: this.getWalletLedgerEntryRepository()
+      });
+    }
+    return this._instances.walletService;
   }
 
   getFirebaseAdapter() {
@@ -456,6 +475,25 @@ class EventModule {
     return this._instances.resendEventTicketsUseCase;
   }
 
+  getIssueTicketUseCase() {
+    if (!this._instances.issueTicketUseCase) {
+      const ticketModule = require('../ticket/ticket.module');
+      const ticketRepository = new TicketRepository();
+      const transactionRepository = new TransactionRepository();
+
+      this._instances.issueTicketUseCase = new IssueTicketUseCase({
+        eventRepository: this.getEventRepository(),
+        eventTeamRepository: this.getEventTeamRepository(),
+        userRepository: this.getUserRepository(),
+        ticketRepository,
+        createTicketUseCase: ticketModule.getCreateTicketUseCase(),
+        transactionRepository,
+        walletService: this.getWalletService()
+      });
+    }
+    return this._instances.issueTicketUseCase;
+  }
+
   getEventController() {
     if (!this._instances.eventController) {
       this._instances.eventController = new EventController({
@@ -480,7 +518,8 @@ class EventModule {
         getEventAnalyticsUseCase: this.getGetEventAnalyticsUseCase(),
         getTeamEventsUseCase: this.getGetTeamEventsUseCase(),
         listTeamInvitationsUseCase: this.getListTeamInvitationsUseCase(),
-        resendEventTicketsUseCase: this.getResendEventTicketsUseCase()
+        resendEventTicketsUseCase: this.getResendEventTicketsUseCase(),
+        issueTicketUseCase: this.getIssueTicketUseCase()
       });
     }
     return this._instances.eventController;

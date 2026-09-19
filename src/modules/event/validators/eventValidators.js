@@ -198,6 +198,14 @@ const validateIssueTicket = [
     .optional()
     .isBoolean()
     .withMessage('Bypass capacity must be a boolean'),
+  body('paymentMethod')
+    .optional()
+    .isIn(['complimentary', 'manual_payment', 'onsite'])
+    .withMessage('paymentMethod must be one of: complimentary, manual_payment, onsite'),
+  body('amount')
+    .if(body('paymentMethod').isIn(['manual_payment', 'onsite']))
+    .isFloat({ gt: 0 })
+    .withMessage('amount is required and must be a positive number for manual_payment/onsite tickets'),
   body()
     .custom((value) => {
       // At least one of email or username must be provided

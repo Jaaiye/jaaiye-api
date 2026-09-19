@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
-  provider: { type: String, enum: ['paystack', 'flutterwave', 'payaza', 'monnify'], required: true },
+  // 'manual_payment' / 'onsite' represent cash the organizer collected
+  // off-platform and recorded via the issue-ticket flow, not a real
+  // payment gateway - see IssueTicketUseCase.
+  provider: { type: String, enum: ['paystack', 'flutterwave', 'payaza', 'monnify', 'manual_payment', 'onsite'], required: true },
   reference: { type: String, required: true }, // jaaiye generated
   transReference: { type: String }, // payment gateway generated
   amount: { type: Number, required: true }, // Grand total (base + fee)

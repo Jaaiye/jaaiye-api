@@ -51,6 +51,15 @@ function createWalletRoutes(walletController) {
     walletController.getWithdrawalDetails
   );
 
+  // Aggregate wallet summary for the home screen - static path, same
+  // ordering requirement as /withdrawals/:withdrawalId above.
+  router.get(
+    '/me/summary',
+    apiLimiter,
+    protect,
+    walletController.getMyWalletSummary
+  );
+
   // Get wallet details (balance + ledger)
   router.get(
     '/:ownerType/:ownerId',

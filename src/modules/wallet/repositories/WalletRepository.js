@@ -169,6 +169,25 @@ class WalletRepository extends IWalletRepository {
   }
 
   /**
+   * Batched lookup of wallets for a list of owner ids - one query
+   * regardless of how many ids are passed, so a caller aggregating a
+   * user's wallets across N events never turns into an N+1 (Section 18).
+   * @param {'EVENT'|'GROUP'} ownerType
+   * @param {string[]} ownerIds
+   * @returns {Promise<WalletEntity[]>}
+   */
+  async findAllByOwnerIds(ownerType, ownerIds) {
+    if (!ownerIds || ownerIds.length === 0) return [];
+
+    const docs = await WalletSchema.find({
+      ownerType,
+      ownerId: { $in: ownerIds },
+      isActive: true
+    });
+    return docs.map(doc => this._toEntity(doc));
+  }
+
+  /**
    * Atomically move a wallet's entire current balance into heldForPayout,
    * but only if the balance currently exceeds minHoldAmount. Uses a
    * pipeline update so "set heldForPayout to whatever balance currently

@@ -14,6 +14,7 @@ class WalletController {
     getWithdrawalsUseCase,
     getWithdrawalDetailsUseCase,
     walletAuthorizationService,
+    getMyWalletSummaryUseCase,
     payoutSchedulerQueue
   }) {
     this.getWalletDetailsUseCase = getWalletDetailsUseCase;
@@ -22,8 +23,26 @@ class WalletController {
     this.getWithdrawalsUseCase = getWithdrawalsUseCase;
     this.getWithdrawalDetailsUseCase = getWithdrawalDetailsUseCase;
     this.walletAuthorizationService = walletAuthorizationService;
+    this.getMyWalletSummaryUseCase = getMyWalletSummaryUseCase;
     this.payoutSchedulerQueue = payoutSchedulerQueue;
   }
+
+  /**
+   * @swagger
+   * /wallets/me/summary:
+   *   get:
+   *     summary: Aggregate wallet balance/held-for-payout across all events the current user created, for the home screen summary
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Wallet summary
+   */
+  getMyWalletSummary = asyncHandler(async (req, res) => {
+    const summary = await this.getMyWalletSummaryUseCase.execute(req.user.id);
+    return successResponse(res, summary);
+  });
 
   /**
    * @swagger

@@ -12,7 +12,8 @@ const {
   GetWithdrawalDetailsUseCase,
   PollPendingWithdrawalsUseCase,
   HoldWalletsForPayoutUseCase,
-  ProcessScheduledPayoutsUseCase
+  ProcessScheduledPayoutsUseCase,
+  GetMyWalletSummaryUseCase
 } = require('./use-cases');
 const WalletController = require('./wallet.controller');
 const createWalletRoutes = require('./wallet.routes');
@@ -192,6 +193,16 @@ class WalletModule {
     return this._instances.processScheduledPayoutsUseCase;
   }
 
+  getGetMyWalletSummaryUseCase() {
+    if (!this._instances.getMyWalletSummaryUseCase) {
+      this._instances.getMyWalletSummaryUseCase = new GetMyWalletSummaryUseCase({
+        eventRepository: new EventRepository(),
+        walletRepository: this.getWalletRepository()
+      });
+    }
+    return this._instances.getMyWalletSummaryUseCase;
+  }
+
   // ============================================================================
   // CONTROLLERS
   // ============================================================================
@@ -210,6 +221,7 @@ class WalletModule {
         getWithdrawalsUseCase: this.getGetWithdrawalsUseCase(),
         getWithdrawalDetailsUseCase: this.getGetWithdrawalDetailsUseCase(),
         walletAuthorizationService: this.getWalletAuthorizationService(),
+        getMyWalletSummaryUseCase: this.getGetMyWalletSummaryUseCase(),
         payoutSchedulerQueue
       });
     }

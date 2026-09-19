@@ -6,6 +6,7 @@ const GetWithdrawalDetailsUseCase = require('./GetWithdrawalDetailsUseCase');
 const PollPendingWithdrawalsUseCase = require('./PollPendingWithdrawalsUseCase');
 const HoldWalletsForPayoutUseCase = require('./HoldWalletsForPayoutUseCase');
 const ProcessScheduledPayoutsUseCase = require('./ProcessScheduledPayoutsUseCase');
+const GetMyWalletSummaryUseCase = require('./GetMyWalletSummaryUseCase');
 
 module.exports = {
   GetWalletDetailsUseCase,
@@ -15,7 +16,8 @@ module.exports = {
   GetWithdrawalDetailsUseCase,
   PollPendingWithdrawalsUseCase,
   HoldWalletsForPayoutUseCase,
-  ProcessScheduledPayoutsUseCase
+  ProcessScheduledPayoutsUseCase,
+  GetMyWalletSummaryUseCase
 };
 
 

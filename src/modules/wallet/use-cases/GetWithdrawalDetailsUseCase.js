@@ -3,6 +3,8 @@
  * Application layer - fetch single withdrawal details
  */
 
+const { NotFoundError } = require('../../../utils/errors');
+
 class GetWithdrawalDetailsUseCase {
   constructor({ withdrawalRepository, walletRepository, bankAccountRepository }) {
     this.withdrawalRepository = withdrawalRepository;
@@ -20,12 +22,15 @@ class GetWithdrawalDetailsUseCase {
   async execute({ withdrawalId, userId }) {
     const withdrawal = await this.withdrawalRepository.findById(withdrawalId);
     if (!withdrawal) {
-      throw new Error('Withdrawal not found');
+      throw new NotFoundError('Withdrawal not found');
     }
 
-    // If userId provided, verify ownership
+    // If userId provided, verify ownership. Same message and status as the
+    // not-found case above - never confirm a withdrawal exists to someone
+    // who isn't its owner (Section 11: don't leak resource existence via
+    // 403 when 404 hides it just as well).
     if (userId && String(withdrawal.user) !== String(userId)) {
-      throw new Error('Withdrawal not found or access denied');
+      throw new NotFoundError('Withdrawal not found');
     }
 
     // Get bank account details

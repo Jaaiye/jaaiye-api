@@ -35,11 +35,19 @@ class InvalidWebhookSignatureError extends AppError {
   }
 }
 
+class InvalidBankAccountError extends AppError {
+  constructor(message = 'Could not verify this bank account. Please check the account number and try again.') {
+    super(message, 400);
+    this.name = 'InvalidBankAccountError';
+  }
+}
+
 module.exports = {
   TransactionNotFoundError,
   InvalidPaymentProviderError,
   PaymentInitializationError,
   PaymentVerificationError,
-  InvalidWebhookSignatureError
+  InvalidWebhookSignatureError,
+  InvalidBankAccountError
 };
 

@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { timingSafeEqualStr } = require('../../../utils/securityUtils');
+const { InvalidBankAccountError } = require('../errors');
 
 // const API_BASE = 'https://developersandbox-api.flutterwave.com';
 const API_BASE = 'https://api.flutterwave.com/v3';
@@ -362,10 +363,18 @@ class FlutterwaveAdapter {
         };
       }
 
-      throw new Error(data?.message || 'Failed to resolve bank account with Flutterwave');
+      throw new InvalidBankAccountError(data?.message || undefined);
     } catch (error) {
+      if (error instanceof InvalidBankAccountError) throw error;
+
+      // Wrap at the boundary - a raw AxiosError (bad account number, wrong
+      // bank code, Flutterwave 4xx) previously propagated uncaught all the
+      // way to the global error handler as an unclassified 500, which in
+      // non-production environments returned the raw Axios error message
+      // (request internals) to the client instead of a clean, actionable
+      // "check your account number" message.
       console.error('Error resolving Flutterwave bank account:', error.response?.data || error.message);
-      throw error;
+      throw new InvalidBankAccountError(error.response?.data?.message || undefined);
     }
   }
 

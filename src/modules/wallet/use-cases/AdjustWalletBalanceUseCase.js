@@ -3,6 +3,8 @@
  * Application layer - admin-only manual wallet adjustments
  */
 
+const { BadRequestError } = require('../../../utils/errors');
+
 class AdjustWalletBalanceUseCase {
   constructor({
     walletRepository,
@@ -32,24 +34,24 @@ class AdjustWalletBalanceUseCase {
    */
   async execute({ ownerType, ownerId, amount, reason, adjustedBy }) {
     if (!ownerType) {
-      throw new Error('ownerType is required');
+      throw new BadRequestError('ownerType is required');
     }
 
     if (ownerType !== 'PLATFORM' && !ownerId) {
-      throw new Error('ownerId is required for non-platform wallets');
+      throw new BadRequestError('ownerId is required for non-platform wallets');
     }
 
     const adjustmentAmount = Number(amount);
     if (!Number.isFinite(adjustmentAmount) || adjustmentAmount === 0) {
-      throw new Error('Amount must be a non-zero number');
+      throw new BadRequestError('Amount must be a non-zero number');
     }
 
     if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-      throw new Error('Reason is required for wallet adjustments');
+      throw new BadRequestError('Reason is required for wallet adjustments');
     }
 
     if (!adjustedBy) {
-      throw new Error('adjustedBy (admin user ID) is required');
+      throw new BadRequestError('adjustedBy (admin user ID) is required');
     }
 
     // Get or create wallet

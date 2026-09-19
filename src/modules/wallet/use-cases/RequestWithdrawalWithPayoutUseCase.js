@@ -12,6 +12,7 @@
  */
 
 const logger = require('../../../utils/logger');
+const { NotFoundError, RateLimitError, BadRequestError } = require('../../../utils/errors');
 
 class RequestWithdrawalWithPayoutUseCase {
   constructor({
@@ -53,15 +54,15 @@ class RequestWithdrawalWithPayoutUseCase {
 
     const withdrawalAmount = Number(amount);
     if (!Number.isFinite(withdrawalAmount) || withdrawalAmount <= 0) {
-      throw new Error('Amount must be a positive number');
+      throw new BadRequestError('Amount must be a positive number');
     }
 
     if (withdrawalAmount < MIN_AMOUNT) {
-      throw new Error(`Minimum withdrawal amount is ₦${MIN_AMOUNT.toLocaleString()}`);
+      throw new BadRequestError(`Minimum withdrawal amount is ₦${MIN_AMOUNT.toLocaleString()}`);
     }
 
     if (withdrawalAmount > MAX_AMOUNT) {
-      throw new Error(`Maximum withdrawal amount is ₦${MAX_AMOUNT.toLocaleString()}`);
+      throw new BadRequestError(`Maximum withdrawal amount is ₦${MAX_AMOUNT.toLocaleString()}`);
     }
 
     // Who actually gets paid: normally the caller, but when an admin is
@@ -72,13 +73,13 @@ class RequestWithdrawalWithPayoutUseCase {
       if (ownerType === 'EVENT') {
         const event = await this.eventRepository.findByIdOrSlug(ownerId);
         if (!event || !event.creatorId) {
-          throw new Error('Could not resolve a payee for this event');
+          throw new NotFoundError('Could not resolve a payee for this event');
         }
         payeeUserId = event.creatorId;
       } else {
         const group = await this.groupRepository.findById(ownerId);
         if (!group || !group.creator) {
-          throw new Error('Could not resolve a payee for this group');
+          throw new NotFoundError('Could not resolve a payee for this group');
         }
         payeeUserId = group.creator;
       }
@@ -104,7 +105,7 @@ class RequestWithdrawalWithPayoutUseCase {
     });
 
     if (todayWithdrawals.length >= 2) {
-      throw new Error('The daily withdrawal limit (2 withdrawals per day) has been reached for this payee');
+      throw new RateLimitError('The daily withdrawal limit (2 withdrawals per day) has been reached for this payee');
     }
 
     // Get bank account (default or specified)
@@ -112,12 +113,12 @@ class RequestWithdrawalWithPayoutUseCase {
     if (bankAccountId) {
       bankAccount = await this.bankAccountRepository.findByIdForUser(bankAccountId, payeeUserId);
       if (!bankAccount) {
-        throw new Error('Bank account not found or does not belong to the payee');
+        throw new NotFoundError('Bank account not found or does not belong to the payee');
       }
     } else {
       bankAccount = await this.bankAccountRepository.findDefaultByUser(payeeUserId);
       if (!bankAccount) {
-        throw new Error('No default bank account found for the payee. Please add a bank account first.');
+        throw new NotFoundError('No default bank account found for the payee. Please add a bank account first.');
       }
     }
 
@@ -201,7 +202,7 @@ class RequestWithdrawalWithPayoutUseCase {
         // Critical: Log for manual intervention
       }
 
-      throw new Error(`Failed to initiate transfer: ${transferError.message}`);
+      throw new BadRequestError(`Failed to initiate transfer: ${transferError.message}`);
     }
 
     // Step 3: Get wallet to link withdrawal

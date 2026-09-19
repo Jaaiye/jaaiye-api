@@ -3,6 +3,8 @@
  * Read-only wallet view: balance + recent ledger entries + bank accounts.
  */
 
+const { BadRequestError } = require('../../../utils/errors');
+
 class GetWalletDetailsUseCase {
   constructor({ walletRepository, walletLedgerEntryRepository, bankAccountRepository }) {
     this.walletRepository = walletRepository;
@@ -22,7 +24,7 @@ class GetWalletDetailsUseCase {
    */
   async execute({ ownerType, ownerId, userId, limit = 50, skip = 0 }) {
     if (!ownerType) {
-      throw new Error('ownerType is required');
+      throw new BadRequestError('ownerType is required');
     }
 
     const wallet = await this.walletRepository.findByOwner(ownerType, ownerId);

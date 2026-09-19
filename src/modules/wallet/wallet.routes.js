@@ -60,6 +60,15 @@ function createWalletRoutes(walletController) {
     walletController.getMyWalletSummary
   );
 
+  // Merged recent-activity feed for the global wallet screen - same
+  // static-path ordering requirement.
+  router.get(
+    '/me/activity',
+    apiLimiter,
+    protect,
+    walletController.getMyWalletActivity
+  );
+
   // Get wallet details (balance + ledger)
   router.get(
     '/:ownerType/:ownerId',

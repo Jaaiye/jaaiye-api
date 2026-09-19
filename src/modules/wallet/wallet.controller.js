@@ -15,6 +15,7 @@ class WalletController {
     getWithdrawalDetailsUseCase,
     walletAuthorizationService,
     getMyWalletSummaryUseCase,
+    getMyWalletActivityUseCase,
     payoutSchedulerQueue
   }) {
     this.getWalletDetailsUseCase = getWalletDetailsUseCase;
@@ -24,6 +25,7 @@ class WalletController {
     this.getWithdrawalDetailsUseCase = getWithdrawalDetailsUseCase;
     this.walletAuthorizationService = walletAuthorizationService;
     this.getMyWalletSummaryUseCase = getMyWalletSummaryUseCase;
+    this.getMyWalletActivityUseCase = getMyWalletActivityUseCase;
     this.payoutSchedulerQueue = payoutSchedulerQueue;
   }
 
@@ -42,6 +44,34 @@ class WalletController {
   getMyWalletSummary = asyncHandler(async (req, res) => {
     const summary = await this.getMyWalletSummaryUseCase.execute(req.user.id);
     return successResponse(res, summary);
+  });
+
+  /**
+   * @swagger
+   * /wallets/me/activity:
+   *   get:
+   *     summary: Merged recent-activity feed across every event wallet the current user owns, for the global wallet screen
+   *     tags: [Wallet]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *       - in: query
+   *         name: skip
+   *         schema:
+   *           type: integer
+   *     responses:
+   *       200:
+   *         description: Merged activity feed
+   */
+  getMyWalletActivity = asyncHandler(async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const skip = req.query.skip ? parseInt(req.query.skip, 10) : 0;
+    const result = await this.getMyWalletActivityUseCase.execute(req.user.id, { limit, skip });
+    return successResponse(res, result);
   });
 
   /**

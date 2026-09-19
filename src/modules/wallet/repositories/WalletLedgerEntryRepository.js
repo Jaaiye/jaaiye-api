@@ -42,6 +42,21 @@ class WalletLedgerEntryRepository extends IWalletLedgerEntryRepository {
       .limit(limit);
     return docs.map(doc => this._toEntity(doc));
   }
+
+  // Batched across multiple wallets (one $in query) - powers the global
+  // wallet screen's merged activity feed across every event a user owns,
+  // rather than looping findByWallet per event.
+  async findByWalletIds(walletIds, options = {}) {
+    if (!walletIds || walletIds.length === 0) return [];
+
+    const { limit = 50, skip = 0 } = options;
+    const docs = await WalletLedgerEntrySchema
+      .find({ walletId: { $in: walletIds } })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    return docs.map(doc => this._toEntity(doc));
+  }
 }
 
 module.exports = WalletLedgerEntryRepository;

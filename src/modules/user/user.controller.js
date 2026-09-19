@@ -23,6 +23,7 @@ class UserController {
     addBankAccountUseCase,
     setDefaultBankAccountUseCase,
     deleteBankAccountUseCase,
+    getBankAccountsUseCase,
     getWithdrawalsUseCase,
     flutterwaveAdapter,
   }) {
@@ -36,6 +37,7 @@ class UserController {
     this.addBankAccountUseCase = addBankAccountUseCase;
     this.setDefaultBankAccountUseCase = setDefaultBankAccountUseCase;
     this.deleteBankAccountUseCase = deleteBankAccountUseCase;
+    this.getBankAccountsUseCase = getBankAccountsUseCase;
     this.getWithdrawalsUseCase = getWithdrawalsUseCase;
     this.flutterwaveAdapter = flutterwaveAdapter;
   }
@@ -111,6 +113,23 @@ class UserController {
       accountNumber
     });
     return successResponse(res, { bankAccount });
+  });
+
+  /**
+   * @swagger
+   * /users/bank-accounts:
+   *   get:
+   *     summary: List the current user's bank accounts
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Bank accounts
+   */
+  getBankAccounts = asyncHandler(async (req, res) => {
+    const bankAccounts = await this.getBankAccountsUseCase.execute(req.user.id);
+    return successResponse(res, { bankAccounts });
   });
 
   /**

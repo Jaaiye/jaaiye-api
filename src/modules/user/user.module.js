@@ -32,7 +32,8 @@ const {
   DeleteAccountUseCase,
   AddBankAccountUseCase,
   SetDefaultBankAccountUseCase,
-  DeleteBankAccountUseCase
+  DeleteBankAccountUseCase,
+  GetBankAccountsUseCase
 } = require('./use-cases');
 
 // Presentation
@@ -189,6 +190,15 @@ class UserModule {
     return this._instances.deleteBankAccountUseCase;
   }
 
+  getGetBankAccountsUseCase() {
+    if (!this._instances.getBankAccountsUseCase) {
+      this._instances.getBankAccountsUseCase = new GetBankAccountsUseCase({
+        bankAccountRepository: this.getBankAccountRepository()
+      });
+    }
+    return this._instances.getBankAccountsUseCase;
+  }
+
   getGetWithdrawalsUseCase() {
     if (!this._instances.getWithdrawalsUseCase) {
       const { WithdrawalRepository, WalletRepository } = require('../wallet/repositories');
@@ -212,6 +222,7 @@ class UserModule {
         logoutUseCase: this.getLogoutUseCase(),
         deleteAccountUseCase: this.getDeleteAccountUseCase(),
         addBankAccountUseCase: this.getAddBankAccountUseCase(),
+        getBankAccountsUseCase: this.getGetBankAccountsUseCase(),
         setDefaultBankAccountUseCase: this.getSetDefaultBankAccountUseCase(),
         deleteBankAccountUseCase: this.getDeleteBankAccountUseCase(),
         getWithdrawalsUseCase: this.getGetWithdrawalsUseCase(),

@@ -35,6 +35,7 @@ function createUserRoutes({ userController }) {
 
   // Bank account routes
   router.get('/banks', userController.getBanks);
+  router.get('/bank-accounts', userController.getBankAccounts);
   router.post('/bank-accounts', userController.addBankAccount);
   router.post('/bank-accounts/default', userController.setDefaultBankAccount);
   router.delete('/bank-accounts/:id', userController.deleteBankAccount);

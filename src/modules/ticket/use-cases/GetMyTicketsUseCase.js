@@ -28,7 +28,12 @@ class GetMyTicketsUseCase {
             ticketFee: ticket.eventId?.ticketFee,
             createdAt: ticket.eventId?.createdAt,
             date: ticket.eventId?.startTime ? new Date(ticket.eventId.startTime).toLocaleDateString() : null,
-            time: ticket.eventId?.startTime ? new Date(ticket.eventId.startTime).toLocaleTimeString() : null
+            time: ticket.eventId?.startTime ? new Date(ticket.eventId.startTime).toLocaleTimeString() : null,
+            // Raw ISO timestamps, in addition to the locale-formatted date/time
+            // above, so clients merging this list with other event feeds can
+            // sort/compare by real DateTime instead of re-parsing a locale string.
+            startTime: ticket.eventId?.startTime || null,
+            endTime: ticket.eventId?.endTime || null
           },
           ticketCount: 0,
           tickets: []

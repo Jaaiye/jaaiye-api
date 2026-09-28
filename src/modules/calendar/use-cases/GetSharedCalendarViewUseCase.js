@@ -7,13 +7,27 @@
 const { ValidationError } = require('../errors');
 const googleUtils = require('../../../utils/googleUtils');
 
+// A non-friend's calendar is reduced to busy/free blocks only - same shape
+// Google's own freebusy API uses. No title, description, location,
+// attendees, or external links leak to someone who isn't a confirmed
+// friend, regardless of what the Jaaiye/Google event itself contains.
+function toBusyBlock(event) {
+  return {
+    startTime: event.startTime,
+    endTime: event.endTime,
+    isAllDay: event.isAllDay || false,
+    busy: true
+  };
+}
+
 class GetSharedCalendarViewUseCase {
-  constructor({ userRepository, calendarRepository, googleCalendarAdapter, eventRepository, eventParticipantRepository }) {
+  constructor({ userRepository, calendarRepository, googleCalendarAdapter, eventRepository, eventParticipantRepository, friendshipRepository }) {
     this.userRepository = userRepository;
     this.calendarRepository = calendarRepository;
     this.googleCalendarAdapter = googleCalendarAdapter;
     this.eventRepository = eventRepository;
     this.eventParticipantRepository = eventParticipantRepository;
+    this.friendshipRepository = friendshipRepository;
   }
 
   /**
@@ -254,8 +268,20 @@ class GetSharedCalendarViewUseCase {
         });
 
         // Filter out error objects from events array before returning
-        const validEvents = allEvents.filter(e => !e.errorType);
+        const rawValidEvents = allEvents.filter(e => !e.errorType);
         const errors = allEvents.filter(e => e.errorType);
+
+        // Only the requesting user themself or a confirmed friend gets full
+        // event detail - anyone else's calendar is reduced to busy/free
+        // blocks. Without this, any authenticated caller could pass any
+        // user id (e.g. from /users/search) and read their event titles,
+        // descriptions, locations, and Google Calendar attendee lists.
+        const isSelfOrFriend =
+          userId.toString() === currentUserId.toString() ||
+          (await this.friendshipRepository.areFriends(currentUserId, userId));
+        const validEvents = isSelfOrFriend
+          ? rawValidEvents
+          : rawValidEvents.map(toBusyBlock);
 
         return {
           userId: user.id,

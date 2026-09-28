@@ -425,12 +425,14 @@ class CalendarModule {
   getGetSharedCalendarViewUseCase() {
     if (!this._instances.getSharedCalendarViewUseCase) {
       const { EventRepository, EventParticipantRepository } = require('../event/repositories');
+      const { FriendshipRepository } = require('../friendship/repositories');
       this._instances.getSharedCalendarViewUseCase = new GetSharedCalendarViewUseCase({
         userRepository: this.getUserRepository(),
         calendarRepository: this.getCalendarRepository(),
         googleCalendarAdapter: this.getGoogleCalendarAdapter(),
         eventRepository: new EventRepository(),
-        eventParticipantRepository: new EventParticipantRepository()
+        eventParticipantRepository: new EventParticipantRepository(),
+        friendshipRepository: new FriendshipRepository()
       });
     }
     return this._instances.getSharedCalendarViewUseCase;

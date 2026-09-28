@@ -10,7 +10,10 @@ module.exports = {
   SearchGroupsUseCase: require('./SearchGroupsUseCase'),
   DeleteGroupUseCase: require('./DeleteGroupUseCase'),
   CreateGroupEventUseCase: require('./CreateGroupEventUseCase'),
-  ListGroupsUseCase: require('./ListGroupsUseCase')
+  ListGroupsUseCase: require('./ListGroupsUseCase'),
+  GenerateGroupInviteCodeUseCase: require('./GenerateGroupInviteCodeUseCase'),
+  GetGroupPreviewByInviteCodeUseCase: require('./GetGroupPreviewByInviteCodeUseCase'),
+  JoinGroupByInviteCodeUseCase: require('./JoinGroupByInviteCodeUseCase')
 };
 
 

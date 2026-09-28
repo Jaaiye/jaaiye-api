@@ -41,6 +41,16 @@ const groupSchema = new mongoose.Schema({
     index: true
   },
   members: [groupMemberSchema],
+  // Shareable join link token - deliberately a random opaque value, not
+  // derived from name/id like Event.slug, since holding this code is
+  // itself the authorization to join. sparse so existing groups with no
+  // code yet (null) don't collide on the unique index.
+  inviteCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true
+  },
   events: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event'

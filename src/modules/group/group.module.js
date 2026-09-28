@@ -25,7 +25,10 @@ const {
   UpdateMemberRoleUseCase,
   SearchGroupsUseCase,
   DeleteGroupUseCase,
-  CreateGroupEventUseCase
+  CreateGroupEventUseCase,
+  GenerateGroupInviteCodeUseCase,
+  GetGroupPreviewByInviteCodeUseCase,
+  JoinGroupByInviteCodeUseCase
 } = require('./use-cases');
 const GroupController = require('./group.controller');
 const createGroupRoutes = require('./group.routes');
@@ -254,6 +257,33 @@ class GroupModule {
     return this._instances.createGroupEventUseCase;
   }
 
+  getGenerateGroupInviteCodeUseCase() {
+    if (!this._instances.generateGroupInviteCodeUseCase) {
+      this._instances.generateGroupInviteCodeUseCase = new GenerateGroupInviteCodeUseCase({
+        groupRepository: this.getGroupRepository()
+      });
+    }
+    return this._instances.generateGroupInviteCodeUseCase;
+  }
+
+  getGetGroupPreviewByInviteCodeUseCase() {
+    if (!this._instances.getGroupPreviewByInviteCodeUseCase) {
+      this._instances.getGroupPreviewByInviteCodeUseCase = new GetGroupPreviewByInviteCodeUseCase({
+        groupRepository: this.getGroupRepository()
+      });
+    }
+    return this._instances.getGroupPreviewByInviteCodeUseCase;
+  }
+
+  getJoinGroupByInviteCodeUseCase() {
+    if (!this._instances.joinGroupByInviteCodeUseCase) {
+      this._instances.joinGroupByInviteCodeUseCase = new JoinGroupByInviteCodeUseCase({
+        groupRepository: this.getGroupRepository()
+      });
+    }
+    return this._instances.joinGroupByInviteCodeUseCase;
+  }
+
   // ============================================================================
   // CONTROLLER
   // ============================================================================
@@ -271,7 +301,10 @@ class GroupModule {
         updateMemberRoleUseCase: this.getUpdateMemberRoleUseCase(),
         searchGroupsUseCase: this.getSearchGroupsUseCase(),
         deleteGroupUseCase: this.getDeleteGroupUseCase(),
-        createGroupEventUseCase: this.getCreateGroupEventUseCase()
+        createGroupEventUseCase: this.getCreateGroupEventUseCase(),
+        generateGroupInviteCodeUseCase: this.getGenerateGroupInviteCodeUseCase(),
+        getGroupPreviewByInviteCodeUseCase: this.getGetGroupPreviewByInviteCodeUseCase(),
+        joinGroupByInviteCodeUseCase: this.getJoinGroupByInviteCodeUseCase()
       });
     }
     return this._instances.groupController;

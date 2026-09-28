@@ -146,6 +146,15 @@ const validateRemoveMember = [
     .withMessage('Invalid member ID format')
 ];
 
+const validateInviteCode = [
+  param('code')
+    .trim()
+    .notEmpty()
+    .withMessage('Invite code is required')
+    .isLength({ min: 10, max: 64 })
+    .withMessage('Invalid invite code format')
+];
+
 module.exports = {
   validateCreateGroup,
   validateCreateGroupFromEvent,
@@ -157,6 +166,7 @@ module.exports = {
   validateMemberId,
   validateSearchGroups,
   validateDeleteGroup,
-  validateRemoveMember
+  validateRemoveMember,
+  validateInviteCode
 };
 

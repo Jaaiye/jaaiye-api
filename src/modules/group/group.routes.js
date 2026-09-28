@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 
 const { apiLimiter } = require('../../middleware/securityMiddleware');
-const { protect } = require('../../middleware/authMiddleware');
+const { protect, optionalAuth } = require('../../middleware/authMiddleware');
 const { validate } = require('../../middleware/validationMiddleware');
 const {
   validateCreateGroup,
@@ -20,7 +20,8 @@ const {
   validateMemberId,
   validateSearchGroups,
   validateDeleteGroup,
-  validateRemoveMember
+  validateRemoveMember,
+  validateInviteCode
 } = require('./validators/groupValidators');
 
 function createGroupRoutes(groupController) {
@@ -66,6 +67,27 @@ function createGroupRoutes(groupController) {
     groupController.searchGroups
   );
 
+  // Invite-link routes - static paths, registered before /:id below so
+  // they're never shadowed by it (same ordering requirement as /search
+  // and /my above).
+  router.get(
+    '/invite/:code',
+    apiLimiter,
+    optionalAuth,
+    validateInviteCode,
+    validate,
+    groupController.getGroupPreviewByInviteCode
+  );
+
+  router.post(
+    '/join/:code',
+    apiLimiter,
+    protect,
+    validateInviteCode,
+    validate,
+    groupController.joinGroupByInviteCode
+  );
+
   router.get(
     '/:id',
     apiLimiter,
@@ -92,6 +114,15 @@ function createGroupRoutes(groupController) {
     ...validateDeleteGroup,
     validate,
     groupController.deleteGroup
+  );
+
+  router.post(
+    '/:id/invite-code',
+    apiLimiter,
+    protect,
+    validateMongoId,
+    validate,
+    groupController.generateInviteCode
   );
 
   // Member management routes

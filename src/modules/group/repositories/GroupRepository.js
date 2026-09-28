@@ -43,6 +43,7 @@ class GroupRepository extends IGroupRepository {
       events: docObj.events || [], // Keep as is (populated event objects or IDs)
       settings: docObj.settings || {},
       isActive: docObj.isActive !== undefined ? docObj.isActive : true,
+      inviteCode: docObj.inviteCode || null,
       createdAt: docObj.createdAt,
       updatedAt: docObj.updatedAt
     });
@@ -101,6 +102,29 @@ class GroupRepository extends IGroupRepository {
   async findByUser(userId, includeInactive = false) {
     const docs = await GroupSchema.getUserGroups(userId, includeInactive).lean();
     return docs.map(doc => this._toEntity(doc));
+  }
+
+  async findByInviteCode(inviteCode) {
+    const doc = await GroupSchema.findOne({ inviteCode, isActive: true })
+      .populate('creator', 'username fullName profilePicture')
+      .lean();
+    return doc ? this._toEntity(doc) : null;
+  }
+
+  async setInviteCode(groupId, inviteCode) {
+    const doc = await GroupSchema.findByIdAndUpdate(
+      groupId,
+      { $set: { inviteCode } },
+      { new: true, runValidators: true }
+    )
+      .populate('creator', 'username fullName profilePicture')
+      .lean();
+
+    if (!doc) {
+      return null;
+    }
+
+    return this._toEntity(doc);
   }
 
   async findByEvent(eventId) {

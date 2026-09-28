@@ -13,6 +13,7 @@ class GroupEntity {
     events = [],
     settings = {},
     isActive = true,
+    inviteCode = null,
     createdAt,
     updatedAt
   }) {
@@ -24,6 +25,7 @@ class GroupEntity {
     this.events = events;
     this.settings = settings;
     this.isActive = isActive;
+    this.inviteCode = inviteCode;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -113,6 +115,7 @@ class GroupEntity {
       events: this.events,
       settings: this.settings,
       isActive: this.isActive,
+      inviteCode: this.inviteCode,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       memberCount: this.getMemberCount(),

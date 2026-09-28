@@ -18,7 +18,10 @@ class GroupController {
     updateMemberRoleUseCase,
     searchGroupsUseCase,
     deleteGroupUseCase,
-    createGroupEventUseCase
+    createGroupEventUseCase,
+    generateGroupInviteCodeUseCase,
+    getGroupPreviewByInviteCodeUseCase,
+    joinGroupByInviteCodeUseCase
   }) {
     this.createGroupUseCase = createGroupUseCase;
     this.createGroupFromEventUseCase = createGroupFromEventUseCase;
@@ -31,6 +34,9 @@ class GroupController {
     this.searchGroupsUseCase = searchGroupsUseCase;
     this.deleteGroupUseCase = deleteGroupUseCase;
     this.createGroupEventUseCase = createGroupEventUseCase;
+    this.generateGroupInviteCodeUseCase = generateGroupInviteCodeUseCase;
+    this.getGroupPreviewByInviteCodeUseCase = getGroupPreviewByInviteCodeUseCase;
+    this.joinGroupByInviteCodeUseCase = joinGroupByInviteCodeUseCase;
   }
 
   /**
@@ -213,6 +219,61 @@ class GroupController {
     const result = await this.addMemberUseCase.execute(id, req.user.id, userId, role);
 
     return successResponse(res, { group: result }, 200, 'Member added successfully');
+  });
+
+  /**
+   * @swagger
+   * /groups/{id}/invite-code:
+   *   post:
+   *     summary: Generate or reset the group's shareable invite link (admin only)
+   *     tags: [Groups]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Invite code and shareable URL
+   */
+  generateInviteCode = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const result = await this.generateGroupInviteCodeUseCase.execute(id, req.user.id);
+
+    return successResponse(res, result, 200, 'Invite link created');
+  });
+
+  /**
+   * @swagger
+   * /groups/invite/{code}:
+   *   get:
+   *     summary: Preview a group by invite code - works without authentication
+   *     tags: [Groups]
+   *     responses:
+   *       200:
+   *         description: Thin group preview
+   */
+  getGroupPreviewByInviteCode = asyncHandler(async (req, res) => {
+    const { code } = req.params;
+    const result = await this.getGroupPreviewByInviteCodeUseCase.execute(code);
+
+    return successResponse(res, { group: result });
+  });
+
+  /**
+   * @swagger
+   * /groups/join/{code}:
+   *   post:
+   *     summary: Join a group by invite code
+   *     tags: [Groups]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Joined group (idempotent if already a member)
+   */
+  joinGroupByInviteCode = asyncHandler(async (req, res) => {
+    const { code } = req.params;
+    const result = await this.joinGroupByInviteCodeUseCase.execute(code, req.user.id);
+
+    return successResponse(res, { group: result }, 200, 'Joined group');
   });
 
   /**

@@ -32,9 +32,15 @@ class GenerateGroupInviteCodeUseCase {
 
     const updatedGroup = await this.groupRepository.setInviteCode(groupId, inviteCode);
 
+    // Must be the app's verified Android App Link / iOS associated domain
+    // (jaaiye-4439b.web.app) so the link opens the app directly instead of
+    // a browser, and must match the /groups/invite/:code path shape the
+    // mobile DeepLinkHandler parses.
+    const baseUrl = process.env.APP_LINK_BASE_URL || 'https://jaaiye-4439b.web.app';
+
     return {
       inviteCode: updatedGroup.inviteCode,
-      inviteUrl: `https://groups.jaaiye.com/invite/${updatedGroup.inviteCode}`
+      inviteUrl: `${baseUrl}/groups/invite/${updatedGroup.inviteCode}`
     };
   }
 }

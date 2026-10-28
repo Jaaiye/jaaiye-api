@@ -65,6 +65,16 @@ class InitializeFlutterwavePaymentUseCase {
       });
       const { totalAmount } = calculateChargeFromBase(baseAmount);
 
+      // Free events must not enter the payment flow at all. Without this guard,
+      // totalAmount is 0, Flutterwave rejects the charge, and we're left with a
+      // 'pending' transaction that the poller retries forever. Route the user
+      // to RSVP instead.
+      if (totalAmount <= 0) {
+        throw new PaymentInitializationError(
+          'This event is free. Please use the RSVP flow to register.'
+        );
+      }
+
       const metadata = {
         eventId: dto.eventId,
         quantity: dto.quantity,

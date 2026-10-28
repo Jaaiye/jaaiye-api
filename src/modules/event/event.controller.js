@@ -30,7 +30,8 @@ class EventController {
     getTeamEventsUseCase,
     listTeamInvitationsUseCase,
     resendEventTicketsUseCase,
-    issueTicketUseCase
+    issueTicketUseCase,
+    RSVPEventUseCase
   }) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
@@ -55,6 +56,7 @@ class EventController {
     this.listTeamInvitationsUseCase = listTeamInvitationsUseCase;
     this.resendEventTicketsUseCase = resendEventTicketsUseCase;
     this.issueTicketUseCase = issueTicketUseCase;
+    this.RSVPEventUseCase = RSVPEventUseCase;
   }
 
   /**
@@ -573,6 +575,18 @@ class EventController {
   resendEventTickets = asyncHandler(async (req, res) => {
     const result = await this.resendEventTicketsUseCase.execute(req.params.id, req.user.id);
     return successResponse(res, result, 200, result.message);
+  });
+
+  rsvpEvent = asyncHandler(async (req, res) => {
+    const ticket = await this.RSVPEventUseCase.execute(
+      req.user.id,
+      req.params.id,
+      {
+        ticketTypeId: req.body?.ticketTypeId || null,
+        referralCode: req.body?.referralCode || null,
+      }
+    );
+    return successResponse(res, { ticket: ticket.toJSON() }, 201, 'RSVP submitted successfully');
   });
 }
 

@@ -284,6 +284,16 @@ function createEventRoutes(eventController) {
     eventController.resendEventTickets
   );
 
+  // POST /events/:eventId/rsvp  (authenticated)
+  router.post(
+    '/:id/rsvp', 
+    apiLimiter,
+    protect,
+    validateEventId,
+    validate,
+    eventController.rsvpEvent
+  );
+
   return router;
 }
 

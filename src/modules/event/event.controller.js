@@ -585,7 +585,7 @@ class EventController {
       const userId = req.user ? req.user.id : null;
       const guestData = (!userId && name && email) ? { name, email } : null;
 
-      const result = await this.rsvpEventUseCase.execute(
+      const result = await this.RSVPEventUseCase.execute(
         userId,
         req.params.eventId,
         { ticketTypeId, referralCode, guestData }

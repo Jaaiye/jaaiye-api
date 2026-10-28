@@ -20,6 +20,7 @@ module.exports = {
   GetEventAnalyticsUseCase: require('./GetEventAnalyticsUseCase'),
   GetTeamEventsUseCase: require('./GetTeamEventsUseCase'),
   ListTeamInvitationsUseCase: require('./ListTeamInvitationsUseCase'),
-  IssueTicketUseCase: require('./IssueTicketUseCase')
+  IssueTicketUseCase: require('./IssueTicketUseCase'),
+  RSVPEventUseCase: require('./RSVPEventUseCase')
 };
 

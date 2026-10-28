@@ -45,7 +45,7 @@ const {
   GetTeamEventsUseCase,
   ListTeamInvitationsUseCase,
   IssueTicketUseCase,
-  RSVPEventUseCase 
+  RSVPEventUseCase
 } = require('./use-cases');
 const { ResendEventTicketsUseCase } = require('../ticket/use-cases');
 const WalletService = require('../wallet/services/WalletService');
@@ -88,6 +88,8 @@ class EventModule {
     }
     return this._instances.eventParticipantRepository;
   }
+
+
 
   getEventTeamRepository() {
     if (!this._instances.eventTeamRepository) {
@@ -466,10 +468,13 @@ class EventModule {
 
   getRSVPEventUseCase() {
     if (!this._instances.rsvpEventUseCase) {
+      const ticketModule = require('../ticket/ticket.module');
+
       this._instances.rsvpEventUseCase = new RSVPEventUseCase({
         eventRepository: this.getEventRepository(),
-        ticketRepository: this.getTicketRepository(),
-        eventTeamRepository: this.getEventTeamRepository()
+        ticketRepository: new TicketRepository(), // Fixed: instantiated directly
+        eventTeamRepository: this.getEventTeamRepository(),
+        createTicketUseCase: ticketModule.getCreateTicketUseCase() // Fixed: passed the use case
       });
     }
     return this._instances.rsvpEventUseCase;

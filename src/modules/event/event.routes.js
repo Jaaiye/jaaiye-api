@@ -288,6 +288,7 @@ function createEventRoutes(eventController) {
   router.post(
     '/:id/rsvp', 
     apiLimiter,
+    optionalAuth,
     validateEventId,
     validate,
     eventController.rsvpEvent

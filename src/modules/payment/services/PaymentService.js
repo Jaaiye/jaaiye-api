@@ -7,7 +7,7 @@
 const logger = require('../../../utils/logger');
 const CreateTicketDTO = require('../../ticket/dto/CreateTicketDTO');
 const authService = require('../../auth/services/auth.service');
-const { splitTotalIntoBaseAndFee } = require('./PricingService');
+const { splitTotalIntoBaseAndFee, calculateTicketBaseAmount } = require('./PricingService');
 
 class PaymentService {
   constructor({
@@ -112,508 +112,529 @@ class PaymentService {
 
     try {
 
-    // Fetch event to get ticket type details (for admission size/names)
-    const event = eventId ? await this.eventRepository.findById(eventId) : null;
+      // Fetch event to get ticket type details (for admission size/names)
+      const event = eventId ? await this.eventRepository.findById(eventId) : null;
 
-    // Handle assigned recipients
-    if (Array.isArray(assignees) && assignees.length > 0) {
-      for (const assignee of assignees) {
-        const { name, email } = assignee;
-        try {
-          // Determine admission size based on ticket type
-          let admissionSize = 1;
-          if (event && event.ticketTypes) {
-            const tt = event.ticketTypes.id ? event.ticketTypes.id(ticketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(ticketTypeId));
-            if (tt) {
-              admissionSize = tt.admissionSize || 1;
-            }
-          }
-
-          const ticketDTO = new CreateTicketDTO({
-            eventId,
-            ticketTypeId: ticketTypeId || null,
-            userId,
-            quantity: 1,
-            admissionSize,
-            bypassCapacity: false,
-            transactionId: transaction.id || transaction._id,
-            referralCode
-          });
-          const ticket = await this.createTicketUseCase.execute(ticketDTO);
-          createdTickets.push(ticket);
-
-          // Send email to assignee
+      // Handle assigned recipients
+      if (Array.isArray(assignees) && assignees.length > 0) {
+        for (const assignee of assignees) {
+          const { name, email } = assignee;
           try {
-            // Populate ticket with event data for email
-            const TicketSchema = require('../../ticket/entities/Ticket.schema');
-            const populatedTicket = await TicketSchema.findById(ticket.id || ticket._id)
-              .select('+qrCode +publicId') // Ensure these fields are included
-              .populate('eventId', 'title startTime endTime venue image ticketTypes')
-              .populate('userId', 'username fullName email')
-              .lean();
+            // Determine admission size based on ticket type
+            let admissionSize = 1;
+            if (event && event.ticketTypes) {
+              const tt = event.ticketTypes.id ? event.ticketTypes.id(ticketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(ticketTypeId));
+              if (tt) {
+                admissionSize = tt.admissionSize || 1;
+              }
+            }
 
-            if (populatedTicket && populatedTicket.eventId && typeof populatedTicket.eventId === 'object') {
-              const ticketForEmail = {
-                ...populatedTicket,
-                id: populatedTicket._id?.toString() || populatedTicket.id,
-                qrCode: ticket.qrCode || populatedTicket.qrCode || null,
-                ticketData: ticket.ticketData || populatedTicket.ticketData || null,
-                publicId: ticket.publicId || populatedTicket.publicId || null,
-                price: ticket.price || populatedTicket.price,
-                quantity: ticket.quantity || populatedTicket.quantity,
-                ticketTypeName: ticket.ticketTypeName || populatedTicket.ticketTypeName,
-                status: ticket.status || populatedTicket.status
-              };
+            const ticketDTO = new CreateTicketDTO({
+              eventId,
+              ticketTypeId: ticketTypeId || null,
+              userId,
+              quantity: 1,
+              admissionSize,
+              bypassCapacity: false,
+              transactionId: transaction.id || transaction._id,
+              referralCode
+            });
+            const ticket = await this.createTicketUseCase.execute(ticketDTO);
+            createdTickets.push(ticket);
 
-              logger.info('Sending ticket email to assignee', {
+            // Send email to assignee
+            try {
+              // Populate ticket with event data for email
+              const TicketSchema = require('../../ticket/entities/Ticket.schema');
+              const populatedTicket = await TicketSchema.findById(ticket.id || ticket._id)
+                .select('+qrCode +publicId') // Ensure these fields are included
+                .populate('eventId', 'title startTime endTime venue image ticketTypes')
+                .populate('userId', 'username fullName email')
+                .lean();
+
+              if (populatedTicket && populatedTicket.eventId && typeof populatedTicket.eventId === 'object') {
+                const ticketForEmail = {
+                  ...populatedTicket,
+                  id: populatedTicket._id?.toString() || populatedTicket.id,
+                  qrCode: ticket.qrCode || populatedTicket.qrCode || null,
+                  ticketData: ticket.ticketData || populatedTicket.ticketData || null,
+                  publicId: ticket.publicId || populatedTicket.publicId || null,
+                  price: ticket.price || populatedTicket.price,
+                  quantity: ticket.quantity || populatedTicket.quantity,
+                  ticketTypeName: ticket.ticketTypeName || populatedTicket.ticketTypeName,
+                  status: ticket.status || populatedTicket.status
+                };
+
+                logger.info('Sending ticket email to assignee', {
+                  email,
+                  name,
+                  hasQrCode: !!ticketForEmail.qrCode,
+                  hasPublicId: !!ticketForEmail.publicId,
+                  publicId: ticketForEmail.publicId
+                });
+
+                await this.emailAdapter.sendPaymentConfirmationEmail(
+                  { email, fullName: name },
+                  ticketForEmail
+                );
+
+                logger.info('Ticket email sent to assignee successfully', {
+                  email,
+                  hasQrCode: !!ticketForEmail.qrCode,
+                  publicId: ticketForEmail.publicId
+                });
+              } else {
+                logger.warn('Cannot send email to assignee - ticket missing event data', {
+                  email,
+                  ticketId: ticket.id || ticket._id,
+                  hasPopulatedTicket: !!populatedTicket,
+                  hasEventId: !!(populatedTicket && populatedTicket.eventId)
+                });
+              }
+            } catch (emailError) {
+              logger.error('Failed to send email to assignee', {
                 email,
-                name,
-                hasQrCode: !!ticketForEmail.qrCode,
-                hasPublicId: !!ticketForEmail.publicId,
-                publicId: ticketForEmail.publicId
+                error: emailError.message,
+                stack: emailError.stack
+              });
+            }
+
+            // Send push notification to assignee if they have an account
+            if (this.sendNotificationUseCase) {
+              try {
+                // Try to find user by email
+                const assigneeUser = await this.userRepository.findByEmail(email);
+                if (assigneeUser) {
+                  if (event) {
+                    await this.sendNotificationUseCase.execute(
+                      assigneeUser.id,
+                      {
+                        title: 'You\'ve Received a Ticket! 🎟️',
+                        body: `${name || 'Someone'} purchased a ticket for "${event.title}" and assigned it to you. Check your email for details.`
+                      },
+                      {
+                        type: 'payment_success',
+                        eventId: eventId.toString(),
+                        ticketId: ticket.id.toString(),
+                        assignedBy: userId.toString(),
+                        priority: 'high',
+                        path: 'ticketsDetailsScreen',
+                      }
+                    );
+                  }
+                }
+              } catch (notificationError) {
+                logger.warn('Failed to send push notification to assignee', { email, error: notificationError.message });
+              }
+            }
+          } catch (ticketError) {
+            logger.error('Failed to create ticket for assignee', { assignee, error: ticketError.message });
+          }
+        }
+      } else {
+        // Single buyer or unassigned multiple tickets
+        // Support both single ticketTypeId and array of ticketTypes
+        const ticketTypesToCreate = parsedTicketTypes.length > 0 ? parsedTicketTypes : Array(quantity).fill(ticketTypeId);
+
+        logger.info('[PaymentService] Creating tickets', {
+          ticketTypesLength: parsedTicketTypes.length,
+          quantity,
+          ticketTypesToCreate,
+          totalToCreate: ticketTypesToCreate.length,
+          hasEvent: !!event
+        });
+
+        for (let i = 0; i < ticketTypesToCreate.length; i++) {
+          try {
+            const currentTicketTypeId = ticketTypesToCreate[i];
+
+            // Determine admission size based on ticket type
+            let admissionSize = 1;
+            if (event && event.ticketTypes) {
+              const tt = event.ticketTypes.id ? event.ticketTypes.id(currentTicketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(currentTicketTypeId));
+              if (tt) {
+                admissionSize = tt.admissionSize || 1;
+              }
+            }
+
+            logger.info(`[PaymentService] Creating ticket ${i + 1}/${ticketTypesToCreate.length}`, {
+              ticketTypeId: currentTicketTypeId,
+              admissionSize
+            });
+
+            const ticketDTO = new CreateTicketDTO({
+              eventId,
+              ticketTypeId: currentTicketTypeId,
+              userId,
+              quantity: 1, // Each record is a unique QR code
+              admissionSize: admissionSize, // Number of people this ticket admits
+              bypassCapacity: false,
+              skipEmail: true, // Prevent individual emails, we'll send one consolidated email
+              transactionId: transaction.id || transaction._id,
+              referralCode
+            });
+            const ticket = await this.createTicketUseCase.execute(ticketDTO);
+            createdTickets.push(ticket);
+
+            logger.info(`[PaymentService] Ticket ${i + 1} created successfully`, {
+              ticketId: ticket.id,
+              ticketTypeId: currentTicketTypeId,
+              admissionSize
+            });
+          } catch (ticketError) {
+            logger.error('Failed to create ticket', {
+              index: i,
+              ticketTypeId: ticketTypesToCreate[i],
+              error: ticketError.message
+            });
+          }
+        }
+
+        // Send confirmation email to buyer (with all tickets if multiple)
+        try {
+          const buyer = await this.userRepository.findById(userId);
+          if (buyer && buyer.email && createdTickets.length > 0) {
+            // Populate tickets with event data for email
+            const TicketSchema = require('../../ticket/entities/Ticket.schema');
+            const populatedTickets = await Promise.all(
+              createdTickets.map(async (ticket) => {
+                try {
+                  // Explicitly select qrCode and publicId fields
+                  const populated = await TicketSchema.findById(ticket.id || ticket._id)
+                    .select('+qrCode +publicId') // Ensure these fields are included
+                    .populate('eventId', 'title startTime endTime venue image ticketTypes')
+                    .populate('userId', 'username fullName email')
+                    .lean();
+
+                  if (populated && populated.eventId) {
+                    // Ensure qrCode and publicId are included (from ticket entity or populated doc)
+                    const ticketForEmail = {
+                      ...populated,
+                      id: populated._id?.toString() || populated.id,
+                      qrCode: ticket.qrCode || populated.qrCode || null,
+                      ticketData: ticket.ticketData || populated.ticketData || null,
+                      publicId: ticket.publicId || populated.publicId || null,
+                      price: ticket.price || populated.price,
+                      quantity: ticket.quantity || populated.quantity,
+                      ticketTypeName: ticket.ticketTypeName || populated.ticketTypeName,
+                      status: ticket.status || populated.status
+                    };
+
+                    logger.debug('Ticket prepared for email', {
+                      ticketId: ticketForEmail.id,
+                      hasQrCode: !!ticketForEmail.qrCode,
+                      hasPublicId: !!ticketForEmail.publicId,
+                      publicId: ticketForEmail.publicId,
+                      qrCodeType: typeof ticketForEmail.qrCode
+                    });
+
+                    return ticketForEmail;
+                  }
+                  return ticket;
+                } catch (populateError) {
+                  logger.warn('Failed to populate ticket for email', {
+                    ticketId: ticket.id || ticket._id,
+                    error: populateError.message
+                  });
+                  return ticket;
+                }
+              })
+            );
+
+            // Filter out tickets without event data
+            const validTickets = populatedTickets.filter(t => t.eventId && typeof t.eventId === 'object' && t.eventId.title);
+
+            if (validTickets.length > 0) {
+              logger.info('Sending ticket confirmation email', {
+                userId,
+                email: buyer.email,
+                ticketCount: validTickets.length
               });
 
               await this.emailAdapter.sendPaymentConfirmationEmail(
-                { email, fullName: name },
-                ticketForEmail
+                buyer,
+                validTickets.length === 1 ? validTickets[0] : validTickets
               );
 
-              logger.info('Ticket email sent to assignee successfully', {
-                email,
-                hasQrCode: !!ticketForEmail.qrCode,
-                publicId: ticketForEmail.publicId
+              logger.info('Ticket confirmation email sent successfully', { userId, email: buyer.email });
+            } else {
+              logger.warn('Cannot send email - tickets missing event data', {
+                userId,
+                totalTickets: createdTickets.length,
+                validTickets: validTickets.length
+              });
+            }
+          } else {
+            logger.warn('Cannot send email - missing buyer or email', {
+              userId,
+              hasBuyer: !!buyer,
+              hasEmail: !!(buyer && buyer.email),
+              ticketCount: createdTickets.length
+            });
+          }
+        } catch (emailError) {
+          logger.error('Failed to send confirmation email', {
+            userId,
+            error: emailError.message,
+            stack: emailError.stack,
+            ticketCount: createdTickets.length
+          });
+        }
+
+        // Send push and in-app notification to buyer
+        if (createdTickets.length > 0 && this.sendNotificationUseCase) {
+          try {
+            const buyer = await this.userRepository.findById(userId);
+
+            if (buyer && event) {
+              const ticketCount = createdTickets.length;
+              const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
+              const eventTitle = event.title || 'Event';
+
+              logger.info('Sending ticket purchase notification', {
+                userId,
+                ticketCount,
+                eventTitle
+              });
+
+              const notificationResult = await this.sendNotificationUseCase.execute(
+                userId,
+                {
+                  title: 'Ticket Purchase Successful! 🎉',
+                  body: `You've successfully purchased ${ticketCount} ${ticketText} for ${eventTitle}. Check your email for ticket details.`
+                },
+                {
+                  type: 'payment_success',
+                  eventId: eventId.toString(),
+                  ticketCount,
+                  transactionId: transaction.id.toString(),
+                  priority: 'high',
+                  path: 'ticketsDetailsScreen',
+                }
+              );
+
+              logger.info('Ticket purchase notification sent successfully', {
+                userId,
+                notificationId: notificationResult?.id
               });
             } else {
-              logger.warn('Cannot send email to assignee - ticket missing event data', {
-                email,
-                ticketId: ticket.id || ticket._id,
-                hasPopulatedTicket: !!populatedTicket,
-                hasEventId: !!(populatedTicket && populatedTicket.eventId)
+              logger.warn('Cannot send notification - missing buyer or event', {
+                userId,
+                hasBuyer: !!buyer,
+                hasEvent: !!event,
+                eventId
               });
             }
-          } catch (emailError) {
-            logger.error('Failed to send email to assignee', {
-              email,
-              error: emailError.message,
-              stack: emailError.stack
-            });
-          }
-
-          // Send push notification to assignee if they have an account
-          if (this.sendNotificationUseCase) {
-            try {
-              // Try to find user by email
-              const assigneeUser = await this.userRepository.findByEmail(email);
-              if (assigneeUser) {
-                if (event) {
-                  await this.sendNotificationUseCase.execute(
-                    assigneeUser.id,
-                    {
-                      title: 'You\'ve Received a Ticket! 🎟️',
-                      body: `${name || 'Someone'} purchased a ticket for "${event.title}" and assigned it to you. Check your email for details.`
-                    },
-                    {
-                      type: 'payment_success',
-                      eventId: eventId.toString(),
-                      ticketId: ticket.id.toString(),
-                      assignedBy: userId.toString(),
-                      priority: 'high',
-                      path: 'ticketsDetailsScreen',
-                    }
-                  );
-                }
-              }
-            } catch (notificationError) {
-              logger.warn('Failed to send push notification to assignee', { email, error: notificationError.message });
-            }
-          }
-        } catch (ticketError) {
-          logger.error('Failed to create ticket for assignee', { assignee, error: ticketError.message });
-        }
-      }
-    } else {
-      // Single buyer or unassigned multiple tickets
-      // Support both single ticketTypeId and array of ticketTypes
-      const ticketTypesToCreate = parsedTicketTypes.length > 0 ? parsedTicketTypes : Array(quantity).fill(ticketTypeId);
-
-      logger.info('[PaymentService] Creating tickets', {
-        ticketTypesLength: parsedTicketTypes.length,
-        quantity,
-        ticketTypesToCreate,
-        totalToCreate: ticketTypesToCreate.length,
-        hasEvent: !!event
-      });
-
-      for (let i = 0; i < ticketTypesToCreate.length; i++) {
-        try {
-          const currentTicketTypeId = ticketTypesToCreate[i];
-
-          // Determine admission size based on ticket type
-          let admissionSize = 1;
-          if (event && event.ticketTypes) {
-            const tt = event.ticketTypes.id ? event.ticketTypes.id(currentTicketTypeId) : event.ticketTypes.find(t => String(t._id || t.id) === String(currentTicketTypeId));
-            if (tt) {
-              admissionSize = tt.admissionSize || 1;
-            }
-          }
-
-          logger.info(`[PaymentService] Creating ticket ${i + 1}/${ticketTypesToCreate.length}`, {
-            ticketTypeId: currentTicketTypeId,
-            admissionSize
-          });
-
-          const ticketDTO = new CreateTicketDTO({
-            eventId,
-            ticketTypeId: currentTicketTypeId,
-            userId,
-            quantity: 1, // Each record is a unique QR code
-            admissionSize: admissionSize, // Number of people this ticket admits
-            bypassCapacity: false,
-            skipEmail: true, // Prevent individual emails, we'll send one consolidated email
-            transactionId: transaction.id || transaction._id,
-            referralCode
-          });
-          const ticket = await this.createTicketUseCase.execute(ticketDTO);
-          createdTickets.push(ticket);
-
-          logger.info(`[PaymentService] Ticket ${i + 1} created successfully`, {
-            ticketId: ticket.id,
-            ticketTypeId: currentTicketTypeId,
-            admissionSize
-          });
-        } catch (ticketError) {
-          logger.error('Failed to create ticket', {
-            index: i,
-            ticketTypeId: ticketTypesToCreate[i],
-            error: ticketError.message
-          });
-        }
-      }
-
-      // Send confirmation email to buyer (with all tickets if multiple)
-      try {
-        const buyer = await this.userRepository.findById(userId);
-        if (buyer && buyer.email && createdTickets.length > 0) {
-          // Populate tickets with event data for email
-          const TicketSchema = require('../../ticket/entities/Ticket.schema');
-          const populatedTickets = await Promise.all(
-            createdTickets.map(async (ticket) => {
-              try {
-                // Explicitly select qrCode and publicId fields
-                const populated = await TicketSchema.findById(ticket.id || ticket._id)
-                  .select('+qrCode +publicId') // Ensure these fields are included
-                  .populate('eventId', 'title startTime endTime venue image ticketTypes')
-                  .populate('userId', 'username fullName email')
-                  .lean();
-
-                if (populated && populated.eventId) {
-                  // Ensure qrCode and publicId are included (from ticket entity or populated doc)
-                  const ticketForEmail = {
-                    ...populated,
-                    id: populated._id?.toString() || populated.id,
-                    qrCode: ticket.qrCode || populated.qrCode || null,
-                    ticketData: ticket.ticketData || populated.ticketData || null,
-                    publicId: ticket.publicId || populated.publicId || null,
-                    price: ticket.price || populated.price,
-                    quantity: ticket.quantity || populated.quantity,
-                    ticketTypeName: ticket.ticketTypeName || populated.ticketTypeName,
-                    status: ticket.status || populated.status
-                  };
-
-                  logger.debug('Ticket prepared for email', {
-                    ticketId: ticketForEmail.id,
-                    hasQrCode: !!ticketForEmail.qrCode,
-                    hasPublicId: !!ticketForEmail.publicId,
-                    publicId: ticketForEmail.publicId,
-                    qrCodeType: typeof ticketForEmail.qrCode
-                  });
-
-                  return ticketForEmail;
-                }
-                return ticket;
-              } catch (populateError) {
-                logger.warn('Failed to populate ticket for email', {
-                  ticketId: ticket.id || ticket._id,
-                  error: populateError.message
-                });
-                return ticket;
-              }
-            })
-          );
-
-          // Filter out tickets without event data
-          const validTickets = populatedTickets.filter(t => t.eventId && typeof t.eventId === 'object' && t.eventId.title);
-
-          if (validTickets.length > 0) {
-            logger.info('Sending ticket confirmation email', {
+          } catch (notificationError) {
+            logger.error('Failed to send push notification', {
               userId,
-              email: buyer.email,
-              ticketCount: validTickets.length
-            });
-
-            await this.emailAdapter.sendPaymentConfirmationEmail(
-              buyer,
-              validTickets.length === 1 ? validTickets[0] : validTickets
-            );
-
-            logger.info('Ticket confirmation email sent successfully', { userId, email: buyer.email });
-          } else {
-            logger.warn('Cannot send email - tickets missing event data', {
-              userId,
-              totalTickets: createdTickets.length,
-              validTickets: validTickets.length
+              error: notificationError.message,
+              stack: notificationError.stack,
+              ticketCount: createdTickets.length
             });
           }
         } else {
-          logger.warn('Cannot send email - missing buyer or email', {
+          logger.warn('Notification not sent - missing requirements', {
             userId,
-            hasBuyer: !!buyer,
-            hasEmail: !!(buyer && buyer.email),
-            ticketCount: createdTickets.length
+            hasTickets: createdTickets.length > 0,
+            hasNotificationUseCase: !!this.sendNotificationUseCase
           });
         }
-      } catch (emailError) {
-        logger.error('Failed to send confirmation email', {
-          userId,
-          error: emailError.message,
-          stack: emailError.stack,
-          ticketCount: createdTickets.length
-        });
       }
 
-      // Send push and in-app notification to buyer
-      if (createdTickets.length > 0 && this.sendNotificationUseCase) {
+      // Notify event creator about ticket sale
+      if (this.sendNotificationUseCase && event && event.creatorId) {
         try {
-          const buyer = await this.userRepository.findById(userId);
+          const creator = await this.userRepository.findById(event.creatorId);
 
-          if (buyer && event) {
+          // Don't notify if creator bought their own ticket (shouldn't happen with restrictions)
+          if (creator && String(creator.id) !== String(userId)) {
             const ticketCount = createdTickets.length;
             const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
-            const eventTitle = event.title || 'Event';
+            const ticketTotalAmount = createdTickets.reduce((sum, t) => sum + Number(t.price || 0), 0);
 
-            logger.info('Sending ticket purchase notification', {
-              userId,
+            logger.info('Sending ticket sale notification to event creator', {
+              creatorId: event.creatorId,
+              eventId,
               ticketCount,
-              eventTitle
+              amount: ticketTotalAmount
             });
 
-            const notificationResult = await this.sendNotificationUseCase.execute(
-              userId,
+            await this.sendNotificationUseCase.execute(
+              event.creatorId,
               {
-                title: 'Ticket Purchase Successful! 🎉',
-                body: `You've successfully purchased ${ticketCount} ${ticketText} for ${eventTitle}. Check your email for ticket details.`
+                title: '🎉 New Ticket Sale!',
+                body: `${ticketCount} ${ticketText} purchased for "${event.title}". Total: ₦${ticketTotalAmount.toLocaleString()}`
               },
               {
-                type: 'payment_success',
+                type: 'ticket_sale',
                 eventId: eventId.toString(),
+                buyerId: userId.toString(),
                 ticketCount,
-                transactionId: transaction.id.toString(),
-                priority: 'high',
-                path: 'ticketsDetailsScreen',
+                amount: ticketTotalAmount,
+                priority: 'medium',
+                path: `https://events.jaaiye.com/events/${event.slug}/analytics`,
               }
             );
 
-            logger.info('Ticket purchase notification sent successfully', {
-              userId,
-              notificationId: notificationResult?.id
-            });
-          } else {
-            logger.warn('Cannot send notification - missing buyer or event', {
-              userId,
-              hasBuyer: !!buyer,
-              hasEvent: !!event,
-              eventId
+            // Send email notification to creator
+            if (this.emailAdapter && creator.email) {
+              try {
+                const buyer = await this.userRepository.findById(userId);
+                await this.emailAdapter.sendTicketSaleNotificationEmail(
+                  creator,
+                  {
+                    eventTitle: event.title,
+                    ticketCount,
+                    amount: ticketTotalAmount,
+                    buyerName: buyer?.fullName || 'A customer',
+                    eventId
+                  },
+                  authService.generateToken(creator)
+                );
+
+                logger.info('Ticket sale email sent to event creator', {
+                  creatorId: event.creatorId,
+                  creatorEmail: creator.email
+                });
+              } catch (emailError) {
+                logger.error('Failed to send ticket sale email to creator', {
+                  creatorId: event.creatorId,
+                  error: emailError.message
+                });
+              }
+            }
+
+            logger.info('Ticket sale notification sent to event creator successfully', {
+              creatorId: event.creatorId
             });
           }
-        } catch (notificationError) {
-          logger.error('Failed to send push notification', {
-            userId,
-            error: notificationError.message,
-            stack: notificationError.stack,
-            ticketCount: createdTickets.length
-          });
-        }
-      } else {
-        logger.warn('Notification not sent - missing requirements', {
-          userId,
-          hasTickets: createdTickets.length > 0,
-          hasNotificationUseCase: !!this.sendNotificationUseCase
-        });
-      }
-    }
-
-    // Notify event creator about ticket sale
-    if (this.sendNotificationUseCase && event && event.creatorId) {
-      try {
-        const creator = await this.userRepository.findById(event.creatorId);
-
-        // Don't notify if creator bought their own ticket (shouldn't happen with restrictions)
-        if (creator && String(creator.id) !== String(userId)) {
-          const ticketCount = createdTickets.length;
-          const ticketText = ticketCount === 1 ? 'ticket' : 'tickets';
-          const ticketTotalAmount = createdTickets.reduce((sum, t) => sum + Number(t.price || 0), 0);
-
-          logger.info('Sending ticket sale notification to event creator', {
-            creatorId: event.creatorId,
+        } catch (creatorNotificationError) {
+          logger.error('Failed to notify event creator about ticket sale', {
             eventId,
-            ticketCount,
-            amount: ticketTotalAmount
-          });
-
-          await this.sendNotificationUseCase.execute(
-            event.creatorId,
-            {
-              title: '🎉 New Ticket Sale!',
-              body: `${ticketCount} ${ticketText} purchased for "${event.title}". Total: ₦${ticketTotalAmount.toLocaleString()}`
-            },
-            {
-              type: 'ticket_sale',
-              eventId: eventId.toString(),
-              buyerId: userId.toString(),
-              ticketCount,
-              amount: ticketTotalAmount,
-              priority: 'medium',
-              path: `https://events.jaaiye.com/events/${event.slug}/analytics`,
-            }
-          );
-
-          // Send email notification to creator
-          if (this.emailAdapter && creator.email) {
-            try {
-              const buyer = await this.userRepository.findById(userId);
-              await this.emailAdapter.sendTicketSaleNotificationEmail(
-                creator,
-                {
-                  eventTitle: event.title,
-                  ticketCount,
-                  amount: ticketTotalAmount,
-                  buyerName: buyer?.fullName || 'A customer',
-                  eventId
-                },
-                authService.generateToken(creator)
-              );
-
-              logger.info('Ticket sale email sent to event creator', {
-                creatorId: event.creatorId,
-                creatorEmail: creator.email
-              });
-            } catch (emailError) {
-              logger.error('Failed to send ticket sale email to creator', {
-                creatorId: event.creatorId,
-                error: emailError.message
-              });
-            }
-          }
-
-          logger.info('Ticket sale notification sent to event creator successfully', {
-            creatorId: event.creatorId
+            creatorId: event.creatorId,
+            error: creatorNotificationError.message,
+            stack: creatorNotificationError.stack
           });
         }
-      } catch (creatorNotificationError) {
-        logger.error('Failed to notify event creator about ticket sale', {
-          eventId,
-          creatorId: event.creatorId,
-          error: creatorNotificationError.message,
-          stack: creatorNotificationError.stack
-        });
       }
-    }
 
-    // Mark transaction as successful
-    transaction.markAsSuccessful();
-    await this.transactionRepository.update(transaction.id, {
-      status: 'successful',
-      gatewayFee: gatewayFee || transaction.gatewayFee
-    });
+      // Mark transaction as successful
+      transaction.markAsSuccessful();
+      await this.transactionRepository.update(transaction.id, {
+        status: 'successful',
+        gatewayFee: gatewayFee || transaction.gatewayFee
+      });
 
-    // Fund the owner wallet with the ticket price; the service fee the
-    // buyer also paid is split out of transaction.amount and routed to the
-    // platform wallet inside fundWalletFromTransaction.
-    if (this.walletService) {
-      try {
-        // Handle group funding
-        if (groupId) {
-          const group = await this.groupRepository.findById(groupId);
-          if (group) {
-            const fundingResult = await this.walletService.fundWalletFromTransaction({
-              ownerType: 'GROUP',
-              ownerId: groupId,
-              transactionEntity: transaction,
-              hangoutId: hangoutId || null
-            });
+      // Ensure transaction.baseAmount is set. It's the ticket price the
+      // organizer must receive in full. Older transactions may not have it -
+      // fall back to computing it from the event's real ticket prices.
+      let txBaseAmount = Number(transaction.baseAmount || 0);
+      if (!txBaseAmount && event) {
+        const ticketTypeIdsForBase = parsedTicketTypes.length > 0
+          ? parsedTicketTypes
+          : Array(quantity).fill(ticketTypeId);
+        txBaseAmount = calculateTicketBaseAmount({
+          event,
+          ticketTypeIds: ticketTypeIdsForBase,
+          quantity
+        });
+        if (txBaseAmount > 0) {
+          await this.transactionRepository.update(transaction.id, { baseAmount: txBaseAmount });
+          transaction.baseAmount = txBaseAmount;
+        }
+      }
 
-            // Notify group creator about wallet credit
-            if (this.walletNotificationService && group.creator) {
-              const creator = await this.userRepository.findById(group.creator);
-              if (creator && creator.email) {
-                const grossAmount = Number(transaction.amount);
-                const { baseAmount: netAmount, feeAmount } = splitTotalIntoBaseAndFee(grossAmount);
-                const walletBalanceAfter = fundingResult.walletBalance;
+      // Fund the owner wallet with the ticket price; the service fee the
+      // buyer also paid is split out of transaction.amount and routed to the
+      // platform wallet inside fundWalletFromTransaction.
+      if (this.walletService) {
+        try {
+          // Handle group funding
+          if (groupId) {
+            const group = await this.groupRepository.findById(groupId);
+            if (group) {
+              const fundingResult = await this.walletService.fundWalletFromTransaction({
+                ownerType: 'GROUP',
+                ownerId: groupId,
+                transactionEntity: transaction,
+                hangoutId: hangoutId || null,
+                settledAmount: Number(amount)
+              });
 
-                // Get hangout title if hangoutId provided
-                let hangoutTitle = null;
-                if (hangoutId) {
-                  try {
-                    const hangout = await this.eventRepository.findById(hangoutId);
-                    if (hangout) {
-                      hangoutTitle = hangout.title;
+              // Notify group creator about wallet credit
+              if (this.walletNotificationService && group.creator) {
+                const creator = await this.userRepository.findById(group.creator);
+                if (creator && creator.email) {
+                  const grossAmount = Number(transaction.amount);
+                  const { baseAmount: netAmount, feeAmount } = splitTotalIntoBaseAndFee(grossAmount);
+                  const walletBalanceAfter = fundingResult.walletBalance;
+
+                  // Get hangout title if hangoutId provided
+                  let hangoutTitle = null;
+                  if (hangoutId) {
+                    try {
+                      const hangout = await this.eventRepository.findById(hangoutId);
+                      if (hangout) {
+                        hangoutTitle = hangout.title;
+                      }
+                    } catch (err) {
+                      logger.warn('Failed to load hangout for group funding email', { hangoutId, error: err.message });
                     }
-                  } catch (err) {
-                    logger.warn('Failed to load hangout for group funding email', { hangoutId, error: err.message });
                   }
+
+                  await this.walletNotificationService.sendGroupWalletCreditedEmail({
+                    user: creator,
+                    groupName: group.name,
+                    hangoutTitle,
+                    amount: grossAmount,
+                    feeAmount,
+                    netAmount,
+                    walletBalanceAfter
+                  });
                 }
-
-                await this.walletNotificationService.sendGroupWalletCreditedEmail({
-                  user: creator,
-                  groupName: group.name,
-                  hangoutTitle,
-                  amount: grossAmount,
-                  feeAmount,
-                  netAmount,
-                  walletBalanceAfter
-                });
               }
             }
           }
-        }
-        // Handle event wallet funding (category === 'event')
-        else if (eventId) {
-          if (event && event.category === 'event') {
-            const fundingResult = await this.walletService.fundWalletFromTransaction({
-              ownerType: 'EVENT',
-              ownerId: eventId,
-              transactionEntity: transaction
-            });
+          // Handle event wallet funding (category === 'event')
+          else if (eventId) {
+            if (event && event.category === 'event') {
+              const fundingResult = await this.walletService.fundWalletFromTransaction({
+                ownerType: 'EVENT',
+                ownerId: eventId,
+                transactionEntity: transaction,
+                settledAmount: Number(amount)
+              });
 
-            // Notify event owner about wallet credit (user-origin events only)
-            if (this.walletNotificationService && event.origin === 'user' && event.creatorId) {
-              const owner = await this.userRepository.findById(event.creatorId);
-              if (owner && owner.email) {
-                const grossAmount = Number(transaction.amount);
-                const { baseAmount: netAmount, feeAmount } = splitTotalIntoBaseAndFee(grossAmount);
-                const walletBalanceAfter = fundingResult.walletBalance;
+              // Notify event owner about wallet credit (user-origin events only)
+              if (this.walletNotificationService && event.origin === 'user' && event.creatorId) {
+                const owner = await this.userRepository.findById(event.creatorId);
+                if (owner && owner.email) {
+                  const grossAmount = Number(transaction.amount);
+                  const { baseAmount: netAmount, feeAmount } = splitTotalIntoBaseAndFee(grossAmount);
+                  const walletBalanceAfter = fundingResult.walletBalance;
 
-                await this.walletNotificationService.sendEventWalletCreditedEmail({
-                  user: owner,
-                  eventTitle: event.title,
-                  grossAmount,
-                  feeAmount,
-                  netAmount,
-                  walletBalanceAfter
-                });
+                  await this.walletNotificationService.sendEventWalletCreditedEmail({
+                    user: owner,
+                    eventTitle: event.title,
+                    grossAmount,
+                    feeAmount,
+                    netAmount,
+                    walletBalanceAfter
+                  });
+                }
               }
             }
           }
+        } catch (walletError) {
+          logger.error('Failed to fund wallet from transaction', {
+            eventId,
+            groupId,
+            reference,
+            error: walletError.message
+          });
         }
-      } catch (walletError) {
-        logger.error('Failed to fund wallet from transaction', {
-          eventId,
-          groupId,
-          reference,
-          error: walletError.message
-        });
       }
-    }
 
       // TODO: Add Google Calendar integration here if needed
       // This can be done via the Calendar domain's use cases
@@ -624,18 +645,27 @@ class PaymentService {
         transaction: transaction.toJSON()
       };
     } catch (error) {
-      // Release the processing claim so a retry (webhook redelivery or the
-      // next poll) can attempt this transaction again instead of it being
-      // stuck in 'processing' forever.
-      try {
-        await this.transactionRepository.update(transaction.id, { status: 'pending' });
-      } catch (revertError) {
-        logger.error('Failed to release processing lock after error', {
-          reference,
-          provider,
-          error: revertError.message
-        });
-      }
+      // Do NOT reset the status back to 'pending' here. That was the bug:
+      // any mid-flight failure (email, notification, wallet credit) flipped
+      // a 'processing' transaction back to 'pending', which is exactly the
+      // state claimForProcessing and PollPendingTransactionsUseCase look for
+      // - so a webhook retry or the next poll tick re-entered this whole
+      // method and credited wallets / minted tickets a second time.
+      //
+      // Leaving it in 'processing' means:
+      //   - claimForProcessing returns { claimed: false, alreadyProcessing: true }
+      //   - the poller (filters on status: 'pending') ignores it
+      //   - nothing re-processes automatically
+      //   - an admin can deliberately retry by resetting status to 'pending'
+      //     (safe because wallet funding and ticket minting are now idempotent
+      //      - see WalletService and the ticket-existence check below)
+      logger.error('Payment processing failed mid-flight; transaction left in processing for manual review', {
+        transactionId: transaction?.id,
+        reference,
+        provider,
+        error: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }

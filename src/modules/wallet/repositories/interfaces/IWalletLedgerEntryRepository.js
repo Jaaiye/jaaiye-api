@@ -11,6 +11,10 @@ class IWalletLedgerEntryRepository {
   async findByWallet() {
     throw new Error('Not implemented');
   }
+
+  async findByTransactionAndType() {
+    throw new Error('Not implemented');
+  }
 }
 
 module.exports = IWalletLedgerEntryRepository;

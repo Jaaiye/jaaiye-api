@@ -33,6 +33,11 @@ class WalletLedgerEntryRepository extends IWalletLedgerEntryRepository {
     return this._toEntity(doc);
   }
 
+  async findByTransactionAndType(transactionId, type) {
+    const doc = await WalletLedgerEntrySchema.findOne({ transactionId, type });
+    return this._toEntity(doc);
+  }
+
   async findByWallet(walletId, options = {}) {
     const { limit = 100, skip = 0 } = options;
     const docs = await WalletLedgerEntrySchema

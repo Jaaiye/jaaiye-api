@@ -44,7 +44,8 @@ const {
   GetEventAnalyticsUseCase,
   GetTeamEventsUseCase,
   ListTeamInvitationsUseCase,
-  IssueTicketUseCase
+  IssueTicketUseCase,
+  RSVPEventUseCase 
 } = require('./use-cases');
 const { ResendEventTicketsUseCase } = require('../ticket/use-cases');
 const WalletService = require('../wallet/services/WalletService');
@@ -463,6 +464,17 @@ class EventModule {
     return this._instances.getEventAnalyticsUseCase;
   }
 
+  getRSVPEventUseCase() {
+    if (!this._instances.rsvpEventUseCase) {
+      this._instances.rsvpEventUseCase = new RSVPEventUseCase({
+        eventRepository: this.getEventRepository(),
+        ticketRepository: this.getTicketRepository(),
+        eventTeamRepository: this.getEventTeamRepository()
+      });
+    }
+    return this._instances.rsvpEventUseCase;
+  }
+
   // ============================================================================
   // CONTROLLER
   // ============================================================================
@@ -519,7 +531,8 @@ class EventModule {
         getTeamEventsUseCase: this.getGetTeamEventsUseCase(),
         listTeamInvitationsUseCase: this.getListTeamInvitationsUseCase(),
         resendEventTicketsUseCase: this.getResendEventTicketsUseCase(),
-        issueTicketUseCase: this.getIssueTicketUseCase()
+        issueTicketUseCase: this.getIssueTicketUseCase(),
+        rsvpEventUseCase: this.getRSVPEventUseCase()
       });
     }
     return this._instances.eventController;

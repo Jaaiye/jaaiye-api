@@ -1,18 +1,9 @@
-/**
- * RSVP Event Use Case
- * Free-event ticket registration - bypasses payment entirely.
- *
- * A free event is one where ticketFee === 'free' OR every active
- * non-complimentary ticket type has price <= 0. Nothing in this flow
- * touches Transaction, WalletService, or PaymentService - there is no
- * money to move. Ticket shape is identical to the paid flow because it
- * reuses CreateTicketUseCase.
- */
-
-const { ValidationError } = require('../../common/errors');
-const { NotFoundError } = require('../../common/errors');
+const { ValidationError, NotFoundError } = require('../../common/errors');
 const { InvalidTicketTypeError } = require('../errors');
 const CreateTicketDTO = require('../../ticket/dto/CreateTicketDTO');
+const UserSchema = require('../../common/entities/User.schema'); // Adjust path if needed
+const authService = require('../../auth/services/auth.service'); // Adjust path if needed
+const crypto = require('crypto');
 
 class RSVPEventUseCase {
     constructor({
@@ -27,42 +18,64 @@ class RSVPEventUseCase {
         this.createTicketUseCase = createTicketUseCase;
     }
 
-    async execute(userId, eventId, { ticketTypeId = null, referralCode = null } = {}) {
-        if (!userId) throw new ValidationError('User is required');
+    async execute(userId, eventId, { ticketTypeId = null, referralCode = null, guestData = null } = {}) {
+        let targetUserId = userId;
+        let authToken = null;
 
-        // 1. Resolve event (accepts id or slug)
+        // 1. Resolve User (Logged in vs Guest)
+        if (!targetUserId) {
+            if (!guestData || !guestData.email || !guestData.name) {
+                throw new ValidationError('Guest name and email are required');
+            }
+
+            const email = guestData.email.toLowerCase().trim();
+            let user = await UserSchema.findOne({ email });
+
+            if (!user) {
+                // Create a Guest account
+                const tempPassword = crypto.randomBytes(16).toString('hex');
+                user = await UserSchema.create({
+                    email,
+                    fullName: guestData.name,
+                    username: email.split('@')[0] + Math.floor(Math.random() * 1000), // Generate username
+                    password: tempPassword, // Will be hashed by your schema pre-save hook if you have one
+                    isGuest: true // Optional: if your schema has this field
+                });
+            }
+
+            targetUserId = user._id;
+            // Generate token so they are auto-logged in on the frontend
+            authToken = authService.generateToken(user);
+        }
+
+        // 2. Resolve event (accepts id or slug)
         const event = await this.eventRepository.findByIdOrSlug(eventId);
         if (!event) throw new NotFoundError('Event not found');
 
-        // 2. Status gate - same rule as the paid path
+        // 3. Status gate
         if (!['scheduled', 'published'].includes(event.status)) {
             throw new ValidationError(`Cannot RSVP for ${event.status} event`);
         }
 
-        // 3. Must actually be a free event
+        // 4. Must actually be a free event
         if (!this._isFreeEvent(event)) {
             throw new ValidationError('This is a paid event. Please purchase a ticket instead.');
         }
 
-        // 4. Creator / team cannot RSVP to their own event
-        if (event.creatorId && String(event.creatorId) === String(userId)) {
-            throw new ValidationError(
-                'Event creators cannot RSVP. Issue complimentary tickets from the event management page.'
-            );
+        // 5. Creator / team cannot RSVP
+        if (event.creatorId && String(event.creatorId) === String(targetUserId)) {
+            throw new ValidationError('Event creators cannot RSVP.');
         }
         if (this.eventTeamRepository) {
-            const teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, userId);
+            const teamMember = await this.eventTeamRepository.findByEventAndUser(event.id, targetUserId);
             if (teamMember && teamMember.status === 'accepted') {
-                throw new ValidationError(
-                    'Event team members cannot RSVP. Issue complimentary tickets from the event management page.'
-                );
+                throw new ValidationError('Event team members cannot RSVP.');
             }
         }
 
-        // 5. One active RSVP per user per event (product rule - remove this
-        //    block if you want to allow multiple RSVPs from the same user)
+        // 6. One active RSVP per user per event
         const existing = await this.ticketRepository.find({
-            userId,
+            userId: targetUserId,
             eventId: event.id,
             status: { $ne: 'cancelled' },
         });
@@ -70,31 +83,30 @@ class RSVPEventUseCase {
             throw new ValidationError('You already have a ticket for this event');
         }
 
-        // 6. Resolve the ticket type - validates capacity and sales window
+        // 7. Resolve ticket type
         const chosenType = this._resolveTicketType(event, ticketTypeId);
         const admissionSize = chosenType?.admissionSize || 1;
 
-        // 7. Reuse the paid flow's ticket creation - identical ticket shape,
-        //    same QR generation, same email, same participant + calendar sync.
+        // 8. Create the ticket
         const dto = new CreateTicketDTO({
             eventId: event.id,
             ticketTypeId: chosenType?._id || chosenType?.id || null,
-            userId,
-            quantity: 1,             // one physical QR per RSVP
+            userId: targetUserId,
+            quantity: 1,
             admissionSize,
             bypassCapacity: false,
-            skipEmail: false,        // RSVP confirmation email IS the ticket delivery
-            transactionId: null,     // no transaction - this is deliberate
+            skipEmail: false,
+            transactionId: null,
             referralCode,
         });
 
-        return await this.createTicketUseCase.execute(dto);
+        const ticket = await this.createTicketUseCase.execute(dto);
+
+        return { ticket, authToken };
     }
 
-    /** True if the event has no payable ticket type. */
     _isFreeEvent(event) {
         if (event.ticketFee === 'free' || Number(event.ticketFee) === 0) return true;
-
         const types = (event.ticketTypes || []).filter(
             (t) => t.isActive !== false && t.type !== 'complimentary'
         );
@@ -102,37 +114,23 @@ class RSVPEventUseCase {
         return types.every((t) => Number(t.price ?? 0) <= 0);
     }
 
-    /** Validate and return the ticket type to RSVP against. */
     _resolveTicketType(event, ticketTypeId) {
         const types = (event.ticketTypes || []).filter(
             (t) => t.isActive !== false && t.type !== 'complimentary'
         );
 
         if (types.length === 0) {
-            // If there are no specific ticket types, but it's a free event, just let it pass.
-            // CreateTicketUseCase handles the fallback pricing automatically.
-            if (event.ticketFee === 'free' || Number(event.ticketFee) === 0) {
-                return null;
-            }
+            if (event.ticketFee === 'free' || Number(event.ticketFee) === 0) return null;
             throw new InvalidTicketTypeError('No available ticket types');
         }
-        // ... rest of the existing logic
 
         const now = new Date();
-
         if (ticketTypeId) {
             const match = types.find((t) => String(t._id || t.id) === String(ticketTypeId));
             if (!match) throw new InvalidTicketTypeError('Ticket type not found or not available');
-
-            if (match.salesStartDate && now < new Date(match.salesStartDate)) {
-                throw new InvalidTicketTypeError('Ticket sales have not started');
-            }
-            if (match.salesEndDate && now > new Date(match.salesEndDate)) {
-                throw new InvalidTicketTypeError('Ticket sales have ended');
-            }
-            if (match.capacity != null && (match.soldCount || 0) >= match.capacity) {
-                throw new InvalidTicketTypeError('This ticket type is sold out');
-            }
+            if (match.salesStartDate && now < new Date(match.salesStartDate)) throw new InvalidTicketTypeError('Ticket sales have not started');
+            if (match.salesEndDate && now > new Date(match.salesEndDate)) throw new InvalidTicketTypeError('Ticket sales have ended');
+            if (match.capacity != null && (match.soldCount || 0) >= match.capacity) throw new InvalidTicketTypeError('This ticket type is sold out');
             return match;
         }
 
@@ -142,15 +140,8 @@ class RSVPEventUseCase {
             if (t.capacity != null && (t.soldCount || 0) >= t.capacity) return false;
             return true;
         });
-        if (available.length === 0) {
-            throw new InvalidTicketTypeError('No available ticket types');
-        }
-
-        return (
-            available.find((t) => /early\s*bird/i.test(t.name)) ||
-            available.find((t) => /regular/i.test(t.name)) ||
-            available[0]
-        );
+        if (available.length === 0) throw new InvalidTicketTypeError('No available ticket types');
+        return available[0];
     }
 }
 

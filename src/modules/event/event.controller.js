@@ -577,16 +577,27 @@ class EventController {
     return successResponse(res, result, 200, result.message);
   });
 
-  rsvpEvent = asyncHandler(async (req, res) => {
-    const ticket = await this.RSVPEventUseCase.execute(
-      req.user.id,
-      req.params.id,
-      {
-        ticketTypeId: req.body?.ticketTypeId || null,
-        referralCode: req.body?.referralCode || null,
-      }
-    );
-    return successResponse(res, { ticket: ticket.toJSON() }, 201, 'RSVP submitted successfully');
+  rsvpEvent = asyncHandler(async (req, res, next) => {
+    try {
+      const { ticketTypeId, referralCode, name, email } = req.body;
+
+      // If req.user exists, they are logged in. Otherwise, pass guestData.
+      const userId = req.user ? req.user.id : null;
+      const guestData = (!userId && name && email) ? { name, email } : null;
+
+      const result = await req.container.resolve('rsvpEventUseCase').execute(
+        userId,
+        req.params.eventId,
+        { ticketTypeId, referralCode, guestData }
+      );
+
+      res.status(201).json({
+        ticket: result.ticket.toJSON(),
+        token: result.authToken // Return token if guest
+      });
+    } catch (err) {
+      next(err);
+    }
   });
 }
 

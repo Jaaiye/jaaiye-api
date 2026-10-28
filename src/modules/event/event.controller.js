@@ -31,7 +31,7 @@ class EventController {
     listTeamInvitationsUseCase,
     resendEventTicketsUseCase,
     issueTicketUseCase,
-    RSVPEventUseCase
+    rsvpEventUseCase
   }) {
     this.createEventUseCase = createEventUseCase;
     this.getEventUseCase = getEventUseCase;
@@ -56,7 +56,7 @@ class EventController {
     this.listTeamInvitationsUseCase = listTeamInvitationsUseCase;
     this.resendEventTicketsUseCase = resendEventTicketsUseCase;
     this.issueTicketUseCase = issueTicketUseCase;
-    this.RSVPEventUseCase = RSVPEventUseCase;
+    this.rsvpEventUseCase = rsvpEventUseCase;
   }
 
   /**
@@ -585,9 +585,9 @@ class EventController {
       const userId = req.user ? req.user.id : null;
       const guestData = (!userId && name && email) ? { name, email } : null;
 
-      const result = await this.RSVPEventUseCase.execute(
+      const result = await this.rsvpEventUseCase.execute(
         userId,
-        req.params.eventId,
+        req.params.id,
         { ticketTypeId, referralCode, guestData }
       );
 
